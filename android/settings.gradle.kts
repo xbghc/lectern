@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FocusSession"
+rootProject.name = "Lectern"
 include(":app")

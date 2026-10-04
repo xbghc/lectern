@@ -70,13 +70,13 @@ export function isNewer(remote: string, local: string): boolean {
 }
 
 /**
- * 正式签名的 APK 叫 `focus-session-vX.Y.Z.apk`，Release 工作流里配了签名密钥时才有。
+ * 正式签名的 APK 叫 `lectern-vX.Y.Z.apk`，Release 工作流里配了签名密钥时才有。
  *
  * 只认这一个名字。同一次发布里可能还躺着 `-debug.apk`（仓库没配密钥时的产物），
  * 那个包是 runner 每次现生成的 debug 密钥签的，装不上任何已有的安装——
  * 拿它当升级包只会让用户在系统安装器那里撞一句没头没尾的「应用未安装」。
  */
-const RELEASE_APK = /^focus-session-v\d+(?:\.\d+)*\.apk$/;
+const RELEASE_APK = /^lectern-v\d+(?:\.\d+)*\.apk$/;
 
 export function pickReleaseApk(assets: readonly ReleaseAsset[] | null | undefined, tag?: string): ReleaseAsset | null {
   // 响应来自网络：assets 是不是个数组都得先问一句
@@ -86,7 +86,7 @@ export function pickReleaseApk(assets: readonly ReleaseAsset[] | null | undefine
   );
   if (!usable.length) return null;
   // 这次发布自己的那个包优先；名字对不上时退回同名规则里的第一个
-  const exact = tag ? usable.find((a) => a.name === `focus-session-${tag}.apk`) : undefined;
+  const exact = tag ? usable.find((a) => a.name === `lectern-${tag}.apk`) : undefined;
   return exact ?? usable[0] ?? null;
 }
 

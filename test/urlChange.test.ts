@@ -19,7 +19,7 @@ import type { PageContext, PageFeature, PagePlugin } from "../src/core/page/plug
 const FIRST = "https://news.example.com/a/first";
 const SECOND = "https://news.example.com/a/second";
 const THIRD = "https://news.example.com/a/third";
-const CARD_ID = "focus-session-finish";
+const CARD_ID = "lectern-finish";
 
 /** 三段短正文：按 238 wpm 每段的读完阈值约 1 秒，跑几拍就都算读过。 */
 const PARAS = [

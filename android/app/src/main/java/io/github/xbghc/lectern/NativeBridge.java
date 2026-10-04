@@ -1,4 +1,4 @@
-package com.focussession.app;
+package io.github.xbghc.lectern;
 
 import android.app.Activity;
 import android.content.ContentValues;
@@ -471,7 +471,7 @@ public class NativeBridge {
                 ContentValues v = new ContentValues();
                 v.put(MediaStore.Downloads.DISPLAY_NAME, name);
                 v.put(MediaStore.Downloads.MIME_TYPE, mime);
-                v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/FocusSession");
+                v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Lectern");
                 Uri uri = activity.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
                 if (uri == null) throw new IllegalStateException("MediaStore 拒绝了写入");
                 try (OutputStream os = activity.getContentResolver().openOutputStream(uri)) {
@@ -734,7 +734,7 @@ public class NativeBridge {
         if (tts == null || !ttsReady || pendingSpeech == null) return;
         tts.setLanguage(Locale.forLanguageTag(pendingLang));
         tts.setSpeechRate(pendingRate);
-        tts.speak(pendingSpeech, TextToSpeech.QUEUE_FLUSH, null, "focus-session");
+        tts.speak(pendingSpeech, TextToSpeech.QUEUE_FLUSH, null, "lectern");
         pendingSpeech = null;
     }
 

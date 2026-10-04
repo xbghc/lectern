@@ -513,7 +513,7 @@ document.getElementById("open-panel")!.addEventListener("click", (e) => {
   if (currentWindowId === null) return;
   // 同步发起（手势要求），失败只记日志——popup 马上就关了，没地方显示错误
   chrome.sidePanel.open({ windowId: currentWindowId }).catch((err: unknown) => {
-    console.warn("[focus-session] 打开侧边栏失败", err);
+    console.warn("[lectern] 打开侧边栏失败", err);
   });
   window.close();
 });

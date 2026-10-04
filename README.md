@@ -1,8 +1,8 @@
-# Focus Session
+# Lectern
 
-[![CI](https://github.com/xbghc/focus-session/actions/workflows/ci.yml/badge.svg)](https://github.com/xbghc/focus-session/actions/workflows/ci.yml)
+[![CI](https://github.com/xbghc/lectern/actions/workflows/ci.yml/badge.svg)](https://github.com/xbghc/lectern/actions/workflows/ci.yml)
 
-浏览器扩展，外加一个用同一份代码做的安卓 App（见[安卓 App](#安卓-app)）。两件事合一：
+读书台：阅读时用到的工具都放在这儿。浏览器扩展，外加一个用同一份代码做的安卓 App（见[安卓 App](#安卓-app)）。眼下是两件事：
 
 1. **阅读追踪** —— 记录你在每篇文章上的注意力片段：每次连续专注了多久、实际读了多少内容、
    阅读速度是多少，哪些文章真正读完了，以及上次读到了哪一段——重新打开时跳回去。
@@ -10,6 +10,17 @@
 2. **划词翻译与讲解、复习** —— 在被识别为文章的页面上选中英文即调用 MiniMax 翻译，
    给出结合本文语境的解释，再像老师那样补一句用法、把句子里的生词逐个讲开并存档；
    之后在面板里用 FSRS 间隔重复复习。图片里的字可以截图翻译。
+
+## 从 Focus Session 改名
+
+这个项目原名 Focus Session，0.3.16 之后改叫 Lectern。
+
+- **扩展**：更新后照常用。本机的库第一次打开时自动从旧名字搬到新名字，阅读记录、设备号都不变。
+- **安卓 App**：包名从 `com.focussession.app` 换成了 `io.github.xbghc.lectern`，系统把它当成另一个 App，
+  旧 App 不会自动升级过来，要手动装新的。数据不会跟着走：开了设备同步的，在新 App 里填上后端地址和 Token 拉回来；
+  没开同步的，先在旧 App 设置页导出文件，再到新 App 里导入。确认数据都在之后再卸载旧 App。
+- **自建后端**：镜像改名 `ghcr.io/<所有者>/lectern-server`，0.3.16 及更早的版本仍在 `focus-session-server` 下。
+  Compose 项目名、数据库名、`FOCUS_SERVER_IMAGE` 这些部署侧的名字没有动，升级只需改 `.env` 里的镜像地址。
 
 ## 数据去哪了
 
@@ -38,7 +49,7 @@
 那边的进度是新的（见[书](#书)）。划词记录和生词卡不受影响，它们本来就独立于出处。
 
 **App 还会问 GitHub 有没有新版本**：安卓 App 不走应用商店，装出去的包只能自己管升级，
-所以每天最多一次向 `https://api.github.com/repos/xbghc/focus-session/releases/latest` 发一个匿名 GET。
+所以每天最多一次向 `https://api.github.com/repos/xbghc/lectern/releases/latest` 发一个匿名 GET。
 请求里除了「最新的一次发布是哪个版本」什么都没有——不带 API Key、不带阅读记录，
 连当前版本号都不带（比较在本机做）。设置页的「更新」里能关掉，关掉之后只有手按「检查更新」才联网。
 问到新版本之后，App 会**自己把升级包下下来**（只从 `github.com` 的 https 地址、只在不按流量计费的网络上），
@@ -95,7 +106,7 @@ Storybook → 扩展 → 页面 → “LLM 文章筛选”提供混合结果、�
 
 ## UI 开发预览（Storybook）
 
-[在线查看 Storybook](https://xbghc.github.io/focus-session/)。GitHub Pages 从 `gh-pages` 分支发布静态产物；更新源码后需重新构建并发布，目前不会随 `main` 自动更新。
+[在线查看 Storybook](https://xbghc.github.io/lectern/)。GitHub Pages 从 `gh-pages` 分支发布静态产物；更新源码后需重新构建并发布，目前不会随 `main` 自动更新。
 
 ```bash
 npm install
@@ -122,8 +133,8 @@ npm run build      # 产出 dist/
 
 **Chrome / Edge 114+**：打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选 `dist/`。
 
-不想自己构建的话，[Releases](https://github.com/xbghc/focus-session/releases) 里有打好的
-`focus-session-extension-vX.Y.Z.zip`，解压后同样用「加载已解压的扩展程序」选那个目录。
+不想自己构建的话，[Releases](https://github.com/xbghc/lectern/releases) 里有打好的
+`lectern-extension-vX.Y.Z.zip`，解压后同样用「加载已解压的扩展程序」选那个目录。
 
 装好后打开扩展的**设置页**填 MiniMax API Key（去
 [platform.minimaxi.com](https://platform.minimaxi.com/) 创建），点「保存并测试连接」验证。
@@ -144,7 +155,7 @@ cd android && ./gradlew assembleDebug   # 会先跑 npm run build:app 生成网�
 自带前者、会代下后者；没有 Android Studio 的话，便携版 JDK + Gradle 8.13 也能构建，
 `android/local.properties` 里指一下 `sdk.dir` 即可。
 
-[Releases](https://github.com/xbghc/focus-session/releases) 里也有打好的 APK，不装工具链也能用。
+[Releases](https://github.com/xbghc/lectern/releases) 里也有打好的 APK，不装工具链也能用。
 签名不同的两个包不能互相覆盖安装（见[持续集成与发布](#持续集成与发布)），换包前先在 App 里导出数据。
 装的是 Releases 里那个正式签名的包时，之后的升级 App 自己管（见[更新](#更新)）：
 设置页能查、能装，首页每天自动问一次。
@@ -780,7 +791,7 @@ background 里发。
 
 ### 文章从哪来
 
-- 浏览器里点「分享」→ Focus Session：App 从分享的文本里挑出第一个网址，直接进阅读器。
+- 浏览器里点「分享」→ Lectern：App 从分享的文本里挑出第一个网址，直接进阅读器。
 - 首页粘贴一个地址。
 - 文章列表、回顾页里的「打开原文」、正文里的链接，点了都进阅读器——`MainActivity` 把站外地址
   一律改写成 `read.html?u=…`，App 里没有"开新标签页"这回事。
@@ -925,7 +936,7 @@ measure / layout **之前**派发的，那时视图的尺寸还是上一轮的�
 （`src/lib/update.ts`）：按段取整数比大小，所以 `0.3.10` 大于 `0.3.9`——字典序会说反。
 认不出的版本号读成 `0.0.0`，也就是**不提示更新**：宁可漏报，也不能误报着让人去装一个来路不明的包。
 
-只认 `focus-session-vX.Y.Z.apk` 这一个附件名。同一次发布里可能还躺着 `-debug.apk`
+只认 `lectern-vX.Y.Z.apk` 这一个附件名。同一次发布里可能还躺着 `-debug.apk`
 （仓库没配签名密钥时的产物），那个包是 runner 每次现生成的 debug 密钥签的，
 装不上任何已有的安装。这条规则让 Release 的**附件名成了接口**，改名字等于断掉老版本的升级路。
 
@@ -1160,20 +1171,20 @@ git push --follow-tags
 ```
 
 工作流先核对标签和 package.json 的版本号一致（不一致就停），跑完整检查，把扩展打成
-`focus-session-extension-vX.Y.Z.zip`、把 APK 一起挂到 GitHub Release 上。
+`lectern-extension-vX.Y.Z.zip`、把 APK 一起挂到 GitHub Release 上。
 
 APK 默认是 **debug 签名**的：runner 每次生成的 debug 密钥都不一样，手机上装第二个版本得先卸载
 第一个。想让它能直接覆盖升级，生成一个签名密钥放进仓库的 Secrets（Settings → Secrets and variables → Actions）：
 
 ```bash
-keytool -genkeypair -v -keystore focus-session.jks -alias focus-session -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 focus-session.jks     # 这一串填进 ANDROID_KEYSTORE_BASE64
+keytool -genkeypair -v -keystore lectern.jks -alias lectern -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 lectern.jks     # 这一串填进 ANDROID_KEYSTORE_BASE64
 ```
 
 四个 Secret：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。
-都在时 Release 工作流改出正式签名的 `focus-session-vX.Y.Z.apk`。密钥文件本身别进仓库，丢了就没法再给老安装升级。
+都在时 Release 工作流改出正式签名的 `lectern-vX.Y.Z.apk`。密钥文件本身别进仓库，丢了就没法再给老安装升级。
 
-`focus-session-vX.Y.Z.apk` 这个名字是**接口**，不是随手起的：App 的自动更新（见
+`lectern-vX.Y.Z.apk` 这个名字是**接口**，不是随手起的：App 的自动更新（见
 [更新](#更新)）在 Release 的附件里只认它，认不出就当这次发布没有能装的包，
 用户那边看到的是「已经是最新的」。改附件名 = 断掉所有老版本的升级路。同理，
 一次发布里没有正式签名的包时（没配上面四个 Secret），装着的 App 不会去拿那个 `-debug.apk`。
@@ -1314,7 +1325,7 @@ onChanged、port 两头收发与单侧断开、getURL 的别名、换页、flush
 正文白名单（脚本 / 样式 / iframe / svg / 表单整块丢掉、事件属性去掉、不认识的标签只留内容、
 链接补全并去掉 javascript:、图片只留网络与内嵌地址）；阅读器容器抽取与整页抽取得出同一批段落指纹；
 自动更新的版本比较与附件挑选（`0.3.10` 大于 `0.3.9` 而不是按字典序、位数不同时短的补 0、
-认不出的版本号读成 0.0.0 因而不提示更新、只认 `focus-session-vX.Y.Z.apk` 而不拿 `-debug.apk`
+认不出的版本号读成 0.0.0 因而不提示更新、只认 `lectern-vX.Y.Z.apk` 而不拿 `-debug.apk`
 或扩展的 zip 当升级包、已经是最新时不提示、GitHub 的响应缺字段或整个不是那么回事时不炸）。
 
 截图翻译：裁剪的横纵比例、越界与取整、放大上限、深底反色；清洗的低置信度过滤、英文筛选、

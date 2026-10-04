@@ -57,7 +57,7 @@ let pop: PopoverT;
 let asked: string[] = [];
 let optionsOpened = 0;
 beforeEach(() => {
-  document.documentElement.querySelectorAll("#focus-session-popover").forEach((n) => n.remove());
+  document.documentElement.querySelectorAll("#lectern-popover").forEach((n) => n.remove());
   asked = [];
   optionsOpened = 0;
   pop = new Popover({
@@ -456,7 +456,7 @@ const layout = (vh: number, h: number): void => {
   Object.defineProperty(proto, "offsetWidth", { get: () => 300, configurable: true });
   Object.defineProperty(proto, "getBoundingClientRect", {
     value: function (this: HTMLElement): DOMRect {
-      if (this.id === "focus-session-popover") {
+      if (this.id === "lectern-popover") {
         const { left, top } = hostAt;
         return { left, top, right: left, bottom: top, width: 0, height: 0, x: left, y: top, toJSON: () => ({}) } as DOMRect;
       }

@@ -151,10 +151,10 @@ if (watch) {
     if (!file) return;
     if (!/\.(html|css|json)$/.test(file)) return;
     copyStatic();
-    console.log(`[focus-session] 已同步静态资源（${file}）`);
+    console.log(`[lectern] 已同步静态资源（${file}）`);
   });
-  console.log("[focus-session] watching…");
+  console.log("[lectern] watching…");
 } else {
   await build(options);
-  console.log(`[focus-session] built ${OUT}/ (${app ? "app, " : ""}${dev ? "dev" : "production"})`);
+  console.log(`[lectern] built ${OUT}/ (${app ? "app, " : ""}${dev ? "dev" : "production"})`);
 }

@@ -69,7 +69,7 @@ export function memoryBackend(): KvBackend {
  * 不用 localStorage：它有 5MB 左右的配额，而段落记录、正文、阅读器缓存加起来轻易就超了，
  * 超了之后写入抛异常。IndexedDB 的配额按设备剩余空间算，和扩展声明的 unlimitedStorage 一个量级。
  */
-export function idbBackend(dbName = "focus-session", storeName = "kv"): KvBackend {
+export function idbBackend(dbName = "lectern", storeName = "kv"): KvBackend {
   let opening: Promise<IDBDatabase> | null = null;
   const open = (): Promise<IDBDatabase> => {
     opening ??= new Promise((resolve, reject) => {
@@ -146,7 +146,7 @@ function pipe<T>(): { post: (m: T) => void; listeners: Set<(m: T) => void> } {
           try {
             fn(m);
           } catch (err) {
-            console.warn("[focus-session] port listener 抛错", err);
+            console.warn("[lectern] port listener 抛错", err);
           }
         }
       });
@@ -234,7 +234,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
       try {
         fn(changes, areaName);
       } catch (err) {
-        console.warn("[focus-session] storage.onChanged listener 抛错", err);
+        console.warn("[lectern] storage.onChanged listener 抛错", err);
       }
     }
   };
@@ -271,7 +271,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
   const noop = () => ({ addListener: () => undefined, removeListener: () => undefined, hasListener: () => false });
 
   // 测试跑在 Node 里，没有 location
-  const baseHref = typeof location === "undefined" ? "app://focus-session/" : new URL(".", location.href).href;
+  const baseHref = typeof location === "undefined" ? "app://lectern/" : new URL(".", location.href).href;
 
   const chromeLike = {
     storage: {
@@ -280,7 +280,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
       onChanged: listeners(changeListeners),
     },
     runtime: {
-      id: "focus-session-app",
+      id: "lectern-app",
       lastError: undefined,
       sendMessage: (msg: unknown): Promise<unknown> =>
         track(
@@ -288,7 +288,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
             .then(() => opts.handle(msg, SENDER))
             .catch((err: unknown) => {
               // 和 background/index.ts 一样：写入失败（多半是配额）不能无声无息
-              console.warn("[focus-session] 消息处理失败", msg, err);
+              console.warn("[lectern] 消息处理失败", msg, err);
               return { ok: false, error: String(err) };
             }),
         ),
@@ -299,7 +299,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
         return client;
       },
       getURL: (path: string): string => new URL(URL_ALIAS[path] ?? path, baseHref).href,
-      getManifest: () => ({ version: opts.version, name: "Focus Session", manifest_version: 3 }),
+      getManifest: () => ({ version: opts.version, name: "Lectern", manifest_version: 3 }),
       openOptionsPage: async (): Promise<void> => opts.navigate("options.html"),
       onMessage: noop(),
       onConnect: noop(),

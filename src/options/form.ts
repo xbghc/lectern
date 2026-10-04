@@ -222,7 +222,7 @@ $("export").addEventListener("click", async () => {
   const bundle = (await chrome.runtime.sendMessage({ type: "data:export" })) as ExportBundle;
   // 用 <a download> 而不是 downloads API，省掉一个权限声明；安卓里由宿主接管，见 lib/download.ts
   const note = saveTextFile(
-    `focus-session-${new Date().toISOString().slice(0, 10)}.json`,
+    `lectern-${new Date().toISOString().slice(0, 10)}.json`,
     "application/json",
     JSON.stringify(bundle, null, 2),
     $<HTMLAnchorElement>("download"),
@@ -372,7 +372,7 @@ $("log-download").addEventListener("click", async () => {
   const bundle = await fetchLog();
   // 与数据导出同一套：<a download> 而不是 downloads API，省掉一个权限声明
   const note = saveTextFile(
-    `focus-session-llm-log-${new Date().toISOString().slice(0, 10)}.json`,
+    `lectern-llm-log-${new Date().toISOString().slice(0, 10)}.json`,
     "application/json",
     JSON.stringify(bundle, null, 2),
     $<HTMLAnchorElement>("log-file"),

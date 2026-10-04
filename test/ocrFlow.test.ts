@@ -26,7 +26,7 @@ document.removeEventListener = ((type: string, fn: EventListener, opts?: AddEven
 }) as typeof document.removeEventListener;
 const count = (type: string) => listeners.get(type)?.size ?? 0;
 const tick = () => new Promise<void>((r) => setImmediate(r));
-const root = () => document.getElementById("focus-session-popover")?.shadowRoot;
+const root = () => document.getElementById("lectern-popover")?.shadowRoot;
 const rect = new DOMRect(30, 40, 100, 50);
 let settings: Settings;
 let translator: SelectionTranslator;
@@ -233,14 +233,14 @@ test("完整控制器路径：预热不等待、冻结帧裁剪、识别文本�
   try {
     controller = await startTranslation();
     controller.screenshot(); await tick();
-    const overlay = document.getElementById("focus-session-screenshot")!;
+    const overlay = document.getElementById("lectern-screenshot")!;
     assert.ok(overlay);
     for (const [type, x, y] of [["pointerdown", 10, 20], ["pointerup", 100, 60]] as const) {
       const e = new dom.window.MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true });
       Object.defineProperty(e, "pointerId", { value: 1 }); overlay.dispatchEvent(e);
     }
     await tick();
-    assert.equal(document.getElementById("focus-session-screenshot"), null);
+    assert.equal(document.getElementById("lectern-screenshot"), null);
     // 收尾时轨迹也送去后台。这个环境没有 rAF，complete() 一到就同步收束，所以它紧跟在识别之后
     assert.deepEqual(messages.map((m) => m.type), ["ocr:warm", "page:capture", "ocr:recognize", "translation:trace"]);
     const trace = (messages.at(-1) as unknown as { trace: { source: string; text: string; kind: string } }).trace;
@@ -400,11 +400,11 @@ test("选区没变的 keyup 不重建浮层；选区变了照常重翻", async (
     translator.start();
     select(5); arrow(); await settle();
     assert.equal(requests.length, 1);
-    const host = document.getElementById("focus-session-popover");
+    const host = document.getElementById("lectern-popover");
     assert.ok(host);
     arrow(); await settle();
     assert.equal(requests.length, 1, "方向键滚页面，选区没变：不重翻");
-    assert.equal(document.getElementById("focus-session-popover"), host, "浮层没被拆了重建");
+    assert.equal(document.getElementById("lectern-popover"), host, "浮层没被拆了重建");
     select(4); arrow(); await settle();
     assert.equal(requests.length, 2, "选区变了照常翻");
   } finally {

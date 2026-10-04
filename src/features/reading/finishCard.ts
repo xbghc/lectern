@@ -8,7 +8,7 @@
  * 这里只有一行汉字标签，系统无衬线就够，省一次 woff2 请求。
  */
 
-const HOST_ID = "focus-session-finish";
+const HOST_ID = "lectern-finish";
 
 const CSS = `
 :host { all: initial; }

@@ -12,7 +12,7 @@
  * - 不共用角标的 host：那边的 `hide()` 会把自己的宿主整个 remove 掉。
  */
 
-const HOST_ID = "focus-session-position";
+const HOST_ID = "lectern-position";
 
 /** 提示停留时长。够读完一行字，短到不会跟着人一路往下滚。 */
 const AUTO_HIDE_MS = 6_000;

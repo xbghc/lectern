@@ -1,11 +1,12 @@
 <!--
-  字母 F，同时是一页字：左边一道赭色的竖条是读到哪儿的进度条，右边两行墨字。
+  一个 L，同时是一张读书台：赭色的直角是台子的靠背和托边，上面搁着三行墨字。
   画在 16 格网格上（1 格 = 8 个单位），所有边都落在格线上，缩到 16px 时每条边正好压在像素边界，不发虚。
   改了这里要跑 scripts/make-icons.sh 重新出 PNG；安卓那份在 ic_launcher_foreground.xml，是同一个形状的 0.6 倍。
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="24" fill="#EFE9DE"/>
-  <rect x="32" y="24" width="16" height="80" fill="#9C4D14"/>
-  <rect x="48" y="24" width="48" height="16" fill="#2B2724"/>
-  <rect x="48" y="56" width="32" height="16" fill="#2B2724"/>
+  <path fill="#9C4D14" d="M24 24h16v64h64v16H24z"/>
+  <rect x="56" y="32" width="48" height="8" fill="#2B2724"/>
+  <rect x="56" y="48" width="48" height="8" fill="#2B2724"/>
+  <rect x="56" y="64" width="32" height="8" fill="#2B2724"/>
 </svg>

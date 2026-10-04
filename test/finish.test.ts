@@ -42,7 +42,7 @@ let opened = 0;
 let dismissed = 0;
 let card: InstanceType<typeof FinishCard>;
 beforeEach(() => {
-  document.documentElement.querySelectorAll("#focus-session-finish").forEach((n) => n.remove());
+  document.documentElement.querySelectorAll("#lectern-finish").forEach((n) => n.remove());
   opened = dismissed = 0;
   card = new FinishCard({ onOpen: () => opened++, onDismiss: () => dismissed++ });
 });
@@ -61,7 +61,7 @@ test("重复 show 不会挂出第二个角标", () => {
   const first = card.hostElement;
   card.show();
   assert.equal(card.hostElement, first);
-  assert.equal(document.documentElement.querySelectorAll("#focus-session-finish").length, 1);
+  assert.equal(document.documentElement.querySelectorAll("#lectern-finish").length, 1);
 });
 
 test("点「回顾这篇」通知调用方，角标留在原地", () => {
@@ -76,7 +76,7 @@ test("点 × 立刻摘掉角标并通知调用方", () => {
   btn("x").dispatchEvent(new dom.window.Event("click"));
   assert.equal(dismissed, 1);
   assert.equal(card.hostElement, null);
-  assert.equal(document.documentElement.querySelectorAll("#focus-session-finish").length, 0);
+  assert.equal(document.documentElement.querySelectorAll("#lectern-finish").length, 0);
 });
 
 test("没挂出来时 hide 不炸", () => {

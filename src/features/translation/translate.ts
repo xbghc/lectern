@@ -64,7 +64,7 @@ function describe(err: unknown): TranslateFailure {
  */
 function report(err: unknown, config: LlmConfig, ctx: FailureContext, count = true): TranslateFailure {
   if (err instanceof LlmError && err.raw) {
-    console.warn("[focus-session] 模型输出解析失败", err.message, `stop_reason=${err.raw.stopReason}`, err.raw.text);
+    console.warn("[lectern] 模型输出解析失败", err.message, `stop_reason=${err.raw.stopReason}`, err.raw.text);
   }
   later(() => recordFailure(err, config, { ...ctx, countUsage: count }));
   return describe(err);

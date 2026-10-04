@@ -15,7 +15,7 @@ import { Typewriter, type TypewriterDeps } from "./typewriter.ts";
  * 拉丁衬线是扩展自带的（见 FONT_FACES），中文交给系统宋体。
  */
 
-const HOST_ID = "focus-session-popover";
+const HOST_ID = "lectern-popover";
 const MARGIN = 8;
 /** 同 CSS 里 .box 那条 max-height：min(70vh, 520px)。挑边要算「这一边放不放得下」，JS 这边也得知道。 */
 const MAX_HEIGHT = 520;

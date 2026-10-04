@@ -14,7 +14,7 @@ import {
 
 const asset = (name: string, size = 1024): ReleaseAsset => ({
   name,
-  browser_download_url: `https://github.com/xbghc/focus-session/releases/download/v0.4.0/${name}`,
+  browser_download_url: `https://github.com/xbghc/lectern/releases/download/v0.4.0/${name}`,
   size,
 });
 
@@ -59,26 +59,26 @@ test("isNewer 认不出的远端版本不提示更新", () => {
 
 test("pickReleaseApk 只认正式签名的那个名字", () => {
   const found = pickReleaseApk([
-    asset("focus-session-extension-v0.4.0.zip"),
-    asset("focus-session-v0.4.0.apk"),
+    asset("lectern-extension-v0.4.0.zip"),
+    asset("lectern-v0.4.0.apk"),
   ]);
-  assert.equal(found?.name, "focus-session-v0.4.0.apk");
+  assert.equal(found?.name, "lectern-v0.4.0.apk");
 });
 
 test("pickReleaseApk 不拿 debug 包当升级包", () => {
   // runner 每次现生成的 debug 密钥签的，装不上任何已有的安装
-  assert.equal(pickReleaseApk([asset("focus-session-v0.4.0-debug.apk")]), null);
-  assert.equal(pickReleaseApk([asset("focus-session-extension-v0.4.0.zip")]), null);
+  assert.equal(pickReleaseApk([asset("lectern-v0.4.0-debug.apk")]), null);
+  assert.equal(pickReleaseApk([asset("lectern-extension-v0.4.0.zip")]), null);
   assert.equal(pickReleaseApk([]), null);
   assert.equal(pickReleaseApk(null), null);
 });
 
 test("pickReleaseApk 优先本次发布自己的那个包", () => {
   const found = pickReleaseApk(
-    [asset("focus-session-v0.3.9.apk"), asset("focus-session-v0.4.0.apk")],
+    [asset("lectern-v0.3.9.apk"), asset("lectern-v0.4.0.apk")],
     "v0.4.0",
   );
-  assert.equal(found?.name, "focus-session-v0.4.0.apk");
+  assert.equal(found?.name, "lectern-v0.4.0.apk");
 });
 
 test("readUpdate 认出可升级的版本", () => {
@@ -86,7 +86,7 @@ test("readUpdate 认出可升级的版本", () => {
     {
       tag_name: "v0.4.0",
       body: "## 变更\n- 修了点东西",
-      assets: [asset("focus-session-extension-v0.4.0.zip"), asset("focus-session-v0.4.0.apk", 4096)],
+      assets: [asset("lectern-extension-v0.4.0.zip"), asset("lectern-v0.4.0.apk", 4096)],
     },
     "0.3.4",
   );
@@ -97,7 +97,7 @@ test("readUpdate 认出可升级的版本", () => {
 });
 
 test("readUpdate 已经是最新时返回 null", () => {
-  const latest = { tag_name: "v0.3.4", assets: [asset("focus-session-v0.3.4.apk")] };
+  const latest = { tag_name: "v0.3.4", assets: [asset("lectern-v0.3.4.apk")] };
   assert.equal(readUpdate(latest, "0.3.4"), null);
   assert.equal(readUpdate(latest, "0.4.0"), null);
 });
@@ -105,7 +105,7 @@ test("readUpdate 已经是最新时返回 null", () => {
 test("readUpdate 没有正式签名的包时返回 null", () => {
   // 仓库没配签名密钥的那次发布：有新版本，但那个包装不上去
   const up = readUpdate(
-    { tag_name: "v0.4.0", assets: [asset("focus-session-v0.4.0-debug.apk")] },
+    { tag_name: "v0.4.0", assets: [asset("lectern-v0.4.0-debug.apk")] },
     "0.3.4",
   );
   assert.equal(up, null);
@@ -122,7 +122,7 @@ test("readUpdate 挡得住乱七八糟的响应", () => {
 
 test("readUpdate 没有说明时 notes 是空串而不是 undefined", () => {
   const up = readUpdate(
-    { tag_name: "v0.4.0", body: null, assets: [asset("focus-session-v0.4.0.apk")] },
+    { tag_name: "v0.4.0", body: null, assets: [asset("lectern-v0.4.0.apk")] },
     "0.3.4",
   );
   assert.equal(up?.notes, "");
@@ -130,7 +130,7 @@ test("readUpdate 没有说明时 notes 是空串而不是 undefined", () => {
 
 /* ==================== 自动下载并安装 ==================== */
 
-const found = (version: string): Update => ({ tag: `v${version}`, version, notes: "", apk: asset(`focus-session-v${version}.apk`) });
+const found = (version: string): Update => ({ tag: `v${version}`, version, notes: "", apk: asset(`lectern-v${version}.apk`) });
 /** 一切就绪的默认处境：开着自动安装、新宿主、不计费的网络、能静默装、没失败过、没跳过。 */
 const auto = (over: Partial<AutoInput> = {}): AutoInput => ({
   ready: "", found: null, skipped: () => false, autoInstall: true, canPrefetch: true, metered: false, canSilent: true, failedVersion: null, ...over,

@@ -81,10 +81,10 @@ function addShare(afterId: string, label: string, filename: () => string, load: 
   anchor.after(btn);
 }
 
-addShare("export", "分享导出文件…", () => `focus-session-${stamp()}.json`, () =>
+addShare("export", "分享导出文件…", () => `lectern-${stamp()}.json`, () =>
   chrome.runtime.sendMessage({ type: "data:export" }),
 );
-addShare("log-download", "分享日志…", () => `focus-session-llm-log-${stamp()}.json`, fetchLog);
+addShare("log-download", "分享日志…", () => `lectern-llm-log-${stamp()}.json`, fetchLog);
 
 /* ==================== 更新 ==================== */
 

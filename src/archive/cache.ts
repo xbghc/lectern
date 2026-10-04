@@ -1,14 +1,11 @@
+import { openRenamedDb } from "../lib/renamedDb.ts";
 import { ARCHIVE_HASH, hashBytes } from "./types.ts";
 
 let opening: Promise<IDBDatabase> | null = null;
 
 function open(): Promise<IDBDatabase> {
-  return opening ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open("focus-session-archive-blobs", 1);
-    request.onupgradeneeded = () => request.result.createObjectStore("blobs");
-    request.onerror = () => { opening = null; reject(request.error); };
-    request.onsuccess = () => resolve(request.result);
-  });
+  return opening ??= openRenamedDb("lectern-archive-blobs", "focus-session-archive-blobs", 1, db => { db.createObjectStore("blobs"); })
+    .catch(error => { opening = null; throw error; });
 }
 
 export async function cachedBlob(hash: string): Promise<Blob | undefined> {

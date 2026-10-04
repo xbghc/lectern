@@ -18,7 +18,7 @@ dom.window.HTMLElement.prototype.attachShadow = function (init: ShadowRootInit) 
 const { FocusBar, focusGradient, focusRuns } = await import("../src/features/reading/focusBar.ts");
 
 beforeEach(() => {
-  dom.window.document.documentElement.querySelector("#focus-session-focusbar")?.remove();
+  dom.window.document.documentElement.querySelector("#lectern-focusbar")?.remove();
 });
 
 test("按字数分宽度，相邻同一档的并成一截，没字的段落不占地方", () => {

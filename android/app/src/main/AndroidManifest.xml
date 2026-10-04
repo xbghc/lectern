@@ -12,7 +12,7 @@
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.FocusSession"
+        android:theme="@style/Theme.Lectern"
         android:allowBackup="true"
         android:supportsRtl="false"
         android:usesCleartextTraffic="true"

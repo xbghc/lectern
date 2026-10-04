@@ -62,7 +62,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         shell: bash
         run: |
-          IMAGE="ghcr.io/${OWNER,,}/focus-session-server"
+          IMAGE="ghcr.io/${OWNER,,}/lectern-server"
           TAGS="$IMAGE:sha-$GITHUB_SHA"
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             VERSION="$(node -p "require('./package.json').version")"
@@ -102,7 +102,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=Focus Session Server
+            org.opencontainers.image.title=Lectern Server
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Record published digest

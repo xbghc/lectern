@@ -7,7 +7,7 @@
 需要 Docker Engine 和 Compose v2。仓库根目录的 `compose.yaml` 启动两个容器：`server` 和 `postgres`；数据库不暴露主机端口，两个命名卷分别保存数据库和文章文件。
 
 1. 把 `compose.yaml` 和 `.env.example` 放入服务器上的同一个目录，将 `.env.example` 复制为 `.env`。
-2. 将 `FOCUS_SERVER_IMAGE` 改为已发布的 `ghcr.io/<仓库所有者>/focus-session-server:<版本>`，或固定到镜像摘要 `@sha256:...`。镜像在新的 `v*` 标签触发 Server image 工作流成功后才存在，旧的 GitHub Release 不会自动补发镜像。
+2. 将 `FOCUS_SERVER_IMAGE` 改为已发布的 `ghcr.io/<仓库所有者>/lectern-server:<版本>`，或固定到镜像摘要 `@sha256:...`。镜像在新的 `v*` 标签触发 Server image 工作流成功后才存在，旧的 GitHub Release 不会自动补发镜像。
 3. 用 `openssl rand -hex 32` 生成数据库密码，填入 `POSTGRES_PASSWORD`。使用十六进制避免连接 URL 中的特殊字符转义问题。
 4. 按下文配置 HTTPS 入口和客户端来源，再启动服务。
 
@@ -153,7 +153,7 @@ docker compose up -d server
 `.github/workflows/server.yml` 的行为如下：
 
 - 推送 `main`、创建 PR 或手动运行：执行客户端与后端检查、带 PostgreSQL 的集成测试，构建 `linux/amd64` 和 `linux/arm64` 镜像，不发布。
-- 推送 `v*` 标签：检查通过后发布到 `ghcr.io/<仓库所有者>/focus-session-server`。根目录和 `server/package.json` 的版本必须与标签一致。
+- 推送 `v*` 标签：检查通过后发布到 `ghcr.io/<仓库所有者>/lectern-server`。根目录和 `server/package.json` 的版本必须与标签一致。
 - 发布标签包括版本号（例如 `0.3.5`）和 `sha-<完整提交 SHA>`；稳定版本额外更新 `latest`，预发布版本不更新 `latest`。
 - 工作流使用最小范围的 `GITHUB_TOKEN` 包写权限，Actions 固定到完整提交 SHA。镜像摘要在成功运行的 Summary 中显示。
 
@@ -173,4 +173,4 @@ npm --prefix server run admin -- create-user developer
 npm --prefix server start
 ```
 
-后端测试用 `npm --prefix server test`。设置 `DATABASE_URL` 时会运行数据库集成测试，应指向专用测试库。容器构建可在仓库根目录运行 `docker build -t focus-session-server:dev .`，然后把该标签填入 Compose 的 `FOCUS_SERVER_IMAGE`。
+后端测试用 `npm --prefix server test`。设置 `DATABASE_URL` 时会运行数据库集成测试，应指向专用测试库。容器构建可在仓库根目录运行 `docker build -t lectern-server:dev .`，然后把该标签填入 Compose 的 `FOCUS_SERVER_IMAGE`。

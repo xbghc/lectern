@@ -1,4 +1,4 @@
-package com.focussession.app;
+package io.github.xbghc.lectern;
 
 import android.app.PendingIntent;
 import android.content.Context;
@@ -37,7 +37,7 @@ final class UpdateInstaller {
     /** 系统拒绝静默安装时，当时装着的 versionCode。换了版本之后值得再试一次。 */
     private static final String KEY_REFUSED_AT = "silentRefusedAt";
     private static final String KEY_FAILURE = "failure";
-    static final String EXTRA_VERSION = "com.focussession.app.UPDATE_VERSION";
+    static final String EXTRA_VERSION = "io.github.xbghc.lectern.UPDATE_VERSION";
 
     private UpdateInstaller() {}
 

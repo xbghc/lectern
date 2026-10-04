@@ -47,7 +47,7 @@ export async function go(url: string): Promise<void> {
     await navigation.beforeLeave();
     await shim.flush();
   } catch (err) {
-    console.warn("[focus-session] 换页前的收尾出错，照常换页", err);
+    console.warn("[lectern] 换页前的收尾出错，照常换页", err);
   }
   location.href = url;
   // 真换了页这条定时器跟着旧页一起没；没换成（同一个地址、只差一个锚点）就得把锁放开，

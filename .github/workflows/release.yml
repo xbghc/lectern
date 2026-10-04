@@ -38,7 +38,7 @@ jobs:
       - run: npm run check
 
       - name: 打包扩展
-        run: (cd dist && zip -qr "../focus-session-extension-${GITHUB_REF_NAME}.zip" .)
+        run: (cd dist && zip -qr "../lectern-extension-${GITHUB_REF_NAME}.zip" .)
 
       - uses: actions/setup-java@v6
         with:
@@ -63,18 +63,18 @@ jobs:
         run: |
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$FS_KEYSTORE_FILE"
           ./gradlew assembleRelease --console=plain
-          cp app/build/outputs/apk/release/app-release.apk "../focus-session-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "../lectern-${GITHUB_REF_NAME}.apk"
 
       - name: debug 签名的 APK
         if: env.HAS_KEYSTORE != 'true'
         working-directory: android
         run: |
           ./gradlew assembleDebug --console=plain
-          cp app/build/outputs/apk/debug/app-debug.apk "../focus-session-${GITHUB_REF_NAME}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "../lectern-${GITHUB_REF_NAME}-debug.apk"
 
       - name: 创建 Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" focus-session-*.zip focus-session-*.apk \
+          gh release create "$GITHUB_REF_NAME" lectern-*.zip lectern-*.apk \
             --title "$GITHUB_REF_NAME" --generate-notes

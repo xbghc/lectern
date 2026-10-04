@@ -171,7 +171,7 @@ test("停止时取消单击等待、卸载监听，重新启动不叠加请求",
 
 /* ---- 浮层开着时，点浮层外面只关浮层 ---- */
 
-const popover = (): Element | null => document.getElementById("focus-session-popover");
+const popover = (): Element | null => document.getElementById("lectern-popover");
 
 test("浮层开着时点正文里的词：这一下只关浮层、不发请求；关掉之后再点才翻译", t => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"] });

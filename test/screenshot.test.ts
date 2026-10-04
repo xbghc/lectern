@@ -29,7 +29,7 @@ for (const target of [dom.window, dom.window.document]) {
   }) as typeof target.removeEventListener;
 }
 const tick = () => new Promise<void>((r) => setImmediate(r));
-const host = () => document.getElementById("focus-session-screenshot");
+const host = () => document.getElementById("lectern-screenshot");
 const pointer = (type: string, x: number, y: number, id = 1) => {
   const e = new dom.window.MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true });
   Object.defineProperty(e, "pointerId", { value: id });
@@ -106,7 +106,7 @@ test("取消返回是否有框选在进行，供宿主返回键判断是否留�
 test("第二次调用取消第一次且只留下一个覆盖层", async () => {
   const first = begin(); await tick();
   const second = begin(); assert.equal(await first, null); await tick();
-  assert.equal(document.querySelectorAll("#focus-session-screenshot").length, 1);
+  assert.equal(document.querySelectorAll("#lectern-screenshot").length, 1);
   cancelRegion(); assert.equal(await second, null);
 });
 

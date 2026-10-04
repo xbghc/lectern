@@ -19,7 +19,7 @@ async function main(): Promise<void> {
       server.listen(config.port, config.host, resolve);
     });
   } catch (error) { await database.close(); throw error; }
-  console.log(`Focus Session sync server listening on ${config.host}:${config.port}`);
+  console.log(`Lectern sync server listening on ${config.host}:${config.port}`);
   let stopping = false;
   const stop = () => {
     if (stopping) return;

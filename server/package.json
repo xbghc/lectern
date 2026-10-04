@@ -1,5 +1,5 @@
 {
-  "name": "focus-session-server",
+  "name": "lectern-server",
   "version": "0.3.16",
   "private": true,
   "type": "module",

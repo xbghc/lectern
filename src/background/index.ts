@@ -59,7 +59,7 @@ chrome.runtime.onMessage.addListener((msg: AnyMessage & { target?: string }, sen
   // 必须显式 return true 保持通道打开；Chrome 不认返回 Promise 的写法。
   handle(msg, sender).then(sendResponse, (err: unknown) => {
     // 写入失败（多数是超出存储配额）不能无声无息
-    console.warn("[focus-session] 消息处理失败", msg.type, err instanceof Error ? err.message : "未知错误");
+    console.warn("[lectern] 消息处理失败", msg.type, err instanceof Error ? err.message : "未知错误");
     sendResponse({ ok: false, error: String(err) });
   });
   return true;

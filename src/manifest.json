@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Focus Session — 阅读追踪与划词复习",
+  "name": "Lectern — 阅读时用到的工具",
   "version": "0.1.0",
   "description": "记录每篇文章的专注片段与阅读进度；在文章页划词即用 MiniMax 翻译并存档，之后用间隔重复复习。",
   "permissions": [
@@ -41,7 +41,7 @@
       "32": "icons/icon32.png"
     },
     "default_popup": "popup.html",
-    "default_title": "Focus Session"
+    "default_title": "Lectern"
   },
   "options_page": "options.html",
   "content_scripts": [

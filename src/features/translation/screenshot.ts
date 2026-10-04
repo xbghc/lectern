@@ -82,7 +82,7 @@ export function selectRegion(dataUrl: string, opts?: { crop?: CropFn }): Promise
       frame = decoded.frame;
       const viewport = { width: window.innerWidth, height: window.innerHeight };
       host = document.createElement("div");
-      host.id = "focus-session-screenshot";
+      host.id = "lectern-screenshot";
       host.style.cssText = "all:initial;position:fixed;inset:0;z-index:2147483647;";
       const root = host.attachShadow({ mode: "closed" });
       const style = document.createElement("style");

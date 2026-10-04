@@ -1,4 +1,4 @@
-# Focus Session 同步后端
+# Lectern 同步后端
 
 Node.js 22 + PostgreSQL，结构化数据保存在数据库，正文及图片保存在 `DATA_DIR` 的用户隔离目录。运行期间没有主动访问外网的功能。容器部署与 GHCR 发布说明见 [部署文档](../docs/server-deployment.md)。
 

@@ -19,7 +19,7 @@ export interface FocusMark { words: number; state: FocusState }
 export interface FocusSpan { from: number; to: number }
 export interface FocusRun extends FocusSpan { state: FocusState }
 
-const HOST_ID = "focus-session-focusbar";
+const HOST_ID = "lectern-focusbar";
 
 const CSS = `
 :host { all: initial; }

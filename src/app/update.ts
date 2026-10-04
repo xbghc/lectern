@@ -12,7 +12,7 @@ import { planAutoUpdate, readUpdate, type AutoStep, type Update } from "../lib/u
  * 没有阅读记录，连当前版本号都不发——比较是在本机做的）。
  */
 
-const REPO = "xbghc/focus-session";
+const REPO = "xbghc/lectern";
 const LATEST_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 /** 自动更新走不通时（debug 包、宿主太老）让用户自己去下的地方。 */
 export const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;

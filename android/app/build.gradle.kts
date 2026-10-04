@@ -28,13 +28,13 @@ val webVersionCode: Int = webVersion.split(".").map { it.toIntOrNull() ?: 0 }
 val keystorePath: String? = System.getenv("FS_KEYSTORE_FILE")
 
 android {
-    namespace = "com.focussession.app"
+    namespace = "io.github.xbghc.lectern"
     compileSdk = 36
     // 本机 SDK 里装的是这个版本；不写的话 AGP 会去下它自己默认的那个
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.focussession.app"
+        applicationId = "io.github.xbghc.lectern"
         // WebViewAssetLoader、adaptive icon、MediaStore.Downloads 分别要 21 / 26 / 29；
         // 26 起图标只需要一份 XML，29 以下的「保存到下载」退回分享
         minSdk = 26

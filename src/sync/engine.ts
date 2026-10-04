@@ -294,7 +294,7 @@ async function uploadCounts(config:SyncConfig,deviceId:string):Promise<void> {
 export function runSync():Promise<SyncStatus> {
   if(running)return running;
   const work=async()=>{
-    if(typeof navigator!=="undefined"&&navigator.locks)return navigator.locks.request("focus-session-sync",()=>cycle());
+    if(typeof navigator!=="undefined"&&navigator.locks)return navigator.locks.request("lectern-sync",()=>cycle());
     return cycle();
   };
   running=work().finally(()=>{running=null;});return running.then(s=>({...s,running:false}));

@@ -7,6 +7,7 @@ import { isFinished } from "../lib/finish.ts";
 import { normalizeUrl } from "../lib/url.ts";
 import { compareStamp, mergeRecord, object, recordKey, SYNCED_SETTINGS, validateRecord } from "./protocol.ts";
 import type { SyncOperation, SyncRecord, RecordType } from "./protocol.ts";
+import { openRenamedDb } from "../lib/renamedDb.ts";
 
 export interface SyncConfig { enabled: boolean; baseUrl: string; token: string; serverId?: string; userId?: string }
 export interface SyncState {
@@ -26,7 +27,7 @@ let dataQueue:Promise<unknown>=Promise.resolve();
 /** Shared by domain read-modify-write operations and remote application, including other WebView contexts. */
 export function withDataLock<T>(fn:()=>Promise<T>):Promise<T> {
   const work=async():Promise<T> => {
-    if(typeof navigator!=="undefined"&&navigator.locks)return await navigator.locks.request("focus-session-data",fn);
+    if(typeof navigator!=="undefined"&&navigator.locks)return await navigator.locks.request("lectern-data",fn);
     return await fn();
   };
   const next=dataQueue.then(work,work);dataQueue=next.catch(()=>undefined);return next;
@@ -43,14 +44,11 @@ export function memoryDriver(initial = freshState()): StateDriver {
   } };
 }
 /** One IDB transaction commits business data, sync versions and outbox together. */
-export function indexedDriver(seed: () => Promise<Record<string, unknown>>, name = "focus-session-sync-v1"): StateDriver {
+export function indexedDriver(seed: () => Promise<Record<string, unknown>>, name = "lectern-sync-v1", legacyName = "focus-session-sync-v1"): StateDriver {
   let opening: Promise<IDBDatabase> | undefined;
-  const open = () => opening ??= new Promise<IDBDatabase>((resolve,reject) => {
-    const r = indexedDB.open(name,1);
-    r.onupgradeneeded = () => r.result.createObjectStore("state");
-    r.onsuccess = () => {r.result.onversionchange=()=>{r.result.close();opening=undefined;};resolve(r.result);};
-    r.onerror = () => {opening=undefined;reject(r.error);};
-  });
+  const open = () => opening ??= openRenamedDb(name, legacyName, 1, db => { db.createObjectStore("state"); }).then(db => {
+    db.onversionchange=()=>{db.close();opening=undefined;};return db;
+  }, error => {opening=undefined;throw error;});
   let initialized: Promise<void> | undefined;
   const ensure = () => initialized ??= (async () => {
     const db=await open();

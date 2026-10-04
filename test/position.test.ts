@@ -155,7 +155,7 @@ const { PositionCard } = await import("../src/features/reading/positionCard.ts")
 let tops = 0;
 let card: InstanceType<typeof PositionCard>;
 beforeEach(() => {
-  document.documentElement.querySelectorAll("#focus-session-position").forEach((n) => n.remove());
+  document.documentElement.querySelectorAll("#lectern-position").forEach((n) => n.remove());
   visibility = "visible";
   tops = 0;
   card = new PositionCard({ onTop: () => tops++ });
@@ -176,7 +176,7 @@ test("重复 show 不会挂出第二个", () => {
   const first = card.hostElement;
   card.show(6, 10);
   assert.equal(card.hostElement, first);
-  assert.equal(document.documentElement.querySelectorAll("#focus-session-position").length, 1);
+  assert.equal(document.documentElement.querySelectorAll("#lectern-position").length, 1);
 });
 
 test("点「回到顶部」摘掉提示并通知调用方", () => {

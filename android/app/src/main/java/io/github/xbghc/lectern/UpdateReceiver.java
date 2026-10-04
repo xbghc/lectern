@@ -1,4 +1,4 @@
-package com.focussession.app;
+package io.github.xbghc.lectern;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

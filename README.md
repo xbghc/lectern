@@ -106,7 +106,7 @@ Storybook → 扩展 → 页面 → “LLM 文章筛选”提供混合结果、�
 
 ## UI 开发预览（Storybook）
 
-[在线查看 Storybook](https://xbghc.github.io/lectern/)。GitHub Pages 从 `gh-pages` 分支发布静态产物；更新源码后需重新构建并发布，目前不会随 `main` 自动更新。
+[在线查看 Storybook](https://xbghc.github.io/lectern/storybook/)。每次推到 `main`，`.github/workflows/pages.yml` 会重新构建并发布到 GitHub Pages；`site/` 下的静态页面发布在站点根目录，和 Storybook 并排。
 
 ```bash
 npm install

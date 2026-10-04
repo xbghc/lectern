@@ -1,12 +1,11 @@
 <!--
-  一个 L，同时是一张读书台：赭色的直角是台子的靠背和托边，上面搁着三行墨字。
-  画在 16 格网格上（1 格 = 8 个单位），所有边都落在格线上，缩到 16px 时每条边正好压在像素边界，不发虚。
-  改了这里要跑 scripts/make-icons.sh 重新出 PNG；安卓那份在 ic_launcher_foreground.xml，是同一个形状的 0.6 倍。
+  读书台：一本翻开的书搁在台子上，正面看。
+  颜色取自个人设计系统（shadcn Neutral 黑白灰）：底是 primary，书是 primary-foreground，台子是 ring 那一档灰。
+  画在 16 格网格上（1 格 = 8 个单位），除了书页顶上的斜边，所有边都落在格线上，缩到 16px 不发虚。
+  改了这里要跑 scripts/make-icons.sh 重新出 PNG；安卓那份在 ic_launcher_foreground.xml，是同一个形状的 0.55 倍。
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="24" fill="#EFE9DE"/>
-  <path fill="#9C4D14" d="M24 24h16v64h64v16H24z"/>
-  <rect x="56" y="32" width="48" height="8" fill="#2B2724"/>
-  <rect x="56" y="48" width="48" height="8" fill="#2B2724"/>
-  <rect x="56" y="64" width="32" height="8" fill="#2B2724"/>
+  <rect width="128" height="128" rx="24" fill="#171717"/>
+  <path fill="#FAFAFA" d="M24 24L56 40V72H24zM104 24L72 40V72H104z"/>
+  <path fill="#A1A1A1" d="M16 72h96v16H72v16h16v8H40v-8h16V88H16z"/>
 </svg>

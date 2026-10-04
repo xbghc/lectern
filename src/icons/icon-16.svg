@@ -1,0 +1,8 @@
+<!--
+  icon.svg 的 16 像素版：不画字行（这个尺寸下只会糊成一片灰），台子的边挪到像素格线上。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#171717"/>
+  <path fill="#FAFAFA" d="M60 30C46 20 30 18 16 22V66C30 62 46 64 60 74zM68 30C82 20 98 18 112 22V66C98 62 82 64 68 74z"/>
+  <path fill="#A1A1A1" d="M24 80h80v8H72v16h16v8H40v-8h16V88H24z"/>
+</svg>

@@ -1,0 +1,9 @@
+<!--
+  icon.svg 的 32 像素版：字行只留两行、略粗，缩小后还分得开。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#171717"/>
+  <path fill="#FAFAFA" d="M60 30C46 20 30 18 16 22V66C30 62 46 64 60 74zM68 30C82 20 98 18 112 22V66C98 62 82 64 68 74z"/>
+  <path fill="none" stroke="#737373" stroke-width="6" stroke-linecap="round" d="M26 35C36 33 42 34 51 39M102 35C92 33 86 34 77 39M26 48C36 46 42 47 51 52M77 52Q84 48 94 47"/>
+  <path fill="#A1A1A1" d="M24 84h80v8H70v12h18v8H40v-8h18V92H24z"/>
+</svg>

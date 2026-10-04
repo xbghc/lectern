@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 读书台：一本翻开的书搁在台子上。和扩展的 src/icons/icon.svg 同一个形状，缩到 0.55 倍放进安全区 -->
+<!-- 读书台：一本翻开的书搁在台子上。路径和扩展的 src/icons/icon.svg 是同一组（128 的坐标），整体缩到 0.55 倍放进安全区 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FAFAFA"
-        android:pathData="M32.0,32.0 L49.6,40.8 V58.4 H32.0 z M76.0,32.0 L58.4,40.8 V58.4 H76.0 z" />
-    <path
-        android:fillColor="#A1A1A1"
-        android:pathData="M27.6,58.4 H80.4 V67.2 H58.4 V76.0 H67.2 V80.4 H40.8 V76.0 H49.6 V67.2 H27.6 z" />
+    <group
+        android:scaleX="0.55"
+        android:scaleY="0.55"
+        android:translateX="18.8"
+        android:translateY="18.8">
+        <path
+            android:fillColor="#FAFAFA"
+            android:pathData="M60 30C46 20 30 18 16 22V66C30 62 46 64 60 74zM68 30C82 20 98 18 112 22V66C98 62 82 64 68 74z" />
+        <path
+            android:strokeColor="#737373"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:pathData="M26 34C36 32 42 33 51 38M102 34C92 32 86 33 77 38M26 44C36 42 42 43 51 48M102 44C92 42 86 43 77 48M26 54C36 52 42 53 51 58M77 58Q84 54 94 53" />
+        <path
+            android:fillColor="#A1A1A1"
+            android:pathData="M24 84h80v8H70v12h18v8H40v-8h18V92H24z" />
+    </group>
 </vector>

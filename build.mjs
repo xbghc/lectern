@@ -57,6 +57,8 @@ function copyStaticExtension() {
   writeFileSync(join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
   copyFonts();
   copyTesseract();
+  mkdirSync(join(OUT, "icons"), { recursive: true });
+  for (const s of [16, 32, 48, 128]) copyFileSync(`src/icons/icon${s}.png`, join(OUT, "icons", `icon${s}.png`));
   for (const [from, to] of [
     ["src/ocr/ocr.html", "ocr.html"],
     ["src/popup/popup.html", "popup.html"],

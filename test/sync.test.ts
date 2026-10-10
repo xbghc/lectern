@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Article, ParagraphRecord, Session, Snippet, StoredCard } from "../src/types.ts";
-import { DEFAULT_LLM, DEFAULT_SETTINGS } from "../src/types.ts";
+import { DEFAULT_LLM, LEGACY_MINIMAX, DEFAULT_SETTINGS } from "../src/types.ts";
 import { gradeCard, newCard } from "../src/lib/review.ts";
 import { mergeRecord, recordKey, validateRecord } from "../src/sync/protocol.ts";
 import type { SyncRecord } from "../src/sync/protocol.ts";
@@ -341,7 +341,7 @@ test("local transaction exception preserves business data and pending operations
 
 test("credentials and diagnostics are absent from sync operations, public status, exports and content-script projections", async () => {
   const driver = device("computer", { articles: { [URL_A]: article() }, settings: DEFAULT_SETTINGS,
-    llm: { ...DEFAULT_LLM, apiKey: "private-llm-secret" }, llmLog: [{ error: "private-log-text" }],
+    llm: { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: "private-llm-secret" }, llmLog: [{ error: "private-log-text" }],
   });
   await driver.update(state => { state.config = { enabled: false, baseUrl: "https://sync.example.com", token: "private-sync-secret", userId: "owner", serverId: "server" }; });
   let projection: Record<string, unknown> = {};
@@ -361,8 +361,8 @@ test("credentials and diagnostics are absent from sync operations, public status
 test("settings merge by field and LLM keys remain device-local", async () => {
   const seed = { settings: { ...DEFAULT_SETTINGS } };
   const a = device("computer", seed), b = device("phone", seed);
-  await change(a, data => { data.settings.articleExcludedUrls = ["example.com"]; data.llm = { ...DEFAULT_LLM, apiKey: "computer-key" }; });
-  await change(b, data => { data.settings.finishRatio = 0.95; data.llm = { ...DEFAULT_LLM, apiKey: "phone-key" }; });
+  await change(a, data => { data.settings.articleExcludedUrls = ["example.com"]; data.llm = { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: "computer-key" }; });
+  await change(b, data => { data.settings.finishRatio = 0.95; data.llm = { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: "phone-key" }; });
   await exchange(a, b);
   for (const driver of [a, b]) {
     const data = (await driver.read()).data;

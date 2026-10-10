@@ -24,7 +24,7 @@
 
 **名称**（清单里的 `name`，上传后自动带出）：Lectern — 阅读时用到的工具
 
-**简短说明**（清单里的 `description`）：记录每篇文章的专注片段与阅读进度；在文章页划词即用 MiniMax 翻译并存档，之后用间隔重复复习。
+**简短说明**（清单里的 `description`）：记录每篇文章的专注片段与阅读进度；在文章页划词即用你选的模型翻译并存档，之后用间隔重复复习。
 
 **详细说明**：
 
@@ -38,7 +38,7 @@ Lectern 是一张读书台：读网页文章时用得到的工具都放在这儿
 · 多设备：可以连接自己部署的同步服务器，在电脑和安卓 App 之间合并记录。
 
 使用前请注意：
-· 需要你自己的 MiniMax API Key，在设置页填写。没有 Key 时不会记录文章，也不能翻译。
+· 需要你自己的模型服务 API Key：在设置页从两百来家服务商里选一家（OpenAI、Anthropic、DeepSeek、MiniMax 等，或自定义地址），填上模型名和 Key。没有 Key 时不会记录文章，也不能翻译。
 · 填了 Key 之后，你打开的网页的网址、标题和正文会自动发给模型，用来判断它是不是文章。可以在设置页的「文章记录黑名单」里排除网站。
 · 设备同步需要自己部署后端，不启用时所有数据只留在本机。
 · 界面目前只有中文。
@@ -50,7 +50,7 @@ Lectern 是一张读书台：读网页文章时用得到的工具都放在这儿
 
 **Name**: Lectern — reading tools in one place
 
-**Short description**: Tracks focus sessions and progress on each article; select text to translate and save it with MiniMax, then review with spaced repetition.
+**Short description**: Tracks focus sessions and progress on each article; select text to translate and save it with the model you choose, then review with spaced repetition.
 
 **Detailed description**:
 
@@ -64,7 +64,7 @@ Lectern is a reading desk: the tools you need while reading articles on the web,
 · Multiple devices: optionally connect a sync server you host yourself to merge records between computers and the Android app.
 
 Before you install:
-· You need your own MiniMax API key, entered in settings. Without a key nothing is recorded or translated.
+· You need your own API key for a model service: pick one of about 200 providers in settings (OpenAI, Anthropic, DeepSeek, MiniMax and others, or a custom address) and enter a model name and key. Without a key nothing is recorded or translated.
 · Once a key is set, the URL, title and text of pages you open are sent to the model automatically to decide whether each page is an article. Exclude sites with the "article blocklist" in settings.
 · Device sync requires a backend you deploy yourself. With sync off, all data stays on your device.
 · The interface is currently Chinese only.
@@ -108,13 +108,13 @@ Lectern assists reading articles on the web: it tracks reading progress and focu
 
 ### 测试说明（Test instructions）
 
-这一栏上限 500 个字符，下面这份是 410 个。没有 API Key 时扩展什么都不做，审核员需要一个 Key 才看得到翻译；
-MiniMax 的 Key 很长，这一栏放不下，那一页另有单独的凭据输入框就填在那里，没有就不给。给的话单独建一个额度很小的，审核过了就作废。
+这一栏上限 500 个字符，下面这份是 447 个（按字节算 495，贴近上限，改动时数一下）。没有 API Key 时扩展什么都不做，审核员需要一个 Key 才看得到翻译；
+有的服务商（比如 MiniMax）的 Key 很长，这一栏放不下，那一页另有单独的凭据输入框就填在那里，没有就不给。给的话单独建一个额度很小的，审核过了就作废。
 
 ```
-Needs a MiniMax API key.
+Needs an API key for a model service.
 1. Options page opens after install: click "同意并开始" (Agree) at the top.
-2. Paste the key into "API Key", click "保存并测试连接".
+2. In "模型服务" pick a provider, enter a model and the key, click "保存并测试连接".
 3. Open an English article, e.g. https://en.wikipedia.org/wiki/Reading . The popup shows reading progress.
 4. In the popup click "本页启用划词翻译", then select text to see the translation.
 5. Alt+Shift+S starts screenshot translation.

@@ -11,9 +11,9 @@ import {
 } from "../src/lib/articleReview.ts";
 import { LlmError } from "../src/lib/llm.ts";
 import type { LlmConfig } from "../src/types.ts";
-import { DEFAULT_LLM } from "../src/types.ts";
+import { DEFAULT_LLM, LEGACY_MINIMAX } from "../src/types.ts";
 
-const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "k", consentAt: 1, timeoutMs: 1_000 };
+const CFG: LlmConfig = { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: "k", consentAt: 1, timeoutMs: 1_000 };
 const FENCE = "```";
 
 function okResponse(text: string, stopReason = "end_turn"): Response {
@@ -120,7 +120,7 @@ test("生成成功时带回材料和用量", async () => {
   assert.equal(review.outline.length, 3);
   assert.equal(review.questions.length, 3);
   assert.equal(review.generatedTs, 1_700_000_000_000);
-  assert.equal(review.model, DEFAULT_LLM.model);
+  assert.equal(review.model, CFG.model);
   assert.deepEqual(usage, { inputTokens: 4_000, outputTokens: 420 });
 });
 

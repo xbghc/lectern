@@ -9,14 +9,15 @@ import type {
   VocabNote,
 } from "../types.ts";
 import { MAX_VOCAB } from "../types.ts";
+import { endpoint, isTruncated, readEvent, readReply, requestBody, requestHeaders } from "./llmWire.ts";
 
 /**
- * MiniMax 的对话模型走的是 **Anthropic 兼容端点**（`/anthropic/v1/messages`），
- * 鉴权用 `x-api-key`，请求/响应体与 Anthropic Messages API 一致，额外多一个
- * MiniMax 自己的 `base_resp`。这里直接 fetch，不引 `@anthropic-ai/sdk`：
- * service worker 里零依赖更省事，SDK 的浏览器模式还要额外开关。
+ * 向用户选的那家模型服务发请求。说两种协议——Anthropic 的 Messages 和 OpenAI 的 Chat Completions，
+ * 都是原生直连；两种协议在线上的样子（地址、头、请求体、怎么读响应）在 llmWire.ts，
+ * 这里管的是与协议无关的那一半：超时、重试、取消、把各种失败翻成带 kind 的 LlmError、留诊断现场。
+ * 直接 fetch，不引各家的 SDK：service worker 里零依赖更省事。
  *
- * 该端点**不返回 CORS 头**，所以只能在 background 里调用——content script
+ * 这些端点大多**不返回 CORS 头**，所以只能在 background 里调用——content script
  * 发出去会被浏览器拦掉。扩展的 host_permissions 已覆盖全部 https 站点，
  * background 的 fetch 因此拥有跨域特权。
  */
@@ -89,11 +90,13 @@ export class LlmError extends Error {
 }
 
 /**
- * MiniMax 内容审核的拒答。Anthropic 兼容接口回 HTTP 500，错误消息是 `input new_sensitive (1026)`
- * （输入）或 `output new_sensitive (1027)`（输出）；原生接口的 base_resp 给同样的 1026 / 1027。
- * 不认出来的话它就是一条普通的 HTTP 500，看着像服务端故障，人会去刷新重试。
+ * 服务商内容审核的拒答，按错误消息里的字眼认。
+ * MiniMax：Anthropic 兼容接口回 HTTP 500，消息是 `input new_sensitive (1026)`（输入）或
+ * `output new_sensitive (1027)`（输出）；原生接口的 base_resp 给同样的 1026 / 1027。
+ * OpenAI 与 Azure 的 `content_policy_violation` / `content_filter`、DeepSeek 的 `Content Exists Risk` 也收在这里。
+ * 不认出来的话它就是一条普通的 HTTP 错误，看着像服务端故障，人会去刷新重试；认漏了的后果只是退回那样。
  */
-const REFUSAL_MESSAGE = /sensitive|\(102[67]\)/i;
+const REFUSAL_MESSAGE = /sensitive|\(102[67]\)|content_policy_violation|content_filter|Content Exists Risk/i;
 const REFUSAL_CODES = new Set([1026, 1027]);
 
 const refused = (detail: string, status?: number): LlmError =>
@@ -171,9 +174,9 @@ function backoff(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * 发一次 Messages 请求，过载/限流时退避重试一次。
+ * 发一次请求，过载/限流时退避重试一次。
  *
- * URL、鉴权头和重试规矩两条路径共用；流式与否只差请求体里的 `stream`。
+ * 地址、请求头和请求体按协议由 llmWire.ts 给；重试规矩两种协议、流式非流式都共用。
  * 重试整个发生在调用方那个 timeout 之内，所以用户设的超时仍然是总账。
  *
  * `count` 由调用方持有而不是当返回值：抛出去的时候（网络错误、超时）也得数得清发了几次，
@@ -186,17 +189,8 @@ async function postMessages(
   deps: LlmDeps,
   count: { n: number },
 ): Promise<Response> {
-  const url = `${config.baseUrl.replace(/\/+$/, "")}/v1/messages`;
-  const init: RequestInit = {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": config.apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(body),
-    signal,
-  };
+  const url = endpoint(config);
+  const init: RequestInit = { method: "POST", headers: requestHeaders(config), body: JSON.stringify(body), signal };
   for (;;) {
     count.n++;
     const res = await deps.fetch(url, init);
@@ -210,16 +204,17 @@ async function postMessages(
 export const CONSENT_NEEDED = "还没有同意把内容发给模型服务：打开设置页，在顶部确认后才会开始";
 
 /**
- * 发请求前的两道门：有没有密钥，有没有同意过把内容发给模型服务。
- * 两样都算配置问题（kind 都是 config），界面按同一条路把人引到设置页。
+ * 发请求前的三道门：选没选模型服务，有没有密钥，有没有同意过把内容发给模型服务。
+ * 都算配置问题（kind 都是 config），界面按同一条路把人引到设置页，话里说清差的是哪一样。
  * 放在这里而不是各个调用方：所有请求都从下面两个函数出去，漏不掉。
  */
 function assertReady(config: LlmConfig): void {
-  if (!config.apiKey) throw new LlmError("尚未填写 MiniMax API Key", "config");
+  if (!config.baseUrl || !config.model) throw new LlmError("还没有选模型服务：打开设置页，选一家并填上模型和 API Key", "config");
+  if (!config.apiKey) throw new LlmError("尚未填写 API Key：打开设置页填写", "config");
   if (!config.consentAt) throw new LlmError(CONSENT_NEEDED, "config");
 }
 
-/** 一次非流式 Messages 调用。只负责发出去和把文本取回来，不懂业务。 */
+/** 一次非流式调用。只负责发出去和把文本取回来，不懂业务。 */
 export async function callMessages(
   config: LlmConfig,
   system: string,
@@ -242,18 +237,7 @@ export async function callMessages(
   try {
     let res: Response;
     try {
-      res = await postMessages(
-        config,
-        {
-          model: config.model,
-          max_tokens: config.maxTokens,
-          system,
-          messages: [{ role: "user", content: userText }],
-        },
-        ctrl.signal,
-        deps,
-        count,
-      );
+      res = await postMessages(config, requestBody(config, system, userText, false), ctrl.signal, deps, count);
     } catch (err) {
       if (ctrl.signal.aborted) throw new LlmError(`请求超时（${config.timeoutMs}ms）`, "timeout");
       throw new LlmError(`网络错误：${String(err)}`, "network");
@@ -263,25 +247,19 @@ export async function callMessages(
 
     if (!res.ok) throw httpError(res.status, await res.text().catch(() => ""));
 
-    const data = (await res.json().catch(() => null)) as AnthropicResponse | null;
-    if (!data) throw new LlmError("响应不是合法 JSON", "parse");
+    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!data || typeof data !== "object") throw new LlmError("响应不是合法 JSON", "parse");
 
-    const br = data.base_resp;
-    if (br && typeof br.status_code === "number" && br.status_code !== 0) throw baseRespError(br.status_code, br.status_msg);
-
-    const text = (data.content ?? [])
-      .filter((b): b is { type: "text"; text: string } => b?.type === "text" && typeof b.text === "string")
-      .map((b) => b.text)
-      .join("");
+    const reply = readReply(config.protocol, data);
+    if (reply.baseResp) throw baseRespError(reply.baseResp.code, reply.baseResp.message);
+    if (reply.refusal) throw refused(reply.refusal);
+    if (reply.error) throw wireError(reply.error);
 
     return {
-      text,
-      usage: {
-        inputTokens: data.usage?.input_tokens ?? 0,
-        outputTokens: data.usage?.output_tokens ?? 0,
-      },
-      stopReason: data.stop_reason ?? "",
-      truncated: data.stop_reason === "max_tokens",
+      text: reply.text,
+      usage: { inputTokens: reply.inputTokens, outputTokens: reply.outputTokens },
+      stopReason: reply.stopReason,
+      truncated: isTruncated(config.protocol, reply.stopReason),
       timing: timing(),
     };
   } catch (err) {
@@ -290,12 +268,9 @@ export async function callMessages(
   }
 }
 
-interface AnthropicResponse {
-  content?: Array<{ type?: string; text?: string } | null>;
-  usage?: { input_tokens?: number; output_tokens?: number };
-  stop_reason?: string;
-  base_resp?: { status_code?: number; status_msg?: string };
-}
+/** 响应体或流里带着的错误：审核拒答按字眼认出来，其余算服务端报错。 */
+const wireError = (message: string): LlmError =>
+  REFUSAL_MESSAGE.test(message) ? refused(message) : new LlmError(`模型返回错误：${message}`, "http");
 
 /* ==================== 流式 ==================== */
 
@@ -311,8 +286,13 @@ export interface StreamOptions {
  *
  * 分块边界会落在任意位置——一行 JSON 可能被切成两个 chunk，所以必须缓冲到
  * 换行才解析。`event:` 行和空行直接跳过：事件类型在 data 的 `type` 字段里也有。
+ * `[DONE]` 不是事件，不往外吐；它是 OpenAI 那套协议的收尾标志，看到了通过 `onDone` 说一声。
  */
-export async function* sseEvents(body: ReadableStream<Uint8Array>, onChunk?: (chunk: string) => void): AsyncGenerator<Record<string, unknown>> {
+export async function* sseEvents(
+  body: ReadableStream<Uint8Array>,
+  onChunk?: (chunk: string) => void,
+  onDone?: () => void,
+): AsyncGenerator<Record<string, unknown>> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
@@ -331,6 +311,7 @@ export async function* sseEvents(body: ReadableStream<Uint8Array>, onChunk?: (ch
         buf = buf.slice(nl + 1);
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
+        if (payload === "[DONE]") onDone?.();
         if (!payload || payload === "[DONE]") continue;
         try {
           yield JSON.parse(payload) as Record<string, unknown>;
@@ -346,13 +327,8 @@ export async function* sseEvents(body: ReadableStream<Uint8Array>, onChunk?: (ch
   }
 }
 
-interface BaseResp {
-  status_code?: number;
-  status_msg?: string;
-}
-
 /**
- * 流式版的 Messages 调用。
+ * 流式版的调用。
  *
  * 生成耗时与输出 token 数成正比（实测词条 1.4–4.9s），非流式要等整段生成完
  * 才有第一个字节。流式下首字约 700ms 就到，配合把 translation 放在 JSON 第一位，
@@ -407,19 +383,7 @@ export async function callMessagesStream(
   try {
     let res: Response;
     try {
-      res = await postMessages(
-        config,
-        {
-          model: config.model,
-          max_tokens: config.maxTokens,
-          system,
-          messages: [{ role: "user", content: userText }],
-          stream: true,
-        },
-        ctrl.signal,
-        deps,
-        count,
-      );
+      res = await postMessages(config, requestBody(config, system, userText, true), ctrl.signal, deps, count);
     } catch (err) {
       throw wrap(err);
     }
@@ -430,48 +394,24 @@ export async function callMessagesStream(
     let inputTokens = 0;
     let outputTokens = 0;
 
+    /** OpenAI 那套协议的收尾标志。有的兼容实现不给 finish_reason，但只要等到了它，流就不是半路断的。 */
+    let sawDone = false;
+
     try {
-      for await (const ev of sseEvents(res.body, capture)) {
-        switch (ev["type"]) {
-          case "message_stop":
-            stream.messageStop = true;
-            break;
-          case "message_start": {
-            const m = ev["message"] as { usage?: { input_tokens?: number }; base_resp?: BaseResp } | undefined;
-            // MiniMax 会在 HTTP 200 的流里用 base_resp 报业务错误（余额不足、鉴权失败）
-            const br = m?.base_resp;
-            if (br && typeof br.status_code === "number" && br.status_code !== 0) throw baseRespError(br.status_code, br.status_msg);
-            inputTokens = m?.usage?.input_tokens ?? 0;
-            break;
-          }
-          case "content_block_delta": {
-            const d = ev["delta"] as { type?: string; text?: string } | undefined;
-            if (d?.type === "text_delta" && typeof d.text === "string") {
-              // 传输层的"第一个字"：模型开口了。和"浮层能显示了"是两回事，后者要等字段闭合
-              if (d.text && firstTextMs === null) firstTextMs = now() - t0;
-              text += d.text;
-              opts.onDelta(text);
-            }
-            break;
-          }
-          case "message_delta": {
-            const d = ev["delta"] as { stop_reason?: string } | undefined;
-            if (d?.stop_reason) stopReason = d.stop_reason;
-            const u = ev["usage"] as { input_tokens?: number; output_tokens?: number } | undefined;
-            if (typeof u?.output_tokens === "number") outputTokens = u.output_tokens;
-            // Anthropic 只在 message_start 报 input_tokens，MiniMax 那里恒为 0，
-            // 真实值在收尾的 message_delta 里。两处都取，谁非零算谁。
-            if (u?.input_tokens) inputTokens = u.input_tokens;
-            break;
-          }
-          case "error": {
-            const e = ev["error"] as { message?: string; type?: string } | undefined;
-            // 流已经开了才报的审核拒答（比如输出审核）同样认出来
-            if (e?.message && REFUSAL_MESSAGE.test(e.message)) throw refused(e.message);
-            throw new LlmError(`模型返回错误：${e?.message ?? e?.type ?? "未知"}`, "http");
-          }
-          default:
-            break;
+      for await (const ev of sseEvents(res.body, capture, () => { sawDone = true; })) {
+        const step = readEvent(config.protocol, ev);
+        if (step.baseResp) throw baseRespError(step.baseResp.code, step.baseResp.message);
+        if (step.refusal) throw refused(step.refusal);
+        if (step.error !== undefined) throw wireError(step.error);
+        if (step.messageStop) stream.messageStop = true;
+        if (step.inputTokens !== undefined) inputTokens = step.inputTokens;
+        if (step.outputTokens !== undefined) outputTokens = step.outputTokens;
+        if (step.stopReason) stopReason = step.stopReason;
+        if (step.delta !== undefined) {
+          // 传输层的"第一个字"：模型开口了。和"浮层能显示了"是两回事，后者要等字段闭合
+          if (step.delta && firstTextMs === null) firstTextMs = now() - t0;
+          text += step.delta;
+          opts.onDelta(text);
         }
       }
     } catch (err) {
@@ -480,9 +420,13 @@ export async function callMessagesStream(
       throw wrapped;
     }
 
+    if (sawDone) {
+      stream.messageStop = true;
+      stopReason ||= "stop";
+    }
     if (!stopReason) throw new LlmError("流式响应提前结束，未收到 stop_reason，请重试", "stream_interrupted");
     if (!text) throw new LlmError("流式响应里没有任何文本", "parse");
-    return { text, stream, usage: { inputTokens, outputTokens }, stopReason, truncated: stopReason === "max_tokens", timing: timing() };
+    return { text, stream, usage: { inputTokens, outputTokens }, stopReason, truncated: isTruncated(config.protocol, stopReason), timing: timing() };
   } catch (err) {
     // `wrap` 造的是新的 LlmError，而上面 !res.ok / !res.body / !text 那几处压根不过 wrap，
     // 所以耗时统一在这里挂，不在 wrap 里挂

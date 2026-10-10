@@ -6,6 +6,7 @@ import { getUsage, setLlmConfig } from "../src/core/background/llm.ts";
 import { updateLocalOnly } from "../src/background/store.ts";
 import { streamTranslate } from "../src/features/translation/translate.ts";
 import { freshState, installStorage, memoryDriver, onLocalMutation } from "../src/sync/storage.ts";
+import { LEGACY_MINIMAX } from "../src/types.ts";
 
 /*
  * 后台翻译整条路：模型答完 → 存划词 → 回复 → 随后记账。盯的是诊断日志里量出来的那一秒——
@@ -65,7 +66,7 @@ beforeEach(async () => {
   area.open(); // 上一条用例断言失败时闸门可能还关着，别让它把后面的全堵死
   await bookkeepingSettled();
   area = fakeArea();
-  await setLlmConfig({ apiKey: "k", consentAt: 1 });
+  await setLlmConfig({ ...LEGACY_MINIMAX, apiKey: "k", consentAt: 1 });
 });
 
 test("模型答完、划词存好就回复；用量和耗时随后一笔记上，不让人等", async () => {
@@ -122,7 +123,7 @@ test("有状态库时：记账走本机专用的直写，不进 outbox、不催�
   let mutations = 0;
   onLocalMutation(() => { mutations++; });
   try {
-    await setLlmConfig({ apiKey: "k", consentAt: 1 });
+    await setLlmConfig({ ...LEGACY_MINIMAX, apiKey: "k", consentAt: 1 });
     await driver.update((s) => { s.outbox = []; });
     mutations = 0;
     serve(GOOD);

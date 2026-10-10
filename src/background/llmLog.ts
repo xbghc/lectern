@@ -209,6 +209,8 @@ export async function llmLogBundle(version: string): Promise<LlmLogBundle> {
     exportedAt: Date.now(),
     version,
     llm: {
+      provider: llm.provider,
+      protocol: llm.protocol,
       baseUrl: llm.baseUrl,
       model: llm.model,
       maxTokens: llm.maxTokens,

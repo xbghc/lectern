@@ -18,7 +18,7 @@ import type { TranslationBackendTiming } from "../../lib/translationDiagnostics.
  * 翻译请求的门面：缓存、并发去重、用量记账都在这里，
  * 让消息路由那边保持一句话。
  *
- * 之所以必须在 background 发请求：MiniMax 的端点不返回 CORS 头，
+ * 之所以必须在 background 发请求：模型服务的端点大多不返回 CORS 头，
  * content script 里 fetch 会被浏览器直接拦掉；而且 API key 也不能进页面上下文。
  */
 

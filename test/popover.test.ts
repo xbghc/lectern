@@ -132,8 +132,10 @@ test("浮层关掉后迟到的增量不会炸，也不会把浮层拉回来", ()
 
 test("报错会顶掉流式骨架，之后的增量不再落到已经消失的节点上", () => {
   pop.showStreaming(RECT, "leaks");
-  pop.showError(RECT, "HTTP 401", true);
-  assert.match(txt(".err"), /API Key/);
+  // 配置类的失败有好几种（没选服务商、没填 Key、没点同意），浮层照实显示出错处给的那句话
+  pop.showError(RECT, "还没有同意把内容发给模型服务：打开设置页，在顶部确认后才会开始", true);
+  assert.match(txt(".err"), /还没有同意/);
+  assert.ok(root().querySelector('[data-act="opt"]'), "配置类的失败带一个「去设置」");
   pop.updateStream({ translation: "泄漏", phonetic: null, pos: null, contextNote: null, usage: null, vocab: [] });
   assert.equal(root().querySelector(".tr"), null, "增量不该在错误界面上凭空长出译文");
 });
@@ -389,7 +391,7 @@ test("回车发送；输入法选词时的那一下回车不算", () => {
 test("追问失败：缺配置时给一个「去设置」", () => {
   const input = openAsk();
   ask(input, "为什么？");
-  pop.failAnswer("尚未填写 MiniMax API Key", true);
+  pop.failAnswer("尚未填写 API Key：打开设置页填写", true);
   assert.ok(txt(".aa").includes("API Key"));
   click(root().querySelector('[data-act="opt"]'));
   assert.equal(optionsOpened, 1);

@@ -2,7 +2,7 @@
  * 安卓宿主注入到 `window.Native` 上的桥（见 android/…/NativeBridge.java），
  * 以及建立在它上面的 fetch。
  *
- * 为什么 HTTP 要走宿主：MiniMax 的端点不返回 CORS 头，WebView 里的页面是
+ * 为什么 HTTP 要走宿主：模型服务的端点大多不返回 CORS 头，WebView 里的页面是
  * https://appassets.androidplatform.net 这个真实的 origin，直接 fetch 会被浏览器拦掉——
  * 扩展里是 background 靠 host permission 绕过的，App 里没有这个特权，只能让原生代码代发。
  * 抓文章的 HTML 同理。

@@ -50,7 +50,7 @@
         </ul>
 
         <h2>发送给模型服务的数据</h2>
-        <p>Lectern 用你自己填写的 API Key 调用模型服务，默认是 MiniMax（<code>api.minimaxi.com</code>），你可以在设置页换成别的地址。设置页顶部列着下面这些内容，在你点「同意并开始」之前不会发送任何东西；没有填 API Key 时同样不发送。同意可以随时在设置页撤回。会发送的有：</p>
+        <p>Lectern 用你自己填写的 API Key，直接请求你在设置页选择的那家模型服务（例如 OpenAI、Anthropic、MiniMax、DeepSeek，或你自己填的地址）；没有预设的服务商，中间也不经过开发者的服务器。设置页顶部列着下面这些内容，在你点「同意并开始」之前不会发送任何东西；没有填 API Key 时同样不发送。同意可以随时在设置页撤回。会发送的有：</p>
         <ul>
           <li><strong>文章判别（自动）：</strong>你打开一个网页时，Lectern 会把它的网址、标题和页面文字（最多约 3 万字）发给模型，判断它是不是一篇文章。这一步是自动的。把网站加入设置页的「文章记录黑名单」后，那些网站的页面不会被发送。</li>
           <li><strong>划词翻译（你选中文字时）：</strong>选中的文字、它所在的段落和文章标题。只在翻译白名单里的网站，或你手动为当前页开启后才会生效。</li>
@@ -95,7 +95,7 @@
         </ul>
 
         <h2>Data sent to the model service</h2>
-        <p>Lectern calls a model service with the API key you provide. The default is MiniMax (<code>api.minimaxi.com</code>); you can change the address in settings. The settings page lists the items below, and nothing is sent until you click "Agree and start" there; nothing is sent without an API key either. You can withdraw consent in settings at any time. What is sent:</p>
+        <p>Lectern uses the API key you provide to call, directly, the model service you choose in settings (for example OpenAI, Anthropic, MiniMax, DeepSeek, or an address you enter yourself). There is no preset provider, and requests do not pass through any server run by the developer. The settings page lists the items below, and nothing is sent until you click "Agree and start" there; nothing is sent without an API key either. You can withdraw consent in settings at any time. What is sent:</p>
         <ul>
           <li><strong>Article detection (automatic):</strong> when you open a web page, Lectern sends its URL, title and page text (up to about 30,000 characters) to the model to decide whether it is an article. This happens automatically. Pages on sites you add to the "article blocklist" in settings are not sent.</li>
           <li><strong>Selection translation (when you select text):</strong> the selected text, its surrounding paragraph and the article title. Active only on sites in your translation allowlist, or after you enable it for the current page.</li>

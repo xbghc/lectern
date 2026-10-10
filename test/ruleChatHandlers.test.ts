@@ -1,7 +1,7 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { memoryBackend } from "../src/app/shim.ts";
-import { DEFAULT_LLM, DEFAULT_SETTINGS, type LlmFailure, type Settings } from "../src/types.ts";
+import { DEFAULT_LLM, LEGACY_MINIMAX, DEFAULT_SETTINGS, type LlmFailure, type Settings } from "../src/types.ts";
 import { ruleChatHandlers } from "../src/core/background/ruleChat.ts";
 import { READING_URL_LISTS } from "../src/features/reading/settings.ts";
 import { TRANSLATION_URL_LISTS } from "../src/features/translation/settings.ts";
@@ -30,7 +30,7 @@ beforeEach(async () => {
   status = 200;
   await local.set({
     settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: ["zhihu.com"], translationAllowedUrls: ["nytimes.com"], finishRatio: 0.7 },
-    llm: { ...DEFAULT_LLM, apiKey: "test-only", consentAt: 1 },
+    llm: { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: "test-only", consentAt: 1 },
     articles: {
       a: { id: "a", url: "https://www.weibo.com/1" },
       b: { id: "b", url: "https://weibo.com/2" },

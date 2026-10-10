@@ -1,6 +1,6 @@
 import { localStorage } from "../../sync/storage.ts";
 import type { LlmConfig, LlmUsage } from "../../types.ts";
-import { DEFAULT_LLM, EMPTY_USAGE } from "../../types.ts";
+import { DEFAULT_LLM, EMPTY_USAGE, LEGACY_MINIMAX } from "../../types.ts";
 import { serialize, updateLocalOnly } from "../../background/store.ts";
 
 /**
@@ -22,7 +22,13 @@ const local = (): chrome.storage.StorageArea => localStorage();
 export async function getLlmConfig(): Promise<LlmConfig> {
   const got = await local().get(KEY_LLM);
   const stored = (got[KEY_LLM] as StoredLlm) ?? {};
-  return { ...DEFAULT_LLM, ...stored, ...raiseBudget(stored) };
+  // 多提供商之前存下的配置没有 provider 这个键。那时只有 MiniMax 一家，地址和模型名靠默认值补；
+  // 现在的默认是「什么都没选」，所以这种旧配置要按当时的默认补，老用户升级后才不会突然停摆。
+  // 那时也能手改 Base URL：改成了别家的，标签就不该还叫 MiniMax。
+  const legacy = stored.provider === undefined && Object.keys(stored).length > 0;
+  const merged = { ...DEFAULT_LLM, ...(legacy ? LEGACY_MINIMAX : {}), ...stored, ...raiseBudget(stored) };
+  if (legacy && !/minimax/i.test(merged.baseUrl)) merged.provider = "custom";
+  return merged;
 }
 
 type StoredLlm = Partial<LlmConfig> & {
@@ -55,9 +61,21 @@ function raiseBudget(stored: StoredLlm): StoredLlm {
   };
 }
 
+const hostOf = (baseUrl: string): string => {
+  try {
+    return new URL(baseUrl).host.toLowerCase();
+  } catch {
+    return baseUrl.trim().toLowerCase();
+  }
+};
+
 export async function setLlmConfig(patch: Partial<LlmConfig>): Promise<LlmConfig> {
   return serialize(async () => {
-    const merged = { ...(await getLlmConfig()), ...patch };
+    const current = await getLlmConfig();
+    const merged = { ...current, ...patch };
+    // 换了服务地址而没给新密钥：存着的那把是上一家的，绝不能跟着发到新地址去。
+    // 在这里清掉而不是只靠设置页拦——这条规矩不该取决于哪个界面记得检查。
+    if (patch.baseUrl !== undefined && patch.apiKey === undefined && hostOf(patch.baseUrl) !== hostOf(current.baseUrl)) merged.apiKey = "";
     await local().set({ [KEY_LLM]: merged });
     return merged;
   });

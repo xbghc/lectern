@@ -63,6 +63,17 @@
         box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14); font-size: 12px; line-height: 1.65; color: var(--fg-soft);
       }
       .info-pop p { margin: 0 0 8px; }
+      /*
+       * 「同意把内容发给模型服务」的确认块。只在还没同意时出现，放在所有分区前面：
+       * 这是用之前必须看到的一段话，不能收进哪个分区里等人去翻。同意之后整块收起，模型分区里留一行「已同意 · 撤回」。
+       */
+      .consent { margin: 16px 0 24px; padding: 14px 16px; border: 1px solid var(--accent); border-radius: 6px; background: var(--card); }
+      .consent h2 { margin: 0 0 8px; font-size: 15px; }
+      .consent p { margin: 0 0 8px; }
+      .consent ul { margin: 0 0 8px; padding-left: 1.2em; }
+      .consent li { margin-bottom: 4px; }
+      .consent .row { margin-top: 12px; }
+      button.linklike { border: 0; padding: 0; background: none; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; }
       .info-pop p:last-child { margin-bottom: 0; }
 
       /*
@@ -173,9 +184,30 @@
   <body>
     <h1>Lectern 设置</h1>
     <p class="muted small">
-      阅读记录保存在本机；启用同步后，也会保存到你配置的服务器。<strong>划词翻译会把选中的文本及其所在段落发送给
-      MiniMax</strong>——只有下面翻译白名单里的站点自动开启，其余页面要从弹出面板手动开启。
+      阅读记录保存在本机；启用同步后，也会保存到你配置的服务器。<strong>打开的网页会自动发给模型判断是不是文章</strong>（文章记录黑名单里的除外）；<strong>划词翻译会把选中的文本及其所在段落发送给模型</strong>——只有下面翻译白名单里的站点自动开启，其余页面要从弹出面板手动开启。
     </p>
+
+    <section id="consent" class="consent" hidden>
+      <h2>开始之前，请确认会发给模型服务的内容</h2>
+      <p>
+        Lectern 用你自己的 API Key，直接请求下面「模型」分区里填的接口地址（默认是 MiniMax）。同意之后会发送：
+      </p>
+      <ul>
+        <li>
+          <strong>自动发送：</strong>你打开的每个网页的网址、标题和页面文字（最多约 3 万字），用来判断它是不是一篇文章。加进「文章记录黑名单」的网站不发送。
+        </li>
+        <li>
+          <strong>你用到这些功能时发送：</strong>划词和截图翻译、讲解、追问、文章回顾、LLM 筛选、用一句话改名单。发的是这次操作涉及的文字：选中的内容和它所在的段落、文章的标题或正文、名单和当前页的网址。
+        </li>
+      </ul>
+      <p class="muted small">
+        开发者收不到这些内容；模型服务怎么处理它们，由该服务自己的隐私政策决定。同意之前，Lectern 不会向模型服务发送任何内容。
+        <a href="https://xbghc.github.io/lectern/privacy/" target="_blank" rel="noreferrer">隐私政策</a>
+      </p>
+      <div class="row">
+        <button id="consent-agree" class="primary">同意并开始</button>
+      </div>
+    </section>
 
     <fieldset id="sync-settings" data-nav-group="连接">
       <legend>设备同步<button type="button" class="info" aria-label="关于设备同步" aria-expanded="false" aria-controls="sync-about">i</button></legend>
@@ -250,6 +282,9 @@
         <span id="llm-status" class="muted small"></span>
       </div>
       <p id="usage" class="muted small"></p>
+      <p id="consent-state" class="muted small" hidden>
+        已于 <span id="consent-date"></span> 同意把内容发给模型服务。<button id="consent-revoke" type="button" class="linklike">撤回</button>
+      </p>
     </fieldset>
 
     <fieldset id="sec-translate" data-nav-group="偏好">

@@ -421,7 +421,7 @@ export interface ExportBundle {
   articleReviews: ArticleReview[];
   articleCards: ArticleCard[];
   /** 不含 apiKey——导出文件常被随手分享。 */
-  llm: Omit<LlmConfig, "apiKey"> & { apiKeySet: boolean };
+  llm: Omit<LlmConfig, "apiKey" | "consentAt"> & { apiKeySet: boolean };
 }
 
 /** 导入另一台设备的导出文件的结果。合并了什么见 lib/merge.ts 的 MergeReport。 */
@@ -594,6 +594,11 @@ export interface LlmConfig {
    * 否则只是把"被截断"换成了"超时"。
    */
   timeoutMs: number;
+  /**
+   * 用户在设置页点「同意并开始」的时刻；null 是还没同意，这时一个请求都不发（见 lib/llm.ts 的 assertReady）。
+   * 只属于这一份安装：不进导出文件，换一台设备要重新确认。
+   */
+  consentAt: number | null;
 }
 
 export const DEFAULT_LLM: LlmConfig = {
@@ -602,6 +607,7 @@ export const DEFAULT_LLM: LlmConfig = {
   model: "MiniMax-M3-highspeed",
   maxTokens: 4096,
   timeoutMs: 60_000,
+  consentAt: null,
 };
 
 /** 累计用量，给用户一个"烧了多少"的直观数字。 */

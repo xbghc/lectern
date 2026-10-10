@@ -200,6 +200,15 @@ test("LLM 配置合并默认值", async () => {
   assert.equal(cfg.model, "MiniMax-M3-highspeed");
 });
 
+test("旧版本存下的配置没有同意记录，读出来是没同意；同意之后改别的不会把它冲掉，导出文件里也没有它", async () => {
+  await area.set({ llm: { apiKey: "k" } });
+  assert.equal((await llm.getLlmConfig()).consentAt, null);
+  await llm.setLlmConfig({ consentAt: 1234 });
+  await llm.setLlmConfig({ model: "M-other" });
+  assert.equal((await llm.getLlmConfig()).consentAt, 1234);
+  assert.equal("consentAt" in (await store.exportAll()).llm, false);
+});
+
 test("停在旧默认值上的输出上限与超时被抬上来", async () => {
   await area.set({ llm: { apiKey: "k", maxTokens: 1024, timeoutMs: 30_000 } });
   const cfg = await llm.getLlmConfig();

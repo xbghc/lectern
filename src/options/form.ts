@@ -259,7 +259,27 @@ void chrome.runtime.sendMessage({ type: "settings:get" }).then((s: Settings) => 
 
 const llmStatus = $("llm-status");
 
+/*
+ * 同意把内容发给模型服务。没同意之前后台一个请求都不发（lib/llm.ts 的 assertReady），
+ * 所以这里只管把那一个时间戳写进去或清掉，不用通知别的地方。
+ */
+let consented = false;
+function fillConsent(at: number | null): void {
+  consented = at !== null;
+  $("consent").hidden = consented;
+  $("consent-state").hidden = !consented;
+  if (at !== null) $("consent-date").textContent = new Date(at).toLocaleDateString("zh-CN");
+}
+async function setConsent(at: number | null): Promise<void> {
+  await chrome.runtime.sendMessage({ type: "llm:set", config: { consentAt: at } });
+  llmStatus.textContent = "";
+  await loadLlm();
+}
+$("consent-agree").addEventListener("click", () => void setConsent(Date.now()));
+$("consent-revoke").addEventListener("click", () => void setConsent(null));
+
 function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
+  fillConsent(cfg.consentAt ?? null);
   // 密钥不回显：后台只回传"设没设过"。留空提交表示保持不变。
   llmFields.apiKey.value = "";
   llmFields.apiKey.placeholder = cfg.apiKeySet ? "已设置，留空则保持不变" : "尚未设置";
@@ -286,6 +306,12 @@ $("save-llm").addEventListener("click", async () => {
   if (key) patch.apiKey = key;
 
   await chrome.runtime.sendMessage({ type: "llm:set", config: patch });
+  // 测试连接也是一次请求：没同意过就不发，说清楚卡在哪儿
+  if (!consented) {
+    llmStatus.textContent = "已保存。在页面顶部点「同意并开始」之后才会发请求。";
+    await loadLlm();
+    return;
+  }
   llmStatus.textContent = "已保存，正在测试…";
   const res = (await chrome.runtime.sendMessage({ type: "llm:test" })) as {
     ok: boolean;

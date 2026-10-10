@@ -2,6 +2,7 @@ import type { AnyMessage, BgToContent, OcrReply, PopupToContent } from "../types
 import { PORT_TRANSLATE } from "../types.ts";
 import { normalizeUrl } from "../lib/url.ts";
 import { boot, handle } from "./handle.ts";
+import { getLlmConfig } from "../core/background/llm.ts";
 import { getOpen, recoverOpen } from "../features/reading/background.ts";
 import { attachTranslatePort } from "../features/translation/background.ts";
 import { setOcrBackend } from "../features/translation/ocr.ts";
@@ -82,13 +83,20 @@ chrome.commands.onCommand.addListener((command) => {
 chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId === "screenshot-translate") void screenshotTranslate();
 });
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
     id: "screenshot-translate",
     title: "截图翻译",
     contexts: ["page", "image", "selection"],
   });
+  // 设置页顶部有一段「会发什么给模型服务」的确认，同意之前一个请求都不发。
+  // 新装的：第一件事就是看它、填 Key。从旧版本升上来的：Key 早填过了，却没见过这段话，
+  // 升级后判别和翻译会全停——把设置页打开，人才知道去哪儿点。
+  const llm = await getLlmConfig();
+  if (!llm.consentAt && (details.reason === "install" || (details.reason === "update" && llm.apiKey))) {
+    void chrome.runtime.openOptionsPage();
+  }
 });
 
 chrome.runtime.onConnect.addListener((port) => {

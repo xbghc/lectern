@@ -13,7 +13,7 @@ import { LlmError } from "../src/lib/llm.ts";
 import type { LlmConfig } from "../src/types.ts";
 import { DEFAULT_LLM } from "../src/types.ts";
 
-const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "k", timeoutMs: 1_000 };
+const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "k", consentAt: 1, timeoutMs: 1_000 };
 const FENCE = "```";
 
 function okResponse(text: string, stopReason = "end_turn"): Response {

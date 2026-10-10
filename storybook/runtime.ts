@@ -87,7 +87,8 @@ export const shim = installChromeShim({
       case 'articles:blacklist-suggest': return options.state === 'error' ? { ok: false, error: '模型响应超时（模拟）' }
         : { ok: true, suggestions: [{ pattern: msg.articleIds[0] || ARTICLE_URL, reason: '模拟建议：排除所选页面的具体路径。请核对该路径是否包含仍需记录的文章。' }] };
       case 'llm:test': return options.state === 'error' ? { ok: false, error: '连接超时（模拟）' } : { ok: true, model: 'storybook-preview' };
-      case 'llm:get': return { ...seed.data.llm, apiKeySet: options.state !== 'empty' };
+      // 走真的读取，这样在预览里点「同意并开始」「撤回」能看到界面跟着变；只有「填没填过 Key」是按场景假装的
+      case 'llm:get': return Promise.resolve(handle(msg, sender)).then(cfg => ({ ...(cfg as object), apiKeySet: options.state !== 'empty' }));
       case 'article:review': return { ok: true, review: seed.data[`r:${seed.articles[1]!.id}` as keyof typeof seed.data] };
       case 'review:assist': return { ok: true, text: '可以把 consolidate 和“把零散知识放在一起”联系起来。' };
       case 'page:capture': return { ok: false, error: '截图需要真实浏览器扩展或安卓宿主；此处只预览界面。' };

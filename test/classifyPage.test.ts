@@ -27,7 +27,7 @@ const originalFetch = globalThis.fetch;
 beforeEach(async () => {
   local = memoryBackend(); session = memoryBackend(); calls = 0; waits = []; replies = [];
   (globalThis as Record<string, unknown>).chrome = { storage: { local, session } };
-  await local.set({ settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: [] }, llm: { ...DEFAULT_LLM, apiKey: 'test-only' } });
+  await local.set({ settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: [] }, llm: { ...DEFAULT_LLM, apiKey: 'test-only', consentAt: 1 } });
   globalThis.fetch = async () => {
     calls++;
     const next = replies.shift();

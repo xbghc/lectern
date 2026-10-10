@@ -65,7 +65,7 @@ beforeEach(async () => {
   area.open(); // 上一条用例断言失败时闸门可能还关着，别让它把后面的全堵死
   await bookkeepingSettled();
   area = fakeArea();
-  await setLlmConfig({ apiKey: "k" });
+  await setLlmConfig({ apiKey: "k", consentAt: 1 });
 });
 
 test("模型答完、划词存好就回复；用量和耗时随后一笔记上，不让人等", async () => {
@@ -122,7 +122,7 @@ test("有状态库时：记账走本机专用的直写，不进 outbox、不催�
   let mutations = 0;
   onLocalMutation(() => { mutations++; });
   try {
-    await setLlmConfig({ apiKey: "k" });
+    await setLlmConfig({ apiKey: "k", consentAt: 1 });
     await driver.update((s) => { s.outbox = []; });
     mutations = 0;
     serve(GOOD);

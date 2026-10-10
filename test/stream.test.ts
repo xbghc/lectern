@@ -15,7 +15,7 @@ import {
 import type { AskRequest, LlmConfig, PartialTranslation, TranslateRequest } from "../src/types.ts";
 import { DEFAULT_LLM } from "../src/types.ts";
 
-const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "test-key", timeoutMs: 1_000 };
+const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "test-key", consentAt: 1, timeoutMs: 1_000 };
 
 const REQ: TranslateRequest = {
   articleId: "https://a.com/p",
@@ -206,6 +206,27 @@ test("HTTP 200 里的 base_resp 业务错误也要拦下", async () => {
       ),
     (e: unknown) => e instanceof LlmError && e.kind === "http" && /1008/.test(e.message),
   );
+});
+
+test("没同意过：流式同样不发请求，报 config", async () => {
+  let called = false;
+  await assert.rejects(
+    () =>
+      callMessagesStream(
+        { ...CFG, consentAt: null },
+        "s",
+        "u",
+        { onDelta: () => {} },
+        {
+          fetch: (() => {
+            called = true;
+            return Promise.reject(new Error("不该走到这"));
+          }) as unknown as typeof fetch,
+        },
+      ),
+    (e: unknown) => e instanceof LlmError && e.kind === "config",
+  );
+  assert.equal(called, false);
 });
 
 test("缺 API key 直接报 config，不发请求", async () => {

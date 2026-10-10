@@ -206,6 +206,19 @@ async function postMessages(
   }
 }
 
+/** 没同意过时各处看到的那句话。设置页顶部那段说明就是它指的地方。 */
+export const CONSENT_NEEDED = "还没有同意把内容发给模型服务：打开设置页，在顶部确认后才会开始";
+
+/**
+ * 发请求前的两道门：有没有密钥，有没有同意过把内容发给模型服务。
+ * 两样都算配置问题（kind 都是 config），界面按同一条路把人引到设置页。
+ * 放在这里而不是各个调用方：所有请求都从下面两个函数出去，漏不掉。
+ */
+function assertReady(config: LlmConfig): void {
+  if (!config.apiKey) throw new LlmError("尚未填写 MiniMax API Key", "config");
+  if (!config.consentAt) throw new LlmError(CONSENT_NEEDED, "config");
+}
+
 /** 一次非流式 Messages 调用。只负责发出去和把文本取回来，不懂业务。 */
 export async function callMessages(
   config: LlmConfig,
@@ -213,7 +226,7 @@ export async function callMessages(
   userText: string,
   deps: LlmDeps = { fetch: globalThis.fetch.bind(globalThis) },
 ): Promise<CallResult> {
-  if (!config.apiKey) throw new LlmError("尚未填写 MiniMax API Key", "config");
+  assertReady(config);
 
   // 计时从这里起：缺配置那次根本没发请求，不该占一格
   const now = deps.now ?? (() => performance.now());
@@ -352,7 +365,7 @@ export async function callMessagesStream(
   opts: StreamOptions,
   deps: LlmDeps = { fetch: globalThis.fetch.bind(globalThis) },
 ): Promise<CallResult> {
-  if (!config.apiKey) throw new LlmError("尚未填写 MiniMax API Key", "config");
+  assertReady(config);
   if (opts.signal?.aborted) throw new LlmError("已取消", "abort");
 
   const now = deps.now ?? (() => performance.now());

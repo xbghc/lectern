@@ -1,0 +1,66 @@
+name: Chrome Web Store
+
+# 把一次发布里的扩展 zip 传到 Chrome 应用商店并提交审核。
+# 发版工作流（release.yml）发完 GitHub Release 之后会调它；也可以在 Actions 页面对某个标签手动重跑——
+# 商店里上一版还在审的时候传不上去，等它出了结果再来这里补传。
+#
+# 没配凭据（CWS_SERVICE_ACCOUNT_JSON、CWS_PUBLISHER_ID 两个 Secret，见 docs/chrome-web-store.md）时
+# 整件事跳过，不算失败。审核跳不过：这里做的只是「上传 + 点提交」。
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      CWS_SERVICE_ACCOUNT_JSON:
+        required: false
+      CWS_PUBLISHER_ID:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 要上传的版本标签，例如 v0.3.18
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: 上传并提交审核
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
+      CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+    steps:
+      - name: 没配凭据就跳过
+        id: creds
+        run: |
+          if [ -n "$CWS_SERVICE_ACCOUNT_JSON" ] && [ -n "$CWS_PUBLISHER_ID" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::没有配置 Chrome 应用商店的凭据，跳过上传"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.creds.outputs.ok == 'true'
+
+      # 脚本靠 node --experimental-strip-types 直接跑 TypeScript，要 22.6+；它只用 Node 自带的模块，不必 npm ci
+      - uses: actions/setup-node@v7
+        if: steps.creds.outputs.ok == 'true'
+        with:
+          node-version: 22
+
+      - name: 取这次发布的扩展包
+        if: steps.creds.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" --pattern "lectern-extension-$TAG.zip"
+
+      - name: 上传到商店并提交审核
+        if: steps.creds.outputs.ok == 'true'
+        run: node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/store-upload.ts "lectern-extension-$TAG.zip"

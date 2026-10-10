@@ -30,7 +30,7 @@ beforeEach(async () => {
   status = 200;
   await local.set({
     settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: ["zhihu.com"], translationAllowedUrls: ["nytimes.com"], finishRatio: 0.7 },
-    llm: { ...DEFAULT_LLM, apiKey: "test-only" },
+    llm: { ...DEFAULT_LLM, apiKey: "test-only", consentAt: 1 },
     articles: {
       a: { id: "a", url: "https://www.weibo.com/1" },
       b: { id: "b", url: "https://weibo.com/2" },

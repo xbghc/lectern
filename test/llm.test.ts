@@ -14,7 +14,7 @@ import {
 import type { AskRequest, LlmConfig, TranslateRequest } from "../src/types.ts";
 import { DEFAULT_LLM } from "../src/types.ts";
 
-const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "test-key", timeoutMs: 1_000 };
+const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "test-key", consentAt: 1, timeoutMs: 1_000 };
 const FENCE = "```";
 
 const REQ: TranslateRequest = {
@@ -355,6 +355,24 @@ test("未配置 key 时不发请求", async () => {
     (e: unknown) => e instanceof LlmError && e.kind === "config",
   );
   assert.equal(called, false);
+});
+
+test("填了 key 但还没同意把内容发给模型服务：不发请求，报的是配置问题，话里说清去哪儿确认", async () => {
+  let called = false;
+  await assert.rejects(
+    callMessages({ ...CFG, consentAt: null }, "s", "u", {
+      fetch: (async () => {
+        called = true;
+        return okResponse("x");
+      }) as unknown as typeof fetch,
+    }),
+    (e: unknown) => e instanceof LlmError && e.kind === "config" && e.message.includes("设置页"),
+  );
+  assert.equal(called, false);
+});
+
+test("默认配置是没同意过的：新装和从旧版本升上来的都要先确认", () => {
+  assert.equal(DEFAULT_LLM.consentAt, null);
 });
 
 test("HTTP 错误带上状态码与响应体片段", async () => {

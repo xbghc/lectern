@@ -38,6 +38,12 @@
 搜了什么词；不进数据导出。**启用了设备同步的话，这份计数会传到你连的那台同步服务器上**，服务器的管理员可以在那边
 汇总分析；没启用同步就只留在本机（见[界面埋点](#界面埋点)）。
 
+**同意之前一个请求都不发**：设置页顶部列着会发给模型服务的内容——哪些是自动发的、哪些是用到功能时发的、发给谁。
+点「同意并开始」之前，文章判别、翻译和其余用到模型的功能全部不发请求（各处报的是「还没有同意…到设置页确认」）；
+同意之后可以在模型分区里撤回。这个确认只属于这一份安装：不进导出文件、不进同步，换设备或重装要再确认一次。
+扩展新装时设置页会自动打开；从 0.3.17 及更早版本升上来、已经填过 Key 的，升级后也会自动打开一次——在点同意之前判别和翻译是停的。
+App 不会自己弹，进「设置」就能看到这一块。
+
 **但划词翻译会联网**：选中的文本 + 它所在的段落 + 文章标题会发送给 MiniMax
 （`https://api.minimaxi.com/anthropic`）。扩展只在设置页**翻译白名单**里的站点上自动挂选区监听，
 其余页面要从弹出面板点「本页启用划词翻译」（只对本次加载有效，刷新即回到默认）或「本站始终开启」；
@@ -128,19 +134,24 @@ npm run build-storybook    # 静态预览输出到 storybook-static/
 
 ## 安装
 
+**从 Chrome 应用商店装**：打开 [Lectern 的商店页面](https://chromewebstore.google.com/detail/fpplijdeabekpbadojohidampfnjhcdf)，
+点「添加至 Chrome」，之后由浏览器自动更新。
+
+**自己构建**（Chrome / Edge 114+）：
+
 ```bash
 npm install
 npm run build      # 产出 dist/
 ```
 
-**Chrome / Edge 114+**：打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选 `dist/`。
-
+打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选 `dist/`。
 不想自己构建的话，[Releases](https://github.com/xbghc/lectern/releases) 里有打好的
 `lectern-extension-vX.Y.Z.zip`，解压后同样用「加载已解压的扩展程序」选那个目录。
+这样装的和商店版是两个扩展（ID 不同），本机数据各存各的，要互通得靠设备同步或导出导入。
 
-装好后打开扩展的**设置页**填 MiniMax API Key（去
+装好后**设置页**会自动打开。先看顶部那块「会发给模型服务的内容」，点「同意并开始」；再填 MiniMax API Key（去
 [platform.minimaxi.com](https://platform.minimaxi.com/) 创建），点「保存并测试连接」验证。
-未配置 API Key 时无法进行文章判别，因此不会新增文章阅读记录；已有历史仍可查看，翻译浮层会提示去配置。
+没同意或没填 API Key 时不会向模型发任何请求，也就无法进行文章判别，不会新增文章阅读记录；已有历史仍可查看，翻译浮层会提示去设置页。
 
 只支持 Chrome / Edge：侧边栏用的 `chrome.sidePanel` 是 Chrome 专有 API，Firefox 变体已移除。
 
@@ -1175,6 +1186,11 @@ git push --follow-tags
 工作流先核对标签和 package.json 的版本号一致（不一致就停），跑完整检查，把扩展打成
 `lectern-extension-vX.Y.Z.zip`、把 APK 一起挂到 GitHub Release 上。
 
+Release 发出去之后，另一个 job 调 `.github/workflows/store.yml`，把同一个 zip 传到 Chrome 应用商店并提交审核
+（`scripts/store-upload.ts`，商店 API V2 + 服务账号）。仓库里没配 `CWS_SERVICE_ACCOUNT_JSON`、`CWS_PUBLISHER_ID`
+这两个 Secret 时这一步自己跳过；配法和「上一版还在审、传不上去」时怎么补传，见
+[docs/chrome-web-store.md](docs/chrome-web-store.md#自动发布)。
+
 APK 默认是 **debug 签名**的：runner 每次生成的 debug 密钥都不一样，手机上装第二个版本得先卸载
 第一个。想让它能直接覆盖升级，生成一个签名密钥放进仓库的 Secrets（Settings → Secrets and variables → Actions）：
 
@@ -1502,6 +1518,10 @@ WebView 里的每一件事都还是纸上的：长按选区能不能按预期触
 归零、边缘划出来的临时状态栏压不压得住顶栏、以及 Android 15 以前（DecorView 还给 WebView 让位的
 那些版本）收起系统栏时正文会不会跳一下。
 装到手机上先读一篇、划几个词、导出到电脑导入一次——这一圈跑通了再看别的。
+
+**传 Chrome 应用商店那一步没对真的商店跑过**：请求是照 V2 文档写的，JWT 签名、三个请求的地址与顺序、
+「处理中」时的追问、拒收时的报错都对着假的商店测过（`test/storeUpload.test.ts`）；
+但商店实际回的状态值、服务账号在后台加进去之后是否立刻可用，要等配了凭据的第一次发版才知道。
 
 ## 当前不做的事
 

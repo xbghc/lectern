@@ -1,7 +1,7 @@
 name: Release
 
 # 打一个 v* 标签就发版：核对版本号、跑完整检查、把扩展打成 zip、打 APK，
-# 一起挂到 GitHub Release 上。
+# 一起挂到 GitHub Release 上；然后把 zip 传到 Chrome 应用商店提交审核（配了凭据的话）。
 #
 # APK 默认是 debug 签名的——runner 每次生成的 debug 密钥都不一样，手机上装第二个版本
 # 得先卸载第一个。仓库里配了四个 Secret（见 README「持续集成与发布」）时改出正式签名的包。
@@ -78,3 +78,16 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" lectern-*.zip lectern-*.apk \
             --title "$GITHUB_REF_NAME" --generate-notes
+
+  # GitHub Release 发完之后，把同一个 zip 传到 Chrome 应用商店并提交审核。没配凭据时那边自己跳过。
+  # 单独一个 job：商店那头失败（多半是上一版还在审）不影响上面已经发出去的 Release 和 APK，
+  # 之后在 Actions 页面对这个标签手动重跑 Chrome Web Store 工作流即可。
+  store:
+    name: Chrome 应用商店
+    needs: release
+    permissions:
+      contents: read
+    uses: ./.github/workflows/store.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

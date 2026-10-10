@@ -1,16 +1,17 @@
-# 上架 Chrome 应用商店
+# Chrome 应用商店
 
-可见范围选「不公开」（有链接的人才能安装）。这份文档是提交时要填的全部内容，照着后台的栏目贴进去。
+已上架：<https://chromewebstore.google.com/detail/fpplijdeabekpbadojohidampfnjhcdf>（扩展 ID `fpplijdeabekpbadojohidampfnjhcdf`）。
+这份文档是后台各栏填的内容的底稿，改了扩展的权限、数据去向或功能说明时照着更新后台；后半篇是自动发布怎么配。
 商店规则会变，栏目名以开发者后台的实际页面为准。
 
-## 步骤
+## 首次上架时的步骤
 
-1. 用 Google 账号打开 <https://chrome.google.com/webstore/devconsole>，付一次性 5 美元注册费。
+1. 用 Google 账号打开 <https://chrome.google.com/webstore/devconsole>，付一次性 5 美元注册费；在 Settings 里填联系邮箱并验证。
 2. 「新建项目」，上传 Release 里的 `lectern-extension-vX.Y.Z.zip`。
 3. 「商品详情」：按下面的文案填，语言先选中文（简体），再添加英语填英文那份。
    图标用 `src/icons/icon128.png`，截图用 `docs/store/` 下的五张（1280×800）。
 4. 「隐私权」：按下面「隐私页」一节填。隐私政策网址填 <https://xbghc.github.io/lectern/privacy/>。
-5. 「分发」：可见范围选「不公开」，地区全选。
+5. 「分发」：选可见范围（公开能被搜到，不公开只有拿到链接的人能装），地区全选。
 6. 提交审核。要了全部网站的访问权限，会进深度审核，通常几天到几周。
 
 商店版的扩展 ID 和「加载已解压的扩展程序」装的那个不一样，本机数据不会带过去：换装前先确认设备同步是通的，或导出一份文件。
@@ -105,7 +106,60 @@ Lectern assists reading articles on the web: it tracks reading progress and focu
 
 三条声明都勾选：不向第三方出售或转让数据（已批准的用途除外）；不用于与单一用途无关的目的；不用于信用评估或放贷。
 
-## 审核里最可能被问到的一点
+### 测试说明（Test instructions）
 
-填了 API Key 之后，**每个打开的网页的网址、标题和正文都会自动发给模型做文章判别**。商店的用户数据政策要求这类收集有「显著披露」并取得同意。
-现在的披露在商店说明和隐私政策里，扩展内部没有首次使用时的确认步骤。如果审核以此打回，需要在设置页首次保存 API Key 时加一个明确的同意提示。
+没有 API Key 时扩展什么都不做，审核员需要一个 Key 才看得到功能。Key 单独建一个额度很小的，审核过了就作废。
+
+```
+The extension needs a model API key before it does anything.
+1. After install the options page opens. Read the notice at the top and click "同意并开始" (Agree and start).
+2. Paste the API key provided below into the API Key field and click "保存并测试连接".
+3. Open any English article, e.g. https://en.wikipedia.org/wiki/Reading . After a few seconds the popup shows reading progress for the page.
+4. Open the popup and click "本页启用划词翻译" (enable selection translation on this page), then select a sentence to see the translation popover.
+5. Screenshot translation: press Alt+Shift+S and drag a box over text in an image.
+Device sync is optional, off by default, needs a self-hosted server and is not required for review.
+```
+
+## 发给模型之前的确认
+
+填了 API Key 之后，每个打开的网页的网址、标题和正文都会自动发给模型做文章判别。商店的用户数据政策要求这类收集有「显著披露」并取得同意，
+所以从 0.3.18 起：
+
+- 安装后设置页自动打开，顶部是一块说明，列出会自动发什么、哪些功能用到时发什么、发给谁；点「同意并开始」之前一个请求都不发。
+- 从更早版本升上来、已经填过 Key 的，升级后设置页同样会自动打开一次，确认之前判别和翻译是停的。
+- 同意可以在模型分区里撤回；它只属于这一份安装，不进导出文件。
+
+这段说明、商店的详细说明、隐私政策三处讲的是同一件事，改一处要对一下另外两处。
+
+## 自动发布
+
+配好下面两个 Secret 之后，打 `v*` 标签发版时 `release.yml` 会在 GitHub Release 发出去之后调 `store.yml`，
+把同一个 zip 传到商店并提交审核。没配时这一步自己跳过。审核跳不过，每个版本仍然要过审；商店信息（说明、截图、隐私声明）也还是在后台手改。
+
+### 建凭据（一次性）
+
+用的是服务账号：密钥不会过期。（OAuth 的 refresh token 在同意屏幕处于「测试中」时七天就失效，不适合放进 CI。）
+
+1. 打开 <https://console.cloud.google.com/>，新建一个项目（名字随意），在「API 和服务」里搜索并启用 **Chrome Web Store API**。
+2. 打开 <https://console.cloud.google.com/iam-admin/serviceaccounts>，在这个项目里创建一个服务账号。不用给它任何角色。
+3. 点进这个服务账号 →「密钥」→「添加密钥」→「创建新密钥」→ 选 JSON。浏览器会下载一个 `.json` 文件，这就是凭据。
+4. 打开 Chrome 应用商店的开发者后台 → **Account**（账号）页面，把服务账号的邮箱（形如 `xxx@项目名.iam.gserviceaccount.com`）加进去。
+   一个发布者目前只能加一个服务账号。同一页上能看到 **Publisher ID**，记下来。
+5. 把两样东西存成仓库的 Secret（在仓库目录下跑；文件路径换成第 3 步下载的那个）：
+
+   ```bash
+   gh secret set CWS_SERVICE_ACCOUNT_JSON -R xbghc/lectern < ~/Downloads/下载的密钥文件.json
+   gh secret set CWS_PUBLISHER_ID -R xbghc/lectern        # 回车后粘贴 Publisher ID
+   ```
+
+6. 存好之后把下载的那个 `.json` 文件删掉。它等于这个发布者账号的上传权限，别进仓库、别发给任何人。
+
+### 平时怎么用
+
+- **发版**：不用多做什么。`gh run watch` 里多出一个「Chrome 应用商店」的 job，日志里有商店回的状态。
+- **上一版还在审**：商店不收新包，这个 job 会失败（Release 和 APK 不受影响）。等上一版出了结果，
+  到 Actions → Chrome Web Store → Run workflow，填同一个标签重跑。
+- **本机手动传**：`CWS_SERVICE_ACCOUNT_JSON="$(cat key.json)" CWS_PUBLISHER_ID=... node --experimental-strip-types scripts/store-upload.ts lectern-extension-vX.Y.Z.zip`，
+  加 `--no-publish` 只传成草稿、不提交审核。
+
+脚本对着商店 API 的 V2 文档写的，发出去的请求有测试（`test/storeUpload.test.ts`，商店那头是假的）。

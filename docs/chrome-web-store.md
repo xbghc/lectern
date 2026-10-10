@@ -108,16 +108,17 @@ Lectern assists reading articles on the web: it tracks reading progress and focu
 
 ### 测试说明（Test instructions）
 
-没有 API Key 时扩展什么都不做，审核员需要一个 Key 才看得到功能。Key 单独建一个额度很小的，审核过了就作废。
+这一栏上限 500 个字符，下面这份是 410 个。没有 API Key 时扩展什么都不做，审核员需要一个 Key 才看得到翻译；
+MiniMax 的 Key 很长，这一栏放不下，那一页另有单独的凭据输入框就填在那里，没有就不给。给的话单独建一个额度很小的，审核过了就作废。
 
 ```
-The extension needs a model API key before it does anything.
-1. After install the options page opens. Read the notice at the top and click "同意并开始" (Agree and start).
-2. Paste the API key provided below into the API Key field and click "保存并测试连接".
-3. Open any English article, e.g. https://en.wikipedia.org/wiki/Reading . After a few seconds the popup shows reading progress for the page.
-4. Open the popup and click "本页启用划词翻译" (enable selection translation on this page), then select a sentence to see the translation popover.
-5. Screenshot translation: press Alt+Shift+S and drag a box over text in an image.
-Device sync is optional, off by default, needs a self-hosted server and is not required for review.
+Needs a MiniMax API key.
+1. Options page opens after install: click "同意并开始" (Agree) at the top.
+2. Paste the key into "API Key", click "保存并测试连接".
+3. Open an English article, e.g. https://en.wikipedia.org/wiki/Reading . The popup shows reading progress.
+4. In the popup click "本页启用划词翻译", then select text to see the translation.
+5. Alt+Shift+S starts screenshot translation.
+Sync is optional and off by default.
 ```
 
 ## 发给模型之前的确认

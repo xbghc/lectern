@@ -163,3 +163,6 @@ Device sync is optional, off by default, needs a self-hosted server and is not r
   加 `--no-publish` 只传成草稿、不提交审核。
 
 脚本对着商店 API 的 V2 文档写的，发出去的请求有测试（`test/storeUpload.test.ts`，商店那头是假的）。
+2026-10-10 用 v0.3.18 对真的商店跑通过一次：上传回 `SUCCEEDED`，提交回 `PENDING_REVIEW`。
+
+日志里花括号会显示成 `***`：密钥文件是多行的 JSON，GitHub 把它的每一行都当成要遮住的内容，单独成行的 `{`、`}` 也在其中。不影响功能。

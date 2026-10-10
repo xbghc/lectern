@@ -1019,7 +1019,7 @@ function assistBar(item: ReviewCardView): HTMLElement {
     const btn = tracked(el("button", "mini", label), `review.assist.${mode}`);
     btn.addEventListener("click", async () => {
       out.hidden = false;
-      out.textContent = "正在问 MiniMax…";
+      out.textContent = "正在问模型…";
       for (const b of bar.querySelectorAll("button")) b.disabled = true;
       // 后台拒掉请求（刚重启、还没醒）时也得把按钮放开，不然「正在问…」和一排死按钮要挂到刷新为止
       try {
@@ -1031,7 +1031,7 @@ function assistBar(item: ReviewCardView): HTMLElement {
         out.textContent = res.ok
           ? (res.text ?? "")
           : res.needsConfig
-            ? "还没配置 MiniMax API Key，去「设置」里填。"
+            ? (res.error ?? "模型服务还没配置好，去「设置」里处理。")
             : `失败：${res.error ?? "未知错误"}`;
       } catch (err) {
         out.textContent = `失败：${reason(err)}。再点一次重试。`;
@@ -1255,7 +1255,7 @@ function articleTools(item: ArticleReviewView, has: boolean): HTMLElement {
     out.textContent = res.noText
       ? "这篇的正文没有存下来——文章回顾是后来才加的功能，之前读过的文章没赶上。重新读一遍就会存下。"
       : res.needsConfig
-        ? "还没配置 MiniMax API Key，去「设置」里填。"
+        ? (res.error ?? "模型服务还没配置好，去「设置」里处理。")
         : `失败：${res.error ?? "未知错误"}`;
   });
 

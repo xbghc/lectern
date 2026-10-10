@@ -780,7 +780,8 @@ export class Popover {
       rect,
       `<div class="meta err"></div>${needsConfig ? '<div class="ctx"><button data-act="opt">去设置</button></div>' : ""}`,
       (box) => {
-        box.querySelector(".err")!.textContent = needsConfig ? "还没配置 MiniMax API Key" : truncate(message, 200);
+        // 配置类的失败不止「没填 Key」一种（还有没选服务商、没点同意），话由出错的地方说，这里照实显示
+        box.querySelector(".err")!.textContent = truncate(message, 200);
         box.querySelector('[data-act="opt"]')?.addEventListener("click", () => this.actions.onOpenOptions());
       },
     );
@@ -922,7 +923,7 @@ export class Popover {
     const a = this.ask;
     if (!a?.answer) return;
     const slot = a.answer;
-    slot.textContent = needsConfig ? "还没配置 MiniMax API Key" : truncate(message, 200);
+    slot.textContent = truncate(message, 200);
     slot.classList.add("err");
     if (needsConfig) {
       const row = document.createElement("div");

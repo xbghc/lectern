@@ -1,7 +1,7 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryBackend } from '../src/app/shim.ts';
-import { DEFAULT_LLM, DEFAULT_SETTINGS, type LlmFailure } from '../src/types.ts';
+import { DEFAULT_LLM, LEGACY_MINIMAX, DEFAULT_SETTINGS, type LlmFailure } from '../src/types.ts';
 import { classifyPage, NETWORK_RETRY_MS, REFUSAL_TTL_MS, type FilterDeps } from '../src/features/reading/articleFilter.ts';
 import { bookkeepingSettled, getLlmLog } from '../src/background/llmLog.ts';
 
@@ -27,7 +27,7 @@ const originalFetch = globalThis.fetch;
 beforeEach(async () => {
   local = memoryBackend(); session = memoryBackend(); calls = 0; waits = []; replies = [];
   (globalThis as Record<string, unknown>).chrome = { storage: { local, session } };
-  await local.set({ settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: [] }, llm: { ...DEFAULT_LLM, apiKey: 'test-only', consentAt: 1 } });
+  await local.set({ settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: [] }, llm: { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: 'test-only', consentAt: 1 } });
   globalThis.fetch = async () => {
     calls++;
     const next = replies.shift();

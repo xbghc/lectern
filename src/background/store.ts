@@ -561,6 +561,8 @@ export async function exportAll(): Promise<ExportBundle> {
     articleCards: data.articleCards,
     // 导出文件常被随手分享，密钥只导出"有没有设过"这一个 bit
     llm: {
+      provider: llm.provider,
+      protocol: llm.protocol,
       baseUrl: llm.baseUrl,
       model: llm.model,
       maxTokens: llm.maxTokens,

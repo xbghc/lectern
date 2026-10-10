@@ -24,7 +24,7 @@ import { SelectionTranslator, paragraphContext, type TranslateResponse } from ".
  *   - 总开关（translateEnabled）关着：不挂，也不给「本页开启」的入口。
  *   - 命中翻译白名单：自动挂。
  *   - 其余页面：默认不挂，用户从 popup（App 里是阅读器顶栏的「译」）点一下才挂，
- *     只对本次加载有效。在邮件、聊天这类网页应用里选中一段文字，不该悄悄发给 MiniMax。
+ *     只对本次加载有效。在邮件、聊天这类网页应用里选中一段文字，不该悄悄发给模型服务。
  *
  * 截图翻译不受这些管：每次都是用户亲手框的，见 screenshotAction。
  */
@@ -129,7 +129,7 @@ function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInit
  *
  * 走 port 而不是 sendMessage：一次请求要推多次增量（翻译是译文先到、语境解释后到，
  * 追问是答案一路往外冒），而 sendMessage 一个请求只允许一次应答。请求本身仍必须由
- * background 代发——MiniMax 端点没有 CORS 头，而且 API key 不能出现在与网页共享
+ * background 代发——模型服务的端点大多没有 CORS 头，而且 API key 不能出现在与网页共享
  * 进程的 content script 里。
  *
  * 翻译和追问共用这一段：两者的差别只在发什么、怎么认增量、怎么认最终结果，

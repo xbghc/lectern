@@ -12,9 +12,9 @@ import {
   translate,
 } from "../src/lib/llm.ts";
 import type { AskRequest, LlmConfig, TranslateRequest } from "../src/types.ts";
-import { DEFAULT_LLM } from "../src/types.ts";
+import { DEFAULT_LLM, LEGACY_MINIMAX } from "../src/types.ts";
 
-const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey: "test-key", consentAt: 1, timeoutMs: 1_000 };
+const CFG: LlmConfig = { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: "test-key", consentAt: 1, timeoutMs: 1_000 };
 const FENCE = "```";
 
 const REQ: TranslateRequest = {

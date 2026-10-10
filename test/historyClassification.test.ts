@@ -1,7 +1,7 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryBackend } from '../src/app/shim.ts';
-import { DEFAULT_LLM, DEFAULT_SETTINGS } from '../src/types.ts';
+import { DEFAULT_LLM, LEGACY_MINIMAX, DEFAULT_SETTINGS } from '../src/types.ts';
 import { classifyHistoryArticle } from '../src/features/reading/articleFilter.ts';
 
 const id = 'https://example.com/article';
@@ -15,7 +15,7 @@ beforeEach(async () => {
   area = memoryBackend(); websiteCalls = 0; llmCalls = 0; webpageStatus = 200;
   decision = { isArticle: false, reason: '目录页面' };
   (globalThis as Record<string, unknown>).chrome = { storage: { local: area } };
-  await area.set({ articles: { [id]: { id, url: id, title: '示例' } }, settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: ['example.com'] }, llm: { ...DEFAULT_LLM, apiKey: 'test-only', consentAt: 1 } });
+  await area.set({ articles: { [id]: { id, url: id, title: '示例' } }, settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: ['example.com'] }, llm: { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: 'test-only', consentAt: 1 } });
   globalThis.fetch = async (input) => {
     if (String(input).startsWith('https://example.com')) {
       websiteCalls++;

@@ -7,7 +7,7 @@ import { planAutoUpdate, readUpdate, type AutoStep, type Update } from "../lib/u
  * 把「下载完再装」串成一步。
  *
  * App 不走应用商店，装出去的包只能自己管升级。检查走 GitHub 的 Releases API——
- * 这是继 MiniMax 之后 App 会主动联系的第二个地方，所以：默认每天最多问一次、
+ * 这是继模型服务之后 App 会主动联系的第二个地方，所以：默认每天最多问一次、
  * 设置页能关、请求里除了「最新的那次发布是什么」不带任何东西（没有 API Key，
  * 没有阅读记录，连当前版本号都不发——比较是在本机做的）。
  */

@@ -193,11 +193,35 @@ test("LLM 配置与 Settings 分开存放", async () => {
   assert.equal((await llm.getLlmConfig()).apiKey, "secret");
 });
 
-test("LLM 配置合并默认值", async () => {
-  await llm.setLlmConfig({ apiKey: "k" });
+test("新装：什么都没选——不替人预设哪一家", async () => {
   const cfg = await llm.getLlmConfig();
-  assert.equal(cfg.baseUrl, "https://api.minimaxi.com/anthropic");
-  assert.equal(cfg.model, "MiniMax-M3-highspeed");
+  assert.deepEqual([cfg.provider, cfg.baseUrl, cfg.model, cfg.apiKey], ["", "", "", ""]);
+  // 新装后先点了同意、还没选提供商：存下的东西不能被当成旧版本留下的配置
+  await llm.setLlmConfig({ consentAt: 1 });
+  assert.equal((await llm.getLlmConfig()).baseUrl, "");
+});
+
+test("多提供商之前存下的配置：照当时的默认补成 MiniMax，接着能用", async () => {
+  await area.set({ llm: { apiKey: "k" } });
+  const cfg = await llm.getLlmConfig();
+  assert.deepEqual([cfg.provider, cfg.protocol, cfg.baseUrl, cfg.model], ["minimax-cn", "anthropic", "https://api.minimaxi.com/anthropic", "MiniMax-M3-highspeed"]);
+  // 那时手改过 Base URL 指向别家的：地址照旧，标签不再叫 MiniMax
+  await area.set({ llm: { apiKey: "k", baseUrl: "https://other.example/anthropic", model: "m" } });
+  const custom = await llm.getLlmConfig();
+  assert.deepEqual([custom.provider, custom.protocol, custom.baseUrl, custom.model], ["custom", "anthropic", "https://other.example/anthropic", "m"]);
+});
+
+test("换了服务地址而没给新密钥：旧密钥清掉，不会被发到新的那一家去", async () => {
+  await llm.setLlmConfig({ provider: "a", baseUrl: "https://a.example/v1", model: "m", apiKey: "key-of-a" });
+  // 同一家改个路径、改模型：密钥留着
+  await llm.setLlmConfig({ baseUrl: "https://a.example/v2", model: "m2" });
+  assert.equal((await llm.getLlmConfig()).apiKey, "key-of-a");
+  // 换了主机：清掉
+  await llm.setLlmConfig({ provider: "b", baseUrl: "https://b.example/v1" });
+  assert.equal((await llm.getLlmConfig()).apiKey, "");
+  // 换主机的同时给了新密钥：用新的
+  await llm.setLlmConfig({ provider: "a", baseUrl: "https://a.example/v1", apiKey: "new-key" });
+  assert.equal((await llm.getLlmConfig()).apiKey, "new-key");
 });
 
 test("旧版本存下的配置没有同意记录，读出来是没同意；同意之后改别的不会把它冲掉，导出文件里也没有它", async () => {

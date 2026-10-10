@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "ocr-check": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/ocr-check.ts",
+    "providers:update": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/update-providers.ts",
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",

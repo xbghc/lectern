@@ -578,8 +578,23 @@ export interface ReviewCardView {
  * 而 content script 与网页共享同一个进程——API key 绝不能出现在那里。
  * 翻译请求一律由 background 代发。
  */
+/**
+ * 请求用哪套协议说话。两种都是原生直连，不经任何中转：
+ * `anthropic` 是 Anthropic 的 Messages 接口（`…/messages`，`x-api-key`），
+ * `openai` 是 OpenAI 的 Chat Completions 接口（`…/chat/completions`，`Authorization: Bearer`）——
+ * 各家「OpenAI 兼容」的端点实现的都是后者。
+ */
+export type LlmProtocol = "anthropic" | "openai";
+
 export interface LlmConfig {
   apiKey: string;
+  /**
+   * 选的是哪一家：`src/lib/providers.generated.ts` 里的 id，`custom` 是自己填的地址，空串是还没选。
+   * 只是个标签——发请求看的是下面的 protocol 和 baseUrl，这样清单里的地址过时了，人自己改掉 baseUrl 就能用。
+   */
+  provider: string;
+  protocol: LlmProtocol;
+  /** 带版本段的接口根地址，例如 `https://api.openai.com/v1`；请求时在后面接 `/chat/completions` 或 `/messages`。 */
   baseUrl: string;
   model: string;
   /**
@@ -601,13 +616,29 @@ export interface LlmConfig {
   consentAt: number | null;
 }
 
+/** 新装时什么都没选：用哪一家、哪个模型是用户自己的决定，不替人预设。 */
 export const DEFAULT_LLM: LlmConfig = {
   apiKey: "",
-  baseUrl: "https://api.minimaxi.com/anthropic",
-  model: "MiniMax-M3-highspeed",
+  provider: "",
+  protocol: "openai",
+  baseUrl: "",
+  model: "",
   maxTokens: 4096,
   timeoutMs: 60_000,
   consentAt: null,
+};
+
+/**
+ * 支持多家提供商之前，唯一能用的就是 MiniMax 的 Anthropic 兼容端点，地址和模型名是写死的默认值。
+ * 那时存下的配置没有 provider 这个键，读出来时缺的字段要按这一份补（见 core/background/llm.ts），
+ * 不能落到上面「什么都没选」的默认上——否则老用户升级后翻译就停了。
+ * 地址不带 `/v1`：那时的代码自己接 `/v1/messages`，现在的 endpoint() 认得这种写法。
+ */
+export const LEGACY_MINIMAX: Pick<LlmConfig, "provider" | "protocol" | "baseUrl" | "model"> = {
+  provider: "minimax-cn",
+  protocol: "anthropic",
+  baseUrl: "https://api.minimaxi.com/anthropic",
+  model: "MiniMax-M3-highspeed",
 };
 
 /** 累计用量，给用户一个"烧了多少"的直观数字。 */

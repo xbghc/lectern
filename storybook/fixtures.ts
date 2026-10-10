@@ -60,7 +60,8 @@ export function fixtures(empty = false) {
     data: {
       settings: { ...DEFAULT_SETTINGS, articleExcludedUrls: ['https://example.com/search'], translationAllowedUrls: ['nytimes.com'] },
       // 空状态是「刚装上」：还没同意把内容发给模型服务，设置页顶部那块确认说明会出现
-      llm: { ...DEFAULT_LLM, apiKey: '', model: 'storybook-preview', consentAt: empty ? null : now - 86_400_000 },
+      llm: empty ? { ...DEFAULT_LLM }
+        : { ...DEFAULT_LLM, provider: 'openai', protocol: 'openai' as const, baseUrl: 'https://api.openai.com/v1', model: 'storybook-preview', consentAt: now - 86_400_000 },
       articles: Object.fromEntries(activeArticles.concat(empty ? [] : [chapter]).map(a => [a.id, a])), sessions: empty ? [] : sessions,
       [BOOKS_KEY]: empty ? {} : { [book.id]: book },
       [`rh:${chapterId(BOOK_ID, 0)}`]: {

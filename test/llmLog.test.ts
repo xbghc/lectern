@@ -1,7 +1,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import type { AppError, LlmFailure, ReaderFetch } from "../src/types.ts";
-import { DEFAULT_LLM } from "../src/types.ts";
+import { DEFAULT_LLM, LEGACY_MINIMAX } from "../src/types.ts";
 import { type CallTiming, LlmError } from "../src/lib/llm.ts";
 import {
   KEY_LLM_LOG,
@@ -49,7 +49,7 @@ beforeEach(() => {
   area = fakeArea();
 });
 
-const CFG = { ...DEFAULT_LLM, apiKey: "k", consentAt: 1, model: "M-test" };
+const CFG = { ...DEFAULT_LLM, ...LEGACY_MINIMAX, apiKey: "k", consentAt: 1, model: "M-test" };
 /** 一条合法的翻译链路轨迹，够验证它跟着一起导出、一起清。字段本身在 translationDiagnostics.test.ts 里测。 */
 const TRACE = {
   id: "trace-1", ts: Date.now(), source: "mouse", status: "success", kind: "word", text: "river", textChars: 5,

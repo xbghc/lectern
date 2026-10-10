@@ -63,6 +63,19 @@
         box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14); font-size: 12px; line-height: 1.65; color: var(--fg-soft);
       }
       .info-pop p { margin: 0 0 8px; }
+      /* 服务商：上面搜，下面选。列表用原生 select，键盘和读屏都是现成的 */
+      .provider-picker { display: grid; gap: 6px; }
+      /* 右边那一栏有好几行高：标签对着第一行，不悬在半中间 */
+      .field.tall { align-items: start; }
+      .field.tall > label { padding-top: 6px; }
+      .provider-picker input, .provider-picker select, #protocol {
+        width: 100%; padding: 5px 7px; font: inherit; font-size: 13px; color: var(--fg);
+        background: var(--bg); border: 1px solid var(--line); border-radius: 3px;
+      }
+      .provider-picker select { padding: 2px; }
+      .provider-picker optgroup { color: var(--muted); font-style: normal; font-weight: 400; }
+      .provider-picker option { color: var(--fg); padding: 2px 6px; }
+      #protocol:disabled { color: var(--muted); }
       /*
        * 「同意把内容发给模型服务」的确认块。只在还没同意时出现，放在所有分区前面：
        * 这是用之前必须看到的一段话，不能收进哪个分区里等人去翻。同意之后整块收起，模型分区里留一行「已同意 · 撤回」。
@@ -190,7 +203,7 @@
     <section id="consent" class="consent" hidden>
       <h2>开始之前，请确认会发给模型服务的内容</h2>
       <p>
-        Lectern 用你自己的 API Key，直接请求下面「模型」分区里填的接口地址（默认是 MiniMax）。同意之后会发送：
+        Lectern 用你自己的 API Key，直接请求你在下面「模型」分区里选的那家服务。同意之后会发送：
       </p>
       <ul>
         <li>
@@ -250,18 +263,33 @@
     </fieldset>
 
     <fieldset id="sec-llm" data-nav="模型">
-      <legend>MiniMax（翻译与复习都用它）</legend>
-      <div class="field">
-        <label for="apiKey">API Key</label>
-        <input id="apiKey" type="password" placeholder="留空则保持不变" class="wide" />
+      <legend>模型服务（文章判别、翻译与复习都用它）</legend>
+      <div class="field tall">
+        <label for="provider-search">服务商</label>
+        <div class="wide provider-picker">
+          <input id="provider-search" type="search" autocomplete="off" spellcheck="false" />
+          <select id="provider" size="7" aria-label="模型服务商"></select>
+        </div>
       </div>
       <div class="field">
-        <label for="model">模型</label>
-        <input id="model" type="text" class="wide" />
+        <label for="protocol">协议</label>
+        <select id="protocol" class="wide">
+          <option value="openai">OpenAI 兼容（Chat Completions）</option>
+          <option value="anthropic">Anthropic 兼容（Messages）</option>
+        </select>
       </div>
       <div class="field">
         <label for="baseUrl">Base URL</label>
-        <input id="baseUrl" type="text" class="wide" />
+        <input id="baseUrl" type="text" class="wide" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.example.com/v1" />
+      </div>
+      <div class="field">
+        <label for="model">模型</label>
+        <input id="model" type="text" class="wide" list="model-list" autocomplete="off" spellcheck="false" />
+        <datalist id="model-list"></datalist>
+      </div>
+      <div class="field">
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="password" placeholder="留空则保持不变" class="wide" autocomplete="off" />
       </div>
       <div class="field">
         <label for="maxTokens">max_tokens</label>
@@ -274,8 +302,12 @@
         <span class="hint">流式下是整条流的总时限；实测 3–10 秒，长选区加讲解更久</span>
       </div>
       <p class="muted small">
-        去 <a href="https://platform.minimaxi.com/" target="_blank" rel="noreferrer">platform.minimaxi.com</a>
-        创建 API Key。密钥单独存放，不会随导出文件带出，也不会进入网页所在的进程。
+        服务商清单取自 <a href="https://models.dev" target="_blank" rel="noreferrer">models.dev</a>，选一家会带出它的地址和协议，两样都可以再手改；清单里没有的选「自定义地址」。
+        Base URL 要带版本那一段（例如 <code>https://api.openai.com/v1</code>）。模型一栏的候选不全，可以直接手填。
+        <a id="provider-doc" target="_blank" rel="noreferrer" hidden>这一家的模型与文档</a>
+      </p>
+      <p class="muted small">
+        API Key 在所选服务商的控制台里创建。密钥单独存放，不会随导出文件带出，也不会进入网页所在的进程；换了服务地址要重新填，旧的那把不会被发到新地址去。
       </p>
       <div class="row">
         <button id="save-llm" class="primary">保存并测试连接</button>

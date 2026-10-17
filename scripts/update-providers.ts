@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { normalizeLlmBaseUrl } from "../src/lib/llmUrl.ts";
 
 /*
  * 从 models.dev 取模型服务商的清单，裁成扩展用得上的那一小份，写进 src/lib/providers.generated.ts。
@@ -72,9 +73,10 @@ export interface Preset {
 export function toPreset(p: SourceProvider): Preset | null {
   const override = OVERRIDES[p.id];
   const protocol = override?.protocol ?? FAMILY[p.npm ?? ""];
-  const baseUrl = (override?.baseUrl ?? p.api ?? "").trim().replace(/\/+$/, "");
+  let baseUrl = override?.baseUrl ?? p.api ?? "";
   // 地址里带 ${账号ID} 这类占位符的，得按各人的账号拼，预设不了
   if (!protocol || !/^https?:\/\/[^${}\s]+$/.test(baseUrl)) return null;
+  try { baseUrl = normalizeLlmBaseUrl(baseUrl); } catch { return null; }
   const models = Object.values(p.models ?? {})
     .filter((m) => m.id && m.status !== "deprecated" && (m.modalities?.output ?? ["text"]).includes("text"))
     .sort((a, b) => (b.release_date ?? "").localeCompare(a.release_date ?? "") || a.id!.localeCompare(b.id!))

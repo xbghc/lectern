@@ -20,6 +20,8 @@ export interface NativeBridge {
   ocrStart(id: string, png: string): void;
   /** 发起请求；之后宿主回调 __fsHttp 的 head / chunk / end / error。 */
   httpStart(id: string, url: string, method: string, headersJson: string, body: string | null): void;
+  /** 不允许重定向的请求；旧宿主缺此方法时必须拒绝，不能静默退回会跟跳转的实现。 */
+  httpStartNoRedirect(id: string, url: string, method: string, headersJson: string, body: string | null): void;
   httpAbort(id: string): void;
   /** 写进系统「下载」目录。返回给用户看的一句话。 */
   saveFile(name: string, mime: string, text: string): string;
@@ -228,7 +230,8 @@ const callbacks: HostCallbacks["http"] = {
 export function nativeFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const bridge = native();
   if (!bridge?.httpStart || !bridge.httpAbort) return Promise.reject(new TypeError("宿主没有提供 HTTP 桥"));
-  const start = bridge.httpStart.bind(bridge);
+  if (init.redirect === "error" && !bridge.httpStartNoRedirect) return Promise.reject(new TypeError("宿主版本过旧，不能安全发送模型请求，请更新 App"));
+  const start = (init.redirect === "error" ? bridge.httpStartNoRedirect! : bridge.httpStart).bind(bridge);
   const abort = bridge.httpAbort.bind(bridge);
 
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;

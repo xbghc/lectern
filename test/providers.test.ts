@@ -48,6 +48,10 @@ test("裁剪：协议认不出的、地址要按账号拼的不收；模型只�
   assert.equal(toPreset({ id: "amazon-bedrock", npm: "@ai-sdk/amazon-bedrock" }), null);
   assert.equal(toPreset({ id: "cf", npm: "@ai-sdk/openai-compatible", api: "https://api.cloudflare.com/accounts/${ACCOUNT_ID}/ai/v1" }), null);
   assert.equal(toPreset({ id: "x", npm: "@ai-sdk/openai-compatible" }), null, "没给地址又不在手补的表里");
+  for (const api of ["https://api.example:bad", "http://api.example/v1", "http://192.168.1.2/v1", "https://user:pass@api.example/v1", "https://api.example/v1?q=x"]) {
+    assert.equal(toPreset({ id: "unsafe", npm: "@ai-sdk/openai-compatible", api }), null, api);
+  }
+  assert.equal(toPreset({ id: "local", npm: "@ai-sdk/openai-compatible", api: "http://127.0.0.1:1234/v1" })?.baseUrl, "http://127.0.0.1:1234/v1");
   const p = toPreset({
     id: "acme", name: "Acme", npm: "@ai-sdk/openai-compatible", api: "https://api.acme.test/v1/", doc: "https://acme.test/docs",
     models: {

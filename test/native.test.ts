@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { captureVisible, recognizeNative, installNative, hostHooks, onHostVisibility } from "../src/app/native.ts";
+import { captureVisible, recognizeNative, installNative, hostHooks, onHostVisibility, nativeFetch } from "../src/app/native.ts";
 import { cleanOcrLines } from "../src/lib/ocrText.ts";
 
 const g = globalThis as Record<string, unknown>;
@@ -78,4 +78,19 @@ test("宿主说「看不见了」：页面之外登记的先听到，再轮到�
     window.__fsHost!.visibility(true);
     assert.deepEqual(heard, ["engine:false", "page:false", "engine:true", "page:true"]);
   } finally { hostHooks.visibility = prior; }
+});
+
+test("模型请求选择不会跟跳转的原生入口；旧宿主 fail closed，文章 GET 保持原行为", async () => {
+  let ordinary = 0, safe = 0;
+  window.Native = {
+    httpAbort() {},
+    httpStart(id) { ordinary++; window.__fsHttp!.head(id, 204, "", "{}"); window.__fsHttp!.end(id); },
+    httpStartNoRedirect(id) { safe++; window.__fsHttp!.head(id, 204, "", "{}"); window.__fsHttp!.end(id); },
+  };
+  await nativeFetch("https://model.example/v1/messages", { method: "POST", redirect: "error" });
+  await nativeFetch("https://article.example/");
+  assert.deepEqual([ordinary, safe], [1, 1]);
+  delete window.Native.httpStartNoRedirect;
+  await assert.rejects(nativeFetch("https://model.example/v1/messages", { redirect: "error" }), /宿主版本过旧/);
+  assert.deepEqual([ordinary, safe], [1, 1], "绝不退回会跟跳转的旧宿主方法");
 });

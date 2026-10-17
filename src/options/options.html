@@ -304,10 +304,11 @@
       <p class="muted small">
         服务商清单取自 <a href="https://models.dev" target="_blank" rel="noreferrer">models.dev</a>，选一家会带出它的地址和协议，两样都可以再手改；清单里没有的选「自定义地址」。
         Base URL 要带版本那一段（例如 <code>https://api.openai.com/v1</code>）。模型一栏的候选不全，可以直接手填。
+        需要 HTTPS；仅本机 localhost、127.0.0.1、[::1] 允许 HTTP。请直接填写最终地址，不支持重定向、查询参数或片段。
         <a id="provider-doc" target="_blank" rel="noreferrer" hidden>这一家的模型与文档</a>
       </p>
       <p class="muted small">
-        API Key 在所选服务商的控制台里创建。密钥单独存放，不会随导出文件带出，也不会进入网页所在的进程；换了服务地址要重新填，旧的那把不会被发到新地址去。
+        API Key 在所选服务商的控制台里创建。密钥单独存放，不会随导出文件带出，也不会进入网页所在的进程；换了协议、主机或端口要填不同的新密钥，原来的那把不会被发到新地址去。同一服务只改路径不用重填。
       </p>
       <div class="row">
         <button id="save-llm" class="primary">保存并测试连接</button>

@@ -236,7 +236,12 @@ public class NativeBridge {
 
     @JavascriptInterface
     public void httpStart(String id, String url, String method, String headersJson, String body) {
-        pool.execute(() -> run(id, url, method, headersJson, body));
+        pool.execute(() -> run(id, url, method, headersJson, body, true));
+    }
+
+    @JavascriptInterface
+    public void httpStartNoRedirect(String id, String url, String method, String headersJson, String body) {
+        pool.execute(() -> run(id, url, method, headersJson, body, false));
     }
 
     @JavascriptInterface
@@ -246,7 +251,7 @@ public class NativeBridge {
         if (c != null) pool.execute(c::disconnect);
     }
 
-    private void run(String id, String url, String method, String headersJson, String body) {
+    private void run(String id, String url, String method, String headersJson, String body, boolean followRedirects) {
         HttpURLConnection c = null;
         try {
             URL target = new URL(url);
@@ -280,6 +285,10 @@ public class NativeBridge {
                 status = c.getResponseCode();
                 statusText = c.getResponseMessage();
                 boolean redirect = status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
+                if (redirect && !followRedirects) {
+                    error(id, "模型服务地址发生重定向，请在设置中直接填写最终 HTTPS 地址");
+                    return;
+                }
                 String location = c.getHeaderField("Location");
                 if (!redirect || location == null || hop >= MAX_REDIRECTS) break;
                 target = new URL(target, location);

@@ -7,6 +7,7 @@ import { summarizeUiUsage } from "../lib/uiUsage.ts";
 import { followStoredList } from "../lib/ruleChat.ts";
 import { ruleChatBox } from "../popup/ruleChat.ts";
 import { setupProviderPicker } from "./providerPicker.ts";
+import { normalizeLlmBaseUrl, sameLlmOrigin } from "../lib/llmUrl.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -268,16 +269,8 @@ const picker = setupProviderPicker({
   models: $<HTMLDataListElement>("model-list"),
   doc: $<HTMLAnchorElement>("provider-doc"),
 });
-/** 存着的配置指向哪台主机、有没有密钥：换主机时要逼着重填密钥，靠它比。 */
-let saved = { host: "", apiKeySet: false };
-const parsed = (url: string): URL | null => {
-  try {
-    return new URL(url);
-  } catch {
-    return null;
-  }
-};
-const hostOf = (url: string): string => parsed(url)?.host.toLowerCase() ?? "";
+/** 保存时的地址与密钥状态；协议、主机或有效端口变化都不能沿用原 Key。 */
+let saved = { baseUrl: "", apiKeySet: false };
 
 const llmStatus = $("llm-status");
 // 上一次保存留下的提示（「先选一家」之类）在人动手改了之后就过时了
@@ -308,7 +301,7 @@ function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
   llmFields.apiKey.value = "";
   llmFields.apiKey.placeholder = cfg.apiKeySet ? "已设置，留空则保持不变" : "尚未设置";
   picker.show(cfg);
-  saved = { host: hostOf(cfg.baseUrl), apiKeySet: !!cfg.apiKeySet };
+  saved = { baseUrl: cfg.baseUrl, apiKeySet: !!cfg.apiKeySet };
   llmFields.maxTokens.value = String(cfg.maxTokens);
   llmFields.timeout.value = String(Math.round(cfg.timeoutMs / 1000));
 }
@@ -320,15 +313,20 @@ function clamp(input: HTMLInputElement, fallback: number, min: number, max: numb
 }
 
 $("save-llm").addEventListener("click", async () => {
-  const baseUrl = llmFields.baseUrl.value.trim().replace(/\/+$/, "");
+  let baseUrl: string;
   const model = llmFields.model.value.trim();
   const key = llmFields.apiKey.value.trim();
   // 这几样缺了哪样请求都发不出去，存下来只会换成一条更晚、更绕的报错
   if (!picker.provider()) return void (llmStatus.textContent = "先在上面选一家服务商（清单里没有就选「自定义地址」）。");
-  if (!/^https?:$/.test(parsed(baseUrl)?.protocol ?? "")) return void (llmStatus.textContent = "Base URL 要是完整的地址，以 https:// 开头。");
+  try {
+    baseUrl = normalizeLlmBaseUrl(llmFields.baseUrl.value);
+  } catch (err) {
+    llmStatus.textContent = err instanceof Error ? err.message : "Base URL 不是有效的地址。";
+    return;
+  }
   if (!model) return void (llmStatus.textContent = "填上模型名：从候选里挑，或照服务商文档手填。");
   // 后台也会清掉旧密钥（见 setLlmConfig），这里先拦下说明白，免得人以为是保存坏了
-  if (saved.apiKeySet && !key && hostOf(baseUrl) !== saved.host) {
+  if (saved.apiKeySet && !key && !sameLlmOrigin(baseUrl, saved.baseUrl)) {
     return void (llmStatus.textContent = "换了服务地址：请填上这一家的 API Key。原来那把是上一家的，不会发到新地址去。");
   }
   const patch: Partial<LlmConfig> = {
@@ -341,7 +339,17 @@ $("save-llm").addEventListener("click", async () => {
   };
   if (key) patch.apiKey = key;
 
-  await chrome.runtime.sendMessage({ type: "llm:set", config: patch });
+  let result: { ok?: boolean; error?: string };
+  try {
+    result = await chrome.runtime.sendMessage({ type: "llm:set", config: patch }) as typeof result;
+  } catch (err) {
+    llmStatus.textContent = `保存失败：${err instanceof Error ? err.message : "未知错误"}`;
+    return;
+  }
+  if (!result?.ok) {
+    llmStatus.textContent = `保存失败：${result?.error ?? "未知错误"}`;
+    return;
+  }
   // 测试连接也是一次请求：没同意过就不发，说清楚卡在哪儿
   if (!consented) {
     llmStatus.textContent = "已保存。在页面顶部点「同意并开始」之后才会发请求。";

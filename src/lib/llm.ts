@@ -10,6 +10,7 @@ import type {
 } from "../types.ts";
 import { MAX_VOCAB } from "../types.ts";
 import { endpoint, isTruncated, readEvent, readReply, requestBody, requestHeaders } from "./llmWire.ts";
+import { parseLlmBaseUrl } from "./llmUrl.ts";
 
 /**
  * 向用户选的那家模型服务发请求。说两种协议——Anthropic 的 Messages 和 OpenAI 的 Chat Completions，
@@ -190,7 +191,8 @@ async function postMessages(
   count: { n: number },
 ): Promise<Response> {
   const url = endpoint(config);
-  const init: RequestInit = { method: "POST", headers: requestHeaders(config), body: JSON.stringify(body), signal };
+  // 初始地址安全也不能让重定向把 Key 或文章正文带到其它 origin / 明文连接。
+  const init: RequestInit = { method: "POST", headers: requestHeaders(config), body: JSON.stringify(body), signal, redirect: "error", credentials: "omit" };
   for (;;) {
     count.n++;
     const res = await deps.fetch(url, init);
@@ -210,6 +212,11 @@ export const CONSENT_NEEDED = "还没有同意把内容发给模型服务：打�
  */
 function assertReady(config: LlmConfig): void {
   if (!config.baseUrl || !config.model) throw new LlmError("还没有选模型服务：打开设置页，选一家并填上模型和 API Key", "config");
+  try {
+    parseLlmBaseUrl(config.baseUrl);
+  } catch (err) {
+    throw new LlmError(err instanceof Error ? err.message : "Base URL 不是有效的地址。", "config");
+  }
   if (!config.apiKey) throw new LlmError("尚未填写 API Key：打开设置页填写", "config");
   if (!config.consentAt) throw new LlmError(CONSENT_NEEDED, "config");
 }

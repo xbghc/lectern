@@ -1,9 +1,10 @@
 import type { LlmConfig, LlmProtocol } from "../types.ts";
+import { normalizeLlmBaseUrl } from "./llmUrl.ts";
 
 /**
  * 两套协议在线上长什么样：地址、请求头、请求体，以及怎么从响应和流里把文字、用量、结束原因读出来。
  *
- * 这里全是纯函数，不发请求也不抛错——超时、重试、把问题翻成带 kind 的 LlmError 都是 llm.ts 的事。
+ * 这里全是纯函数，不发请求；地址校验失败会抛错，llm.ts 在调用前翻成带 kind 的 LlmError。
  * 两套都是原生直连：选哪一家就用哪一家自己的格式发到它自己的地址，中间不把一种协议转成另一种。
  *
  * - `anthropic`：Messages 接口。MiniMax 的 Anthropic 兼容端点多一个自己的 `base_resp`，也在这条路上读。
@@ -27,7 +28,7 @@ const hostOf = (baseUrl: string): string => {
  * 多提供商之前存下的配置都是这样，那时的代码自己补 `/v1/messages`。
  */
 export function endpoint(config: Pick<LlmConfig, "protocol" | "baseUrl">): string {
-  const base = config.baseUrl.trim().replace(/\/+$/, "");
+  const base = normalizeLlmBaseUrl(config.baseUrl);
   if (config.protocol === "openai") return `${base}/chat/completions`;
   return /\/v\d+$/.test(base) ? `${base}/messages` : `${base}/v1/messages`;
 }

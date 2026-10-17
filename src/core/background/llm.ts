@@ -2,6 +2,7 @@ import { localStorage } from "../../sync/storage.ts";
 import type { LlmConfig, LlmUsage } from "../../types.ts";
 import { DEFAULT_LLM, EMPTY_USAGE, LEGACY_MINIMAX } from "../../types.ts";
 import { serialize, updateLocalOnly } from "../../background/store.ts";
+import { normalizeLlmBaseUrl, sameLlmOrigin } from "../../lib/llmUrl.ts";
 
 /**
  * 模型连接的配置与用量。文章判别、文章回顾、划词翻译共用一份，不属于任何一个功能。
@@ -28,6 +29,10 @@ export async function getLlmConfig(): Promise<LlmConfig> {
   const legacy = stored.provider === undefined && Object.keys(stored).length > 0;
   const merged = { ...DEFAULT_LLM, ...(legacy ? LEGACY_MINIMAX : {}), ...stored, ...raiseBudget(stored) };
   if (legacy && !/minimax/i.test(merged.baseUrl)) merged.provider = "custom";
+  // 旧配置不在读取时覆写；坏地址留给设置页修复，实际请求仍会严格拒绝。
+  if (merged.baseUrl) {
+    try { merged.baseUrl = normalizeLlmBaseUrl(merged.baseUrl); } catch { /* 请求前统一校验 */ }
+  }
   return merged;
 }
 
@@ -61,21 +66,16 @@ function raiseBudget(stored: StoredLlm): StoredLlm {
   };
 }
 
-const hostOf = (baseUrl: string): string => {
-  try {
-    return new URL(baseUrl).host.toLowerCase();
-  } catch {
-    return baseUrl.trim().toLowerCase();
-  }
-};
-
 export async function setLlmConfig(patch: Partial<LlmConfig>): Promise<LlmConfig> {
   return serialize(async () => {
     const current = await getLlmConfig();
     const merged = { ...current, ...patch };
-    // 换了服务地址而没给新密钥：存着的那把是上一家的，绝不能跟着发到新地址去。
-    // 在这里清掉而不是只靠设置页拦——这条规矩不该取决于哪个界面记得检查。
-    if (patch.baseUrl !== undefined && patch.apiKey === undefined && hostOf(patch.baseUrl) !== hostOf(current.baseUrl)) merged.apiKey = "";
+    // 空串表示尚未配置（允许先同意/撤销同意）；其它地址保存前先校验，失败绝不落盘。
+    if (merged.baseUrl !== "") merged.baseUrl = normalizeLlmBaseUrl(merged.baseUrl);
+    if (patch.apiKey !== undefined) merged.apiKey = patch.apiKey.trim();
+    // 回填或再次提交原 Key 不算新 Key。后台兜底，不能依赖某个 UI 是否记得清空输入框。
+    if (patch.baseUrl !== undefined && !sameLlmOrigin(current.baseUrl, merged.baseUrl)
+      && (patch.apiKey === undefined || merged.apiKey === current.apiKey.trim())) merged.apiKey = "";
     await local().set({ [KEY_LLM]: merged });
     return merged;
   });

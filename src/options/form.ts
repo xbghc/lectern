@@ -288,9 +288,20 @@ function fillConsent(at: number | null): void {
   if (at !== null) $("consent-date").textContent = new Date(at).toLocaleDateString("zh-CN");
 }
 async function setConsent(at: number | null): Promise<void> {
-  await chrome.runtime.sendMessage({ type: "llm:set", config: { consentAt: at } });
+  const action = at === null ? "撤回同意" : "同意";
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "llm:set", config: { consentAt: at } }) as { ok?: boolean; error?: string };
+    if (!result?.ok) {
+      llmStatus.textContent = `${action}失败：${result?.error ?? "未知错误"}`;
+      return;
+    }
+  } catch (err) {
+    llmStatus.textContent = `${action}失败：${err instanceof Error ? err.message : "未知错误"}`;
+    return;
+  }
+  // 只在持久化成功后更新同意状态；不重载其它未保存的表单内容。
+  fillConsent(at);
   llmStatus.textContent = "";
-  await loadLlm();
 }
 $("consent-agree").addEventListener("click", () => void setConsent(Date.now()));
 $("consent-revoke").addEventListener("click", () => void setConsent(null));

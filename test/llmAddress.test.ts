@@ -66,6 +66,46 @@ test("HTTPS 降级、非法地址保存失败不污染存储，失败后的队�
   assert.equal((await getLlmConfig()).apiKey, "");
 });
 
+test("旧无效地址不阻止独立撤回同意，但仍拒绝同意、混合保存和模型请求", async () => {
+  let requests = 0;
+  const deps = { fetch: (async () => { requests++; throw new Error("不该发请求"); }) as typeof fetch };
+  for (const baseUrl of INVALID) {
+    for (const legacy of [false, true]) {
+      const stored: Partial<LlmConfig> = { ...CFG, baseUrl };
+      if (legacy) delete stored.provider;
+      await driver.update(s => { s.data.llm = stored; });
+      const current = await getLlmConfig();
+      const before = await driver.read();
+      for (const patch of [{ consentAt: 2 }, { consentAt: null, model: "changed" }, { consentAt: null, baseUrl }]) {
+        await assert.rejects(setLlmConfig(patch), Error, baseUrl);
+        assert.deepEqual(await driver.read(), before, "失败保存不能暗中改变同意状态");
+      }
+      const revoked = await setLlmConfig({ consentAt: null });
+      assert.deepEqual(revoked, { ...current, consentAt: null });
+      assert.deepEqual((await driver.read()).data.llm, revoked);
+      await assert.rejects(callMessages(revoked, "s", "u", deps), LlmError);
+      await assert.rejects(callMessagesStream(revoked, "s", "u", { onDelta() {} }, deps), LlmError);
+      await assert.rejects(setLlmConfig({ consentAt: 3 }), Error, baseUrl);
+      assert.equal((await getLlmConfig()).consentAt, null);
+    }
+  }
+  assert.equal(requests, 0);
+});
+
+test("旧无效地址撤回写入失败时保留已同意状态，队列恢复后可以重试", async () => {
+  await driver.update(s => { s.data.llm = { ...CFG, baseUrl: "http://model.example/v1" }; });
+  const before = await driver.read();
+  installStorage({ read: driver.read, update: async () => { throw new Error("synthetic quota failure"); } });
+  try {
+    await assert.rejects(setLlmConfig({ consentAt: null }), /quota/);
+    assert.deepEqual(await driver.read(), before);
+    assert.equal((await getLlmConfig()).consentAt, CFG.consentAt);
+  } finally {
+    installStorage(driver);
+  }
+  assert.equal((await setLlmConfig({ consentAt: null })).consentAt, null);
+});
+
 test("回环 HTTP 也是不同 origin，不能携带原 HTTPS Key", async () => {
   await setLlmConfig({ baseUrl: "https://localhost:1234/v1", apiKey: "synthetic-local-key" });
   await setLlmConfig({ baseUrl: "http://localhost:1234/v1", apiKey: "synthetic-local-key" });

@@ -6,7 +6,7 @@ import { DEFAULT_LLM, DEFAULT_SETTINGS, type LlmConfig } from "../src/types.ts";
 import { freshState, installStorage, memoryDriver } from "../src/sync/storage.ts";
 import { getLlmConfig, setLlmConfig } from "../src/core/background/llm.ts";
 
-test("设置页与后台共同保护原 Key：同 origin 可保持、跨 origin 必须重填，回填旧值也不继承，保存失败不测试", async () => {
+test("设置页与后台共同保护原 Key 和同意状态：保存失败不测试，旧无效地址仍可撤回同意", async () => {
   const dom = new JSDOM(readFileSync(new URL("../src/options/options.html", import.meta.url), "utf8"), { url: "https://extension.example/options.html" });
   const doc = dom.window.document;
   // 与模型无关的同步表单不启动轮询。
@@ -41,6 +41,14 @@ test("设置页与后台共同保护原 Key：同 origin 可保持、跨 origin 
   const tick = () => new Promise<void>(resolve => setImmediate(resolve));
   const input = (id: string, value: string) => { (doc.getElementById(id) as HTMLInputElement).value = value; };
   const save = async () => { (doc.getElementById("save-llm") as HTMLButtonElement).click(); await tick(); };
+  const consent = async (action: "agree" | "revoke") => {
+    (doc.getElementById(`consent-${action}`) as HTMLButtonElement).click();
+    await tick();
+  };
+  const assertConsent = (expected: boolean) => {
+    assert.equal(doc.getElementById("consent")!.hidden, expected);
+    assert.equal(doc.getElementById("consent-state")!.hidden, !expected);
+  };
   try {
     await import("../src/options/form.ts");
     await tick();
@@ -75,6 +83,52 @@ test("设置页与后台共同保护原 Key：同 origin 可保持、跨 origin 
     assert.match(doc.getElementById("llm-status")!.textContent!, /保存失败：synthetic transport failure/);
     assert.deepEqual(await driver.read(), beforeFailure);
     assert.equal(tests, 0, "未同意和保存失败都不能触发测试请求");
+
+    // 同意操作的失败也必须可见，不能乐观地改变页面状态。
+    assertConsent(false);
+    for (const failure of ["reply", "throw"] as const) {
+      failSave = failure;
+      await consent("agree");
+      assert.match(doc.getElementById("llm-status")!.textContent!, /同意失败：synthetic/);
+      assertConsent(false);
+      assert.deepEqual(await driver.read(), beforeFailure);
+    }
+    failSave = false;
+    await consent("agree");
+    assertConsent(true);
+    assert.ok((await getLlmConfig()).consentAt);
+    const agreed = await driver.read();
+    for (const failure of ["reply", "throw"] as const) {
+      failSave = failure;
+      await save();
+      assert.match(doc.getElementById("llm-status")!.textContent!, /保存失败：synthetic/);
+      assertConsent(true);
+      assert.deepEqual(await driver.read(), agreed);
+      await consent("revoke");
+      assert.match(doc.getElementById("llm-status")!.textContent!, /撤回同意失败：synthetic/);
+      assertConsent(true);
+      assert.deepEqual(await driver.read(), agreed);
+    }
+    assert.equal(tests, 0, "已经同意时保存失败也不能触发测试请求");
+    failSave = false;
+    // 模拟升级前存下的公网 HTTP 和不可解析地址；撤回不得连带保存表单里的其它内容。
+    for (const baseUrl of ["http://model.example/v1", "not a URL"]) {
+      await driver.update(s => { s.data.llm = { ...initial, consentAt: 1, baseUrl }; });
+      const previousConfig = await getLlmConfig();
+      await consent("revoke");
+      assertConsent(false);
+      assert.deepEqual(await getLlmConfig(), { ...previousConfig, consentAt: null });
+      assert.equal(doc.getElementById("llm-status")!.textContent, "");
+      await consent("agree");
+      assert.match(doc.getElementById("llm-status")!.textContent!, /同意失败/);
+      assertConsent(false);
+      assert.equal((await getLlmConfig()).consentAt, null, "无效地址不能重新启用");
+      // 下一轮先恢复有效配置，在设置页上重新进入已同意状态。
+      await driver.update(s => { s.data.llm = initial; });
+      await consent("agree");
+      assertConsent(true);
+    }
+    assert.equal(tests, 0, "同意/撤回本身不发送模型请求");
   } finally {
     dom.window.close();
     for (const [key, value] of Object.entries(previous)) {

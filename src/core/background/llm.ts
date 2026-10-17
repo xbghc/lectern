@@ -70,8 +70,10 @@ export async function setLlmConfig(patch: Partial<LlmConfig>): Promise<LlmConfig
   return serialize(async () => {
     const current = await getLlmConfig();
     const merged = { ...current, ...patch };
-    // 空串表示尚未配置（允许先同意/撤销同意）；其它地址保存前先校验，失败绝不落盘。
-    if (merged.baseUrl !== "") merged.baseUrl = normalizeLlmBaseUrl(merged.baseUrl);
+    // 独立撤回同意不能被旧的坏地址锁住；夹带其它改动、重新同意仍须完整校验。
+    const revokeOnly = patch.consentAt === null && Object.keys(patch).length === 1;
+    // 空串表示尚未配置；其它地址保存前先校验，失败绝不落盘。
+    if (!revokeOnly && merged.baseUrl !== "") merged.baseUrl = normalizeLlmBaseUrl(merged.baseUrl);
     if (patch.apiKey !== undefined) merged.apiKey = patch.apiKey.trim();
     // 回填或再次提交原 Key 不算新 Key。后台兜底，不能依赖某个 UI 是否记得清空输入框。
     if (patch.baseUrl !== undefined && !sameLlmOrigin(current.baseUrl, merged.baseUrl)

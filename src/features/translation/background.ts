@@ -1,7 +1,7 @@
 import type { TranslatePortIn, TranslatePortOut } from "../../types.ts";
 import { recognize, warm } from "./ocr.ts";
 import { dueCards, reviewStats } from "../../lib/review.ts";
-import { handleAssist, streamAsk, streamTranslate, testConnection } from "./translate.ts";
+import { handleAssist, streamAsk, streamTranslate, streamVocabularyChat, testConnection } from "./translate.ts";
 import { recordTranslationTrace } from "./translationLog.ts";
 import {
   attachSnippets,
@@ -156,6 +156,12 @@ export function attachTranslatePort(port: PortLike): void {
         streamAsk(msg.req, (text) => post({ type: "ask-partial", text })),
         (res) => ({ type: "ask-done", res }),
         (error) => ({ type: "ask-done", res: { ok: false, error, needsConfig: false } }),
+      );
+    } else if (msg?.type === "vocab-chat") {
+      settle(
+        streamVocabularyChat(msg.req, text => post({ type: "vocab-chat-partial", text })),
+        res => ({ type: "vocab-chat-done", res }),
+        error => ({ type: "vocab-chat-done", res: { ok: false, error, needsConfig: false } }),
       );
     }
   });

@@ -25,7 +25,10 @@ const scenarios = [
   ['sidepanel', 'populated', 'articles', 'consolidate'],
   ['app', 'populated', 'articles', '共 3 篇'],
   ['app', 'populated', 'articles', '深度阅读的技艺'],
-  ['appOptions', 'populated', 'articles', '返回'],
+  ['appOptions', 'populated', 'articles', '设置'],
+  ['app', 'populated', 'stats', '近 30 天'],
+  ['chat', 'populated', 'articles', '把读过的词，用起来'],
+  ['chat', 'empty', 'articles', '还没有可练习的生词'],
   ['reader', 'populated', 'articles', 'Attention is a practice'],
   ['reader', 'populated', 'bookReader', '开篇：为什么越读越快，记住的越少'],
   ['reader', 'loading', 'articles', 'LLM 正在判断'],
@@ -55,7 +58,7 @@ for (const [page, state, tab, expected] of scenarios) test(`${page}: ${state} / 
 });
 
 test('page bundles inline their assets and replace only the App platform boot', () => {
-  assert.equal(Object.keys(pages).length, 7);
+  assert.equal(Object.keys(pages).length, 8);
   for (const html of Object.values(pages)) {
     assert.ok(html.includes('connect-src'));
     assert.equal(/<script[^>]+src=/.test(html), false);
@@ -399,4 +402,79 @@ test('Android reading entry, local reader preferences and chapter navigation use
     assert.deepEqual(await chrome.runtime.sendMessage({ type: 'settings:get' }), before);
     assert.deepEqual(Array.from(dom.window.__previewErrors), []);
   } finally { close(); }
+});
+
+function chatPreview(state = 'populated') {
+  const html = pages.chat.replace('<!--PREVIEW_CONFIG-->', `<script>window.__PREVIEW__={page:"chat",state:${JSON.stringify(state)},tab:"articles"}</script>`);
+  let close;
+  const dom = new JSDOM(html, { url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
+    beforeParse(window) {
+      close = window.close.bind(window); window.structuredClone = structuredClone;
+      window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder;
+      window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+      window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+      window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+    },
+  });
+  return { dom, close };
+}
+const chatSettle = () => new Promise(resolve => setTimeout(resolve, 150));
+test('vocabulary chat selects actual words, streams a reply and keeps history and drafts local', async () => {
+  const { dom, close } = chatPreview();
+  try {
+    await chatSettle();
+    const { document, chrome, Event, KeyboardEvent } = dom.window;
+    const before = await chrome.runtime.sendMessage({ type: 'settings:get' });
+    const snippets = await chrome.runtime.sendMessage({ type: 'snippets:list' });
+    document.getElementById('chat-select').click(); await chatSettle();
+    assert.equal(document.getElementById('chat-picker').open, true);
+    const choices = document.querySelectorAll('.chat-word-option');
+    choices[0].click();
+    document.querySelector('.chat-word-option[aria-pressed=true]').click();
+    assert.match(document.getElementById('picker-count').textContent, /至少/);
+    document.getElementById('picker-close').click();
+    const input = document.getElementById('chat-input');
+    input.value = 'I consolidate my knowledge by explaining it.'; input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
+    assert.equal(document.querySelectorAll('.chat-message').length, 0);
+    document.getElementById('chat-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await chatSettle();
+    assert.equal(document.querySelectorAll('.chat-message').length, 2);
+    assert.match(document.querySelector('.is-assistant').textContent, /What helps you/);
+    const saved = (await chrome.storage.local.get('vocabulary-chats'))['vocabulary-chats'];
+    assert.equal(saved[0].snippetIds.length, 1);
+    assert.equal(saved[0].messages[1].incomplete, undefined);
+    input.value = 'draft remains'; input.dispatchEvent(new Event('input'));
+    document.getElementById('chat-new').click(); await chatSettle();
+    document.getElementById('chat-history').click();
+    document.querySelector('.phone-chat-history-item').click();
+    assert.equal(input.value, 'draft remains');
+    assert.deepEqual(await chrome.runtime.sendMessage({ type: 'settings:get' }), before);
+    assert.deepEqual(await chrome.runtime.sendMessage({ type: 'snippets:list' }), snippets);
+    assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+  } finally { close(); }
+});
+test('failed or stopped vocabulary chat preserves input and marks partial answers incomplete', async () => {
+  for (const state of ['loading', 'error']) {
+    const { dom, close } = chatPreview(state);
+    try {
+      await chatSettle();
+      const { document, Event, chrome } = dom.window;
+      document.querySelector('#chat-starters button').click(); await chatSettle();
+      if (state === 'loading') {
+        const input = document.getElementById('chat-input');
+        input.value = 'new draft'; input.dispatchEvent(new Event('input'));
+        document.getElementById('chat-stop').click();
+        assert.equal(input.value, 'new draft');
+        assert.match(document.getElementById('chat-status').textContent, /停止/);
+      } else {
+        assert.equal(document.getElementById('chat-config').hidden, false);
+        assert.match(document.getElementById('chat-input').value, /情景对话/);
+      }
+      await chatSettle();
+      const saved = (await chrome.storage.local.get('vocabulary-chats'))['vocabulary-chats'];
+      assert.equal(saved[0].messages[1].incomplete, true);
+      assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+    } finally { close(); }
+  }
 });

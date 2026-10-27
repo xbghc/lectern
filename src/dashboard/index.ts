@@ -24,8 +24,9 @@ import { BOOKS_KEY, parseChapterId, type Book } from "../books/types.ts";
 import { localStorage } from "../sync/storage.ts";
 import { createUiTracker, isUiEvent, type UiEvent } from "../lib/uiUsage.ts";
 import { onSyncUpdated } from "../lib/syncUpdated.ts";
-import { decorateIcons } from "../ui/icons.ts";
+import { decorateIcons, icon } from "../ui/icons.ts";
 import { renderReadingHome, renderStatistics } from "./overview.ts";
+import { renderMobileStatistics } from "./mobileStatistics.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const send = <T,>(msg: unknown): Promise<T> => chrome.runtime.sendMessage(msg) as Promise<T>;
@@ -101,13 +102,19 @@ function show(pane: Pane, load = true): void {
     const panel = $(`pane-${p}`);
     if (!panel) continue;
     panel.hidden = p !== pane;
-    const active = p === pane || (document.body.classList.contains("app") && pane === "review" && p === "words");
+    const active = p === pane || (document.body.classList.contains("app") && ((pane === "review" && p === "words") || (["books", "stats"].includes(pane) && p === "articles")));
     document.querySelector(`.tab[data-tab="${p}"]`)?.classList.toggle("active", active);
     document.querySelector(`.tab[data-tab="${p}"]`)?.setAttribute("aria-current", active ? "page" : "false");
   }
   const titles = { articles: "我的阅读", words: "生词本", review: "间隔复习", stats: "阅读统计", books: "我的书架" };
   if ($("workspace-title")) $("workspace-title").textContent = titles[pane];
-  if ($("app-page-title")) $("app-page-title").textContent = { articles: "阅读", books: "书架", words: "生词", review: "复习", stats: "阅读记录" }[pane];
+  if ($("app-page-title")) $("app-page-title").textContent = { articles: "阅读", books: "书架", words: "生词", review: "复习", stats: "阅读统计" }[pane];
+  if ($("reading-back")) $("reading-back").hidden = !["books", "stats"].includes(pane);
+  if ($("reading-statistics")) {
+    $("reading-statistics").hidden = pane !== "articles";
+    $("workspace-search").hidden = pane !== "articles";
+    $("words-chat").hidden = pane !== "words";
+  }
   document.body.dataset.pane = pane;
   if (document.body.classList.contains("app") && ["articles", "books", "words"].includes(pane)) {
     try { window.sessionStorage.setItem("lectern:home-pane", pane); } catch { /* Reading remains usable without browser preferences. */ }
@@ -118,7 +125,7 @@ function show(pane: Pane, load = true): void {
   if (pane === "review") void loadReview();
   if (pane === "words") void loadWords();
   if (pane === "articles") void loadArticles();
-  if (pane === "stats") void guarded($("statistics"), () => renderStatistics($("statistics")));
+  if (pane === "stats") void guarded($("statistics"), () => document.body.classList.contains("app") ? renderMobileStatistics($("statistics")) : renderStatistics($("statistics")));
 }
 
 function navigateHome(pane: "review" | "words" | "stats", queue?: "words" | "articles"): void {
@@ -813,6 +820,12 @@ function renderWords(): void {
     while (row.children.length > 1) controls.append(row.children[1]!);
     const summary = el("div", "word-summary-row");
     summary.append(row, tr, sub, controls);
+    if (document.body.classList.contains("app") && s.kind !== "sentence") {
+      const chat = tracked(el("a", "icon-btn word-chat-entry"), "chat.word");
+      chat.href = `chat.html?word=${encodeURIComponent(s.id)}`;
+      chat.setAttribute("aria-label", `与 AI 练习 ${s.text}`); chat.append(icon("chat"));
+      row.append(chat);
+    }
     const detail = el("details", "word-detail");
     detail.append(tracked(el("summary", undefined, "语境与讲解"), "words.detail"));
     if (s.context) detail.append(el("blockquote", undefined, s.context));
@@ -1335,6 +1348,8 @@ document.querySelector(".app-sidebar .brand")?.addEventListener("click", e => { 
 $("words-review")?.addEventListener("click", () => { track("nav.review"); setQueue("words", false); show("review"); });
 const openSearch = (): void => { show("articles"); if ($("article-tools")) $<HTMLDetailsElement>("article-tools").open = true; setSearchOpen(true); searchInput.focus(); };
 $("show-books")?.addEventListener("click", () => { track("nav.books"); show("books"); });
+$("reading-back")?.addEventListener("click", () => { track("nav.articles"); show("articles"); });
+$("reading-statistics")?.addEventListener("click", () => { track("nav.stats"); show("stats"); });
 $("review-back")?.addEventListener("click", () => show("words"));
 $("article-tools")?.addEventListener("toggle", () => renderArticles());
 $("workspace-search")?.addEventListener("click", openSearch);

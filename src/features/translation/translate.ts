@@ -6,10 +6,12 @@ import type {
   Snippet,
   TranslateReply,
   TranslateRequest,
+  VocabularyChatRequest,
 } from "../../types.ts";
-import { LlmError, askStream, assist, translate, translateStream } from "../../lib/llm.ts";
+import { LlmError, askStream, assist, translate, translateStream, callMessagesStream } from "../../lib/llm.ts";
+import { buildVocabularyChatPrompt, normalizeChatRequest, VOCABULARY_CHAT_SYSTEM, CHAT_ANSWER_CHARS } from "../../lib/vocabularyChat.ts";
 import type { AssistMode } from "../../types.ts";
-import { addSnippet } from "./vocab.ts";
+import { addSnippet, getSnippets } from "./vocab.ts";
 import { getLlmConfig } from "../../core/background/llm.ts";
 import { type FailureContext, later, recordCall, recordFailure, recordTiming } from "../../background/llmLog.ts";
 import type { TranslationBackendTiming } from "../../lib/translationDiagnostics.ts";
@@ -266,6 +268,30 @@ export interface AssistOutcome {
   text?: string;
   error?: string;
   needsConfig?: boolean;
+}
+
+/** Reuses the consent, endpoint, cancellation, usage and diagnostic path used by translation. */
+export function streamVocabularyChat(input: VocabularyChatRequest, onDelta: (text: string) => void): AskHandle {
+  const ctrl = new AbortController();
+  const done = (async (): Promise<AskReply> => {
+    let req: VocabularyChatRequest;
+    try { req = normalizeChatRequest(input); }
+    catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error), needsConfig: false }; }
+    const config = await getLlmConfig();
+    try {
+      const all = await getSnippets();
+      const words = req.snippetIds.map(id => all.find(s => s.id === id && s.kind !== "sentence"));
+      if (words.some(w => !w)) return { ok: false, error: "选中的生词已不存在，请重新选词。", needsConfig: false };
+      const { text, usage, timing } = await callMessagesStream(config, VOCABULARY_CHAT_SYSTEM,
+        buildVocabularyChatPrompt(req, words as Snippet[]), { signal: ctrl.signal, onDelta: value => onDelta(value.trimStart().slice(0, CHAT_ANSWER_CHARS)) });
+      later(() => recordCall("assist", config, timing, usage));
+      return { ok: true, text: text.trim().slice(0, CHAT_ANSWER_CHARS) };
+    } catch (err) {
+      const failure = report(err, config, { source: "assist", request: { mode: "vocabulary-chat", turns: req.history.length } });
+      return { ok: false, error: failure.error, needsConfig: failure.needsConfig };
+    }
+  })();
+  return { done, cancel: () => ctrl.abort() };
 }
 
 /** 复习卡片上的「再给个例句 / 换个说法讲 / 考我一下」。翻卡本身不花 token，这里才花。 */

@@ -3,6 +3,7 @@ import { setupSettingsLayout } from "./settingsLayout.ts";
 import { fetchLog, hasUnsavedChanges } from "../options/form.ts";
 import { hostHooks, native } from "./native.ts";
 import { reasonOf } from "../lib/reason.ts";
+import { icon } from "../ui/icons.ts";
 import type { Update } from "../lib/update.ts";
 import {
   RELEASES_PAGE,
@@ -22,7 +23,7 @@ import {
 } from "./update.ts";
 
 /**
- * App 的设置页就是扩展的设置页，只多三样：回首页的入口（手机上没有标签栏可以关）、
+ * App 的设置页就是扩展的设置页，另加底部主导航、
  * 两个「分享…」——「导出 JSON」和「下载 JSON」都只是写进下载目录，要把文件弄到
  * 电脑上还得再开一个文件管理器；分享面板一步到位（发给自己的聊天窗口、存网盘、
  * AirDrop 一类都从这里走）——以及末尾那个「更新」。
@@ -33,22 +34,23 @@ import {
  * 页面本身的手机适配在 options/options.html 的那段媒体查询里，两端共用。
  */
 
-const bar = document.createElement("div");
-bar.className = "topnav";
-const back = document.createElement("a");
-let returnPane = "articles";
-try { const saved = window.sessionStorage.getItem("lectern:home-pane"); if (saved && ["articles", "books", "words"].includes(saved)) returnPane = saved; } catch { /* optional preference */ }
-back.href = `index.html#${returnPane}`;
-back.textContent = "‹ 返回";
-bar.append(back);
-document.body.prepend(bar);
+const bar = document.createElement("nav");
+bar.className = "phone-settings-nav"; bar.setAttribute("aria-label", "主导航");
+for (const [name, href, glyph] of [["阅读", "index.html#articles", "book"], ["生词", "index.html#words", "words"], ["设置", "options.html", "settings"]] as const) {
+  const link = document.createElement("a"); link.href = href;
+  const label = document.createElement("span"); label.textContent = name;
+  link.append(icon(glyph), label);
+  if (name === "设置") { link.className = "active"; link.setAttribute("aria-current", "page"); link.addEventListener("click", e => e.preventDefault()); }
+  else link.addEventListener("click", e => { if (!leaveAnyway()) e.preventDefault(); });
+  bar.append(link);
+}
+document.body.append(bar);
 
 /*
  * 带着没保存的修改离开要问一声。扩展里靠 beforeunload，WebView 不弹那个框，两条退路都得自己拦：
- * 页面上的「‹ 返回」，和系统的返回键（宿主先来问 beforeBack，回 true 表示这一下我接了、别退）。
+ * 底部导航，和系统的返回键（宿主先来问 beforeBack，回 true 表示这一下我接了、别退）。
  */
 const leaveAnyway = (): boolean => !hasUnsavedChanges() || confirm("有修改还没保存，离开就丢了。确定离开？");
-back.addEventListener("click", (e) => { if (!leaveAnyway()) e.preventDefault(); });
 hostHooks.beforeBack = () => !leaveAnyway();
 
 const bridge = native();
@@ -279,4 +281,3 @@ function addUpdateSection(): void {
 
 addUpdateSection();
 setupSettingsLayout();
-document.getElementById("settings-statistics")?.addEventListener("click", e => { if (!leaveAnyway()) e.preventDefault(); });

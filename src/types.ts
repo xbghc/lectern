@@ -258,7 +258,7 @@ export type PopupToBg =
   | { type: "articles:list" }
   | { type: "article:sessions"; articleId: string }
   | { type: "stats:overview" }
-  | { type: "stats:activity" }
+  | { type: "stats:activity"; days?: 7 | 30 }
   | { type: "data:export" }
   /** 把另一台设备导出的文件合并进来。规则见 lib/merge.ts。 */
   | { type: "data:import"; bundle: unknown }
@@ -866,18 +866,20 @@ export interface AskRequest {
 /** 一次追问的最终结果。 */
 export type AskReply = { ok: true; text: string } | { ok: false; error: string; needsConfig: boolean };
 
-/**
- * 一条 port 做一件事：连上之后发 start（翻译）或 ask（追问），完事即断。
- * 追问复用翻译那条 port，安卓 App 的垫片（app/shim.ts）因此不必再认一个新名字。
- */
-export type TranslatePortIn = { type: "start"; req: TranslateRequest } | { type: "ask"; req: AskRequest };
+/** 生词对话只传所选记录的 ID，后台读取对应语境，不接受页面伪造的词条内容。 */
+export interface VocabularyChatRequest { snippetIds: string[]; question: string; history: AskTurn[] }
+/** 一条 port 承载一次翻译、追问或生词对话；完成或取消即断开。 */
+export type TranslatePortIn = { type: "start"; req: TranslateRequest } | { type: "ask"; req: AskRequest }
+  | { type: "vocab-chat"; req: VocabularyChatRequest };
 
 export type TranslatePortOut =
   | { type: "partial"; partial: PartialTranslation }
   | { type: "done"; res: TranslateReply }
   /** 追问的增量，参数是**到目前为止的全部答案**，同 StreamOptions.onDelta 的口径。 */
   | { type: "ask-partial"; text: string }
-  | { type: "ask-done"; res: AskReply };
+  | { type: "ask-done"; res: AskReply }
+  | { type: "vocab-chat-partial"; text: string }
+  | { type: "vocab-chat-done"; res: AskReply };
 
 /* ==================== 文章回顾 ==================== */
 

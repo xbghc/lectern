@@ -259,7 +259,7 @@ export const readingHandlers = {
     return { sessions, paragraphs: await getParagraphs(id) };
   },
   "stats:overview": () => overview(),
-  "stats:activity": async () => ({ sessions: recentActivity(await getSessions(), Date.now()) }),
+  "stats:activity": async (m) => ({ sessions: recentActivity(await getSessions(), Date.now(), m.days === 30 ? 30 : 7) }),
   "article:finish": async (m) => {
     const article = await setFinished(m.articleId, m.finished);
     return { ok: article !== null, article };

@@ -20,3 +20,8 @@ export const Books: Story = { name: "书架 · 本地 EPUB", args: { tab: "books
 export const WordReview: Story = { name: "生词复习", args: { tab: "review" } };
 
 export const BookReader: Story = { name: '阅读器 · EPUB 目录', args: { page: 'reader', tab: 'bookReader' } };
+export const Statistics: Story = { name: '阅读统计 · 今天 / 7 天 / 30 天', args: { tab: 'stats' } };
+export const Chat: Story = { name: 'AI 生词对话', args: { page: 'chat' } };
+export const ChatConversation: Story = { name: 'AI 生词对话 · 练习中', args: { page: 'chat', tab: 'conversation' } };
+export const ChatError: Story = { name: 'AI 生词对话 · 连接失败', args: { page: 'chat', tab: 'conversation', state: 'error' } };
+export const ChatEmpty: Story = { name: 'AI 生词对话 · 空生词本', args: { page: 'chat', state: 'empty' } };

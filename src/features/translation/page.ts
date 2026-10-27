@@ -30,6 +30,7 @@ import { SelectionTranslator, paragraphContext, type TranslateResponse } from ".
  */
 
 export interface TranslationOptions {
+  presentation?: "sheet";
   /** App 阅读器传正文容器，启用单击单词、双击句子。 */
   tapRoot?: HTMLElement;
   /**
@@ -44,6 +45,7 @@ export interface TranslationFeature extends PageFeature {
   translateHere(): void;
   setEnabled(enabled: boolean): void;
   screenshot(): void;
+  dismiss(): boolean;
 }
 
 /** chrome.storage.onChanged 的回调类型。具名注册才摘得掉。 */
@@ -69,7 +71,7 @@ function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInit
   let on = false;
 
   const getTranslator = (): SelectionTranslator => {
-    translator ??= makeTranslator(normalizeUrl(pageUrl), pageUrl, ctx.info.title, () => settings ?? DEFAULT_TRANSLATION_SETTINGS, opts.tapRoot);
+    translator ??= makeTranslator(normalizeUrl(pageUrl), pageUrl, ctx.info.title, () => settings ?? DEFAULT_TRANSLATION_SETTINGS, opts.tapRoot, opts.presentation);
     return translator;
   };
   const screenshot = screenshotAction(getTranslator, () => !stopped);
@@ -119,6 +121,7 @@ function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInit
       chrome.storage.onChanged.removeListener(onSettingsChanged);
     },
     screenshot: screenshot.run,
+    dismiss: () => { if (!translator?.visible) return false; translator.dismiss(); return true; },
     translateHere: () => {
       if (stopped) return;
       wanted = true;
@@ -233,10 +236,11 @@ function streamAsk(req: AskRequest, onDelta: (text: string) => void, signal: Abo
 }
 
 /** 划词翻译器的接线。 */
-function makeTranslator(articleId: string, url: string, title: () => string, settings: () => TranslationSettings, tapRoot?: HTMLElement): SelectionTranslator {
+function makeTranslator(articleId: string, url: string, title: () => string, settings: () => TranslationSettings, tapRoot?: HTMLElement, presentation?: "sheet"): SelectionTranslator {
   return new SelectionTranslator({
     recordTrace: trace => send({ type: "translation:trace", trace }),
     tapRoot,
+    presentation,
     articleId,
     url,
     // 每次落库现取：专注记录抽出正文之后才知道真正的文章标题（见 PageInfo）

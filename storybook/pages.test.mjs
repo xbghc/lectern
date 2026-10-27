@@ -27,6 +27,7 @@ const scenarios = [
   ['app', 'populated', 'articles', '深度阅读的技艺'],
   ['appOptions', 'populated', 'articles', '返回'],
   ['reader', 'populated', 'articles', 'Attention is a practice'],
+  ['reader', 'populated', 'bookReader', '开篇：为什么越读越快，记住的越少'],
   ['reader', 'loading', 'articles', 'LLM 正在判断'],
   ['reader', 'empty', 'articles', '抓不到这一页'],
 ];
@@ -281,6 +282,8 @@ test('an article card unfolds into its own focus sessions, looked-up words and s
     try {
       await settle();
       const { document } = dom.window;
+      const articleTools = document.getElementById("article-tools");
+      if (articleTools) { articleTools.open = true; await settle(); }
       const toggle = index => document.querySelectorAll('#articles .article-card')[index].querySelector('button[aria-expanded]');
       assert.equal(document.querySelector('.material-detail'), null, page);
       for (const index of [0, 1, 2]) { toggle(index).click(); await settle(); }
@@ -352,6 +355,48 @@ test('popup focus and translation controls stay independent, and tab changes pre
     document.getElementById('tab-focus').click();
     await settle();
     assert.ok(document.querySelector('.current-state').textContent.includes('本页已暂停'));
+    assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+  } finally { close(); }
+});
+
+test('Android reading entry, local reader preferences and chapter navigation use the real controls', async () => {
+  const html = pages.reader.replace('<!--PREVIEW_CONFIG-->', '<script>window.__PREVIEW__={page:"reader",state:"populated",tab:"bookReader"}</script>');
+  let close;
+  const dom = new JSDOM(html, {
+    url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
+    beforeParse(window) {
+      close = window.close.bind(window); window.structuredClone = structuredClone;
+      window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder;
+      window.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
+      window.scrollBy = window.scrollTo = () => {};
+      window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+      window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+      window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+    },
+  });
+  const settle = () => new Promise(resolve => setTimeout(resolve, 40));
+  try {
+    await settle();
+    const { document, chrome } = dom.window;
+    assert.ok(document.querySelector('.atitle').textContent.includes('开篇'));
+    assert.equal(document.querySelectorAll('.reader-chapter').length, 2);
+    assert.equal(document.querySelector('.reader-chapter[aria-current]').textContent.includes('开篇'), true);
+    const before = await chrome.runtime.sendMessage({ type: 'settings:get' });
+    document.getElementById('reader-font').click();
+    document.getElementById('reader-bookmark').click();
+    await settle();
+    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '20px');
+    assert.equal((await chrome.storage.local.get('reader:font-size'))['reader:font-size'], 20);
+    assert.equal(document.getElementById('reader-bookmark').getAttribute('aria-pressed'), 'true');
+    assert.equal(document.getElementById('bookmark-jump').hidden, false);
+    document.getElementById('reader-toc').click();
+    assert.equal(document.getElementById('reader-contents').open, true);
+    document.getElementById('contents-close').click();
+    assert.equal(document.getElementById('reader-contents').open, false);
+    document.getElementById('reader-bookmark').click();
+    await settle();
+    assert.equal(document.getElementById('reader-bookmark').getAttribute('aria-pressed'), 'false');
+    assert.deepEqual(await chrome.runtime.sendMessage({ type: 'settings:get' }), before);
     assert.deepEqual(Array.from(dom.window.__previewErrors), []);
   } finally { close(); }
 });

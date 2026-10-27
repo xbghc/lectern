@@ -618,3 +618,93 @@ body.app .add-trigger .ui-icon {
   width: 22px;
   height: 22px;
 }
+
+/* Design v5: reading, shelf, and vocabulary are the three mobile destinations. */
+body.app .reading-header { padding-top:calc(22px + var(--sa-top)); padding-bottom:18px; }
+.phone-header-kicker { display:block; margin-bottom:5px; color:var(--muted); font:9px var(--sans); letter-spacing:1.8px; }
+body.app #app-page-title { margin:0; font:28px/1.3 var(--serif); }
+body.app .workspace-bar { top:calc(34px + var(--sa-top)); gap:5px; }
+body.app .workspace-bar .icon-btn { width:40px; height:42px; }
+body.app .dashboard-main { padding-top:0; }
+body.app .phone-continue { padding:20px 20px 16px; margin-bottom:26px; border:1px solid color-mix(in srgb,var(--accent) 20%,var(--line)); border-radius:10px; background:var(--wash); }
+.phone-continue-label { display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--accent); }
+.phone-continue-label svg { width:16px; height:16px; opacity:.7; }
+.phone-continue h2 { font:26px/1.3 var(--serif); margin:12px 0 10px; overflow-wrap:anywhere; }
+.phone-continue p { font-size:12px; line-height:1.7; color:var(--muted); margin:0 0 20px; }
+.phone-continue > .progress { height:2px; margin:0; }
+.phone-continue-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; }
+.phone-continue-bottom > span { color:var(--muted); font-size:11px; }
+.phone-continue-bottom .primary { min-height:42px; padding:10px 15px; font-size:12px; }
+.phone-home-shelf { margin-bottom:28px; }
+.phone-shelf-strip { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.phone-shelf-preview { display:grid; grid-template-columns:53px minmax(0,1fr); gap:10px; align-items:center; color:var(--fg); text-decoration:none; }
+.shelf-cover { display:grid; place-items:center; position:relative; overflow:hidden; background:#ddd0b8; border:1px solid #c9bda6; border-radius:2px 5px 5px 2px; box-shadow:3px 3px 0 #302c270a; color:#685540; aspect-ratio:2/3; }
+.shelf-cover::before { content:''; position:absolute; left:7%; top:0; bottom:0; border-left:1px solid #302c2718; }
+.shelf-cover img { width:100%; height:100%; object-fit:cover; }
+.shelf-cover > span { padding:14%; text-align:center; font:16px/1.7 var(--serif); overflow-wrap:anywhere; }
+.phone-shelf-preview .shelf-cover { width:53px; height:80px; aspect-ratio:auto; }
+.phone-shelf-preview .shelf-cover > span { padding:6px; font-size:9px; }
+.phone-shelf-preview h3 { font:14px/1.5 var(--serif); margin:0 0 7px; overflow-wrap:anywhere; }
+.phone-shelf-preview p { font:11px var(--sans); color:var(--muted); margin:0; }
+body.app .queue-heading { margin-bottom:4px; }
+body.app .queue-heading #add-article { position:static; border:0; width:40px; height:40px; padding:0; box-shadow:none; border-radius:4px; }
+.queue-tools { margin-bottom:6px; }
+.queue-tools > summary { font-size:11px; color:var(--muted); cursor:pointer; padding:8px 0 12px; }
+.queue-tools .article-controls { margin-top:8px; }
+body.app #articles .article-card { min-height:88px; }
+body.app .phone-review-entry { display:flex; align-items:center; gap:12px; width:100%; margin:0 0 24px; padding:16px; text-align:left; border:1px solid var(--line); border-radius:7px; color:var(--fg); background:var(--card); }
+.phone-review-entry > span:last-child { margin-left:auto; }
+.phone-review-entry > [data-icon] { color:var(--accent); }
+.phone-review-entry strong { display:block; font-size:14px; font-weight:500; }
+.phone-review-entry small { display:block; font-size:11px; color:var(--muted); margin-top:6px; }
+.phone-review-entry .badge { display:inline; background:none; padding:0; color:inherit; font:inherit; }
+body.app .book-local-label { color:var(--muted); font-size:11px; padding-bottom:15px; margin:0 0 20px; border-bottom:1px solid var(--line); }
+body.app #book-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px 18px; }
+body.app .book-card { padding:0; background:none; border:0; min-width:0; }
+body.app .book-card .row1 { display:flex; flex-direction:column; align-items:stretch; gap:9px; }
+body.app .shelf-cover-link { display:block; text-decoration:none; width:100%; }
+body.app .book-card .title { font:16px/1.4 var(--serif); display:block; margin-top:4px; }
+body.app .book-card .pill { color:var(--muted); font-size:11px; border:0; padding:0; align-self:flex-start; }
+body.app .book-card .sub { margin:8px 0; font-size:10px; }
+body.app .book-card .sub > :nth-child(n+2) { display:none; }
+body.app .book-card .book-toc { font-size:12px; }
+body.app .book-card > button { font-size:11px; padding:6px 10px; margin-top:10px; }
+body.app #book-section > summary { display:none; }
+body.app #book-row { margin:0 0 20px; }
+body.app #import-book { width:100%; min-height:48px; border-style:dashed; border-color:var(--line); color:var(--muted); background:transparent; }
+.phone-reading-record { margin:24px 0; padding-bottom:22px; border-bottom:1px solid var(--line); }
+.phone-reading-record h2 { margin:0 0 18px; font:18px var(--serif); }
+.reading-record-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; font-size:11px; color:var(--muted); }
+.reading-record-values strong { display:block; font:20px/1.5 var(--serif); color:var(--fg); margin-top:9px; }
+.phone-reading-record > a { display:inline-block; color:var(--accent); font-size:12px; text-decoration:none; margin-top:16px; }
+body.app .article-menu-body { min-width:140px; }
+
+/* Reader chrome: an unobtrusive source line above, chapter progress below. */
+body.reader .rbar { padding:calc(6px + var(--sa-top)) max(10px,var(--sa-right)) 8px max(10px,var(--sa-left)); gap:3px; }
+body.reader .rtitle { text-align:center; color:var(--muted); font:12px var(--sans); }
+body.reader .rmeta { text-align:center; font-size:10px; margin-top:5px; }
+body.reader .iconbtn { width:40px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
+body.reader .iconbtn .ui-icon { width:19px; height:19px; }
+body.reader .bookmarked { color:var(--accent); }
+body.reader .bookmarked svg { fill:var(--wash); }
+body.reader .article .body { font-size:var(--reader-font-size,18px); line-height:1.9; }
+body.reader .article h1.atitle { font-size:30px; line-height:1.3; margin-bottom:18px; }
+body.reader .article .aline { font-size:11px; border:0; padding:0; margin-bottom:28px; flex-wrap:wrap; }
+.reader-progress { position:fixed; z-index:6; bottom:0; left:0; right:0; padding:8px max(22px,var(--sa-right)) calc(10px + var(--sa-bottom)) max(22px,var(--sa-left)); border-top:1px solid var(--line); background:var(--bg); font:11px var(--sans); color:var(--muted); }
+.reader-progress > div:first-child { display:flex; align-items:center; justify-content:space-between; min-height:32px; }
+.reader-progress button { padding:0; display:flex; align-items:center; gap:7px; border:0; background:none; color:inherit; min-height:32px; cursor:pointer; }
+.reader-progress svg { width:15px; height:15px; }
+.reader-progress .progress { margin:5px 0 0; height:2px; }
+.reader-feedback { position:fixed; z-index:7; left:50%; bottom:calc(90px + var(--sa-bottom)); transform:translateX(-50%); max-width:85vw; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--muted); font:12px var(--sans); pointer-events:none; }
+.reader-feedback:empty { display:none; }
+.reader-contents { width:min(520px,calc(100vw - 28px)); max-height:82dvh; padding:22px; border:1px solid var(--line); border-radius:12px; background:var(--bg); color:var(--fg); }
+.reader-contents::backdrop { background:#302c2740; }
+.reader-dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.reader-dialog-heading h2 { font:24px/1.4 var(--serif); }
+.reader-chapter { display:flex; align-items:center; gap:14px; width:100%; padding:16px 0; border:0; border-bottom:1px solid var(--line); background:none; color:var(--fg); text-align:left; font:15px/1.5 var(--serif); }
+.reader-chapter > span:first-child { font:11px var(--sans); color:var(--muted); }
+.reader-chapter > span:nth-child(2) { flex:1; }
+.reader-chapter > svg { width:14px; }
+.reader-chapter[aria-current] { color:var(--accent); }
+.reader-tool-actions { display:flex; gap:8px; flex-wrap:wrap; padding-top:20px; }
+#bookmark-jump { margin-bottom:14px; }

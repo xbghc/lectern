@@ -101,11 +101,17 @@ function show(pane: Pane, load = true): void {
     const panel = $(`pane-${p}`);
     if (!panel) continue;
     panel.hidden = p !== pane;
-    document.querySelector(`.tab[data-tab="${p}"]`)?.classList.toggle("active", p === pane);
-    document.querySelector(`.tab[data-tab="${p}"]`)?.setAttribute("aria-current", p === pane ? "page" : "false");
+    const active = p === pane || (document.body.classList.contains("app") && pane === "review" && p === "words");
+    document.querySelector(`.tab[data-tab="${p}"]`)?.classList.toggle("active", active);
+    document.querySelector(`.tab[data-tab="${p}"]`)?.setAttribute("aria-current", active ? "page" : "false");
   }
   const titles = { articles: "我的阅读", words: "生词本", review: "间隔复习", stats: "阅读统计", books: "我的书架" };
   if ($("workspace-title")) $("workspace-title").textContent = titles[pane];
+  if ($("app-page-title")) $("app-page-title").textContent = { articles: "阅读", books: "书架", words: "生词", review: "复习", stats: "阅读记录" }[pane];
+  document.body.dataset.pane = pane;
+  if (document.body.classList.contains("app") && ["articles", "books", "words"].includes(pane)) {
+    try { window.sessionStorage.setItem("lectern:home-pane", pane); } catch { /* Reading remains usable without browser preferences. */ }
+  }
   if (location.hash !== `#${pane}`) window.history.pushState(null, "", `${location.href.split("#")[0]}#${pane}`);
   document.documentElement.scrollTop = 0;
   if (!load) return;
@@ -302,8 +308,8 @@ async function fetchArticles(onlyIfChanged = false): Promise<void> {
   for (const id of expandedArticles) if (!articles.some(a => a.id === id)) expandedArticles.delete(id);
   for (const id of materialDetails.keys()) if (!articles.some(a => a.id === id)) materialDetails.delete(id);
   speed = res.speed ?? null;
+  void renderReadingHome(articles, speed, navigateHome, books);
   renderArticles();
-  void renderReadingHome(articles, speed, navigateHome);
 }
 
 /*
@@ -335,7 +341,9 @@ function renderArticles(): void {
    */
   const shelved = (a: Article): boolean => Boolean(books[parseChapterId(a.id)?.bookId ?? ""]);
   const loose = articles.filter((a) => !shelved(a));
+  const queueOnly = document.body.classList.contains("app") && !$<HTMLDetailsElement>("article-tools")?.open && !q && !managingArticles;
   const list = loose.filter((a) => {
+    if (queueOnly && (a.finished || a.id === document.body.dataset.resumeArticle)) return false;
     if (filter === "done" && !a.finished) return false;
     if (filter === "reading" && a.finished) return false;
     if (!q) return true;
@@ -388,7 +396,7 @@ function renderArticles(): void {
         // 按 id 找现在那一份：等应答的工夫列表可能被后台刷新换过一遍，手里这个 a 已经不在 articles 里了
         Object.assign(articles.find((x) => x.id === a.id) ?? a, r.article);
         renderArticles();
-        void renderReadingHome(articles, speed, navigateHome);
+        void renderReadingHome(articles, speed, navigateHome, books);
       } catch (err) {
         // 就写在按钮上：批量操作那行状态在列表最顶上，离这儿可能隔着几十张卡片
         toggle.disabled = false;
@@ -860,7 +868,7 @@ function paintBadge(): void {
   const total = dueWords + dueArticles;
   const badge = $("due-badge");
   badge.textContent = String(total);
-  badge.hidden = total === 0;
+  badge.hidden = total === 0 && !document.body.classList.contains("app");
   if ($("home-due-count")) $("home-due-count").textContent = String(total);
   $("seg-words-n").textContent = dueWords > 0 ? String(dueWords) : "";
   $("seg-articles-n").textContent = dueArticles > 0 ? String(dueArticles) : "";
@@ -1325,7 +1333,10 @@ if (!document.body.classList.contains("app")) $("add")?.addEventListener("submit
 window.addEventListener("load", () => { document.documentElement.scrollTop = 0; }, { once: true });
 document.querySelector(".app-sidebar .brand")?.addEventListener("click", e => { e.preventDefault(); show("articles"); });
 $("words-review")?.addEventListener("click", () => { track("nav.review"); setQueue("words", false); show("review"); });
-const openSearch = (): void => { show("articles"); setSearchOpen(true); searchInput.focus(); };
+const openSearch = (): void => { show("articles"); if ($("article-tools")) $<HTMLDetailsElement>("article-tools").open = true; setSearchOpen(true); searchInput.focus(); };
+$("show-books")?.addEventListener("click", () => { track("nav.books"); show("books"); });
+$("review-back")?.addEventListener("click", () => show("words"));
+$("article-tools")?.addEventListener("toggle", () => renderArticles());
 $("workspace-search")?.addEventListener("click", openSearch);
 document.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }

@@ -14,6 +14,9 @@ const paths = {
   pause: '<path d="M9 5v14M15 5v14"/>',
   play: '<path d="m7 4 14 8-14 8Z"/>',
   shelf: '<path d="M3 4h4v16H3Zm6 0h4v16H9Zm6 1 4-1 4 15-4 1Z"/>',
+  bookmark: '<path d="M6 3h12v19l-6-4-6 4Z"/>',
+  type: '<path d="M3 5h12M9 5v14M6 19h6m3 0 3-8 3 8m-5-3h4"/>',
+  back: '<path d="m14 5-7 7 7 7M7 12h14"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
 } as const;

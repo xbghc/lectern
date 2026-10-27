@@ -18,3 +18,5 @@ export const Classification: Story = { name: 'LLM 文章筛选', args: { tab: 'c
 
 export const Books: Story = { name: "书架 · 本地 EPUB", args: { tab: "books" } };
 export const WordReview: Story = { name: "生词复习", args: { tab: "review" } };
+
+export const BookReader: Story = { name: '阅读器 · EPUB 目录', args: { page: 'reader', tab: 'bookReader' } };

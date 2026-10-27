@@ -22,7 +22,7 @@ export async function compilePages() {
     const bundled = await build({
       stdin: { contents: `import './storybook/runtime.ts'; import './${entry}';`, resolveDir: root, loader: 'ts' },
       bundle: true, write: false, format: 'iife', platform: 'browser', target: 'chrome114', minify: true,
-      define: { __APP_VERSION__: '"storybook"', 'location.search': '"?u=https%3A%2F%2Fexample.com%2Fattention"' },
+      define: { __APP_VERSION__: '"storybook"', 'location.search': 'window.__PREVIEW_SEARCH__' },
       plugins: [{ name: 'preview-platform', setup(api) {
         api.onResolve({ filter: /^\.\/boot\.ts$/ }, args => args.importer.replaceAll('\\', '/').includes('/src/app/')
           ? { path: resolve(root, 'storybook/app-boot.ts') } : undefined);

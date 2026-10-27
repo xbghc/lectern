@@ -1162,3 +1162,26 @@ test("打字机：追问的答案边打边贴底；整块失败提示盖上去�
   f.tick(20);
   assert.match(root().querySelector(".err")!.textContent!, /连接中断/);
 });
+
+test('reader sheet stays at the viewport bottom through streaming and closes through its owner', () => {
+  const previousWindow = g['window'];
+  g['window'] = dom.window;
+  let closed = 0;
+  const sheet = new Popover({ presentation: 'sheet', onClose: () => { closed++; sheet.hide(); }, onConfirm() {}, onOpenOptions() {}, onAsk() {} });
+  try {
+    sheet.showStreaming(RECT, 'leaks');
+    const root = sheet.hostElement!.shadowRoot!;
+    const box = root.querySelector<HTMLElement>('.reader-sheet')!;
+    assert.equal(box.getAttribute('role'), 'dialog');
+    assert.equal(box.style.bottom, '0px');
+    sheet.updateStream({ translation: '泄漏', phonetic: null, pos: null, contextNote: null, usage: null, vocab: [] });
+    sheet.showResult(RECT, SNIPPET);
+    assert.equal(root.querySelectorAll('.reader-sheet-close').length, 1);
+    assert.equal(box.style.bottom, '0px');
+    assert.ok(sheet.followAnchor({ ...RECT, top: -500, bottom: -400 } as DOMRect));
+    root.querySelector<HTMLButtonElement>('.reader-sheet-close')!.click();
+    assert.equal(closed, 1);
+    assert.equal(sheet.hostElement, null);
+    dom.window.dispatchEvent(new dom.window.Event('resize'));
+  } finally { sheet.hide(); g['window'] = previousWindow; }
+});

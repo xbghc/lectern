@@ -58,7 +58,7 @@ function openWith(name: string, version: number, upgrade: (db: IDBDatabase) => v
       }
     };
     r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error ?? new Error("indexedDB.open 失败"));
+    r.onerror = () => reject(r.error ?? new Error("Could not open IndexedDB"));
   });
 }
 

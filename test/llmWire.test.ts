@@ -174,7 +174,7 @@ test("没选模型服务：不发请求，话里说的是去选，而不是去�
   const fetchSpy = (async () => { called = true; return json({}); }) as unknown as typeof fetch;
   await assert.rejects(
     callMessages({ ...DEFAULT_LLM, apiKey: "k", consentAt: 1 }, "S", "U", { fetch: fetchSpy }),
-    (e: unknown) => e instanceof LlmError && e.kind === "config" && e.message.includes("选模型服务"),
+    (e: unknown) => e instanceof LlmError && e.kind === "config" && e.message.includes("choose a provider"),
   );
   assert.equal(called, false);
 });

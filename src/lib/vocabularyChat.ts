@@ -7,11 +7,11 @@ export const CHAT_STORAGE_KEY = "vocabulary-chats";
 
 /** Validate at the model boundary as well as in the composer. */
 export function normalizeChatRequest(value: VocabularyChatRequest): VocabularyChatRequest {
-  if (!value || !Array.isArray(value.snippetIds) || !value.snippetIds.length || value.snippetIds.length > 3 || value.snippetIds.some(id => typeof id !== "string" || !id || id.length > 500)) throw new Error("请选择 1–3 个生词。");
-  if (typeof value.question !== "string" || !value.question.trim() || value.question.length > CHAT_QUESTION_CHARS) throw new Error("消息须为 1–1000 个字符。");
-  if (!Array.isArray(value.history)) throw new Error("对话记录格式无效。");
+  if (!value || !Array.isArray(value.snippetIds) || !value.snippetIds.length || value.snippetIds.length > 3 || value.snippetIds.some(id => typeof id !== "string" || !id || id.length > 500)) throw new Error("Select 1–3 vocabulary items.");
+  if (typeof value.question !== "string" || !value.question.trim() || value.question.length > CHAT_QUESTION_CHARS) throw new Error("Messages must contain 1–1000 characters.");
+  if (!Array.isArray(value.history)) throw new Error("Invalid conversation history.");
   const history = value.history.slice(-CHAT_HISTORY_TURNS).map(turn => {
-    if (!turn || typeof turn.question !== "string" || typeof turn.answer !== "string") throw new Error("对话记录格式无效。");
+    if (!turn || typeof turn.question !== "string" || typeof turn.answer !== "string") throw new Error("Invalid conversation history.");
     return { question: turn.question.slice(0, CHAT_QUESTION_CHARS), answer: turn.answer.slice(0, 2000) };
   });
   return { snippetIds: [...new Set(value.snippetIds)], question: value.question.trim(), history };

@@ -11,5 +11,5 @@ export function reasonOf(err: unknown): string {
     const message = (err as { message?: unknown }).message;
     if (typeof message === "string" && message) return message;
   }
-  return "未知错误";
+  return "Unknown error";
 }

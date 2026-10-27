@@ -9,7 +9,7 @@ function open(): Promise<IDBDatabase> {
 }
 
 export async function cachedBlob(hash: string): Promise<Blob | undefined> {
-  if (!ARCHIVE_HASH.test(hash)) throw new Error("无效的资源哈希");
+  if (!ARCHIVE_HASH.test(hash)) throw new Error("Invalid resource hash");
   const db = await open();
   return new Promise((resolve, reject) => {
     const request = db.transaction("blobs", "readonly").objectStore("blobs").get(hash);
@@ -21,7 +21,7 @@ export async function cachedBlob(hash: string): Promise<Blob | undefined> {
 /** Commit before publishing any manifest referencing these bytes. */
 export async function cacheBlob(hash: string, blob: Blob): Promise<void> {
   if (!ARCHIVE_HASH.test(hash) || await hashBytes(new Uint8Array(await blob.arrayBuffer())) !== hash) {
-    throw new Error("文章资源校验失败");
+    throw new Error("Article resource verification failed");
   }
   const db = await open();
   await new Promise<void>((resolve, reject) => {
@@ -29,7 +29,7 @@ export async function cacheBlob(hash: string, blob: Blob): Promise<void> {
     tx.objectStore("blobs").put(blob, hash);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error ?? new Error("文章资源保存被中断"));
+    tx.onabort = () => reject(tx.error ?? new Error("Saving article resources was interrupted"));
   });
 }
 
@@ -42,7 +42,7 @@ export async function dropBlobs(hashes: readonly string[]): Promise<void> {
     const tx = db.transaction("blobs", "readwrite");
     for (const hash of valid) tx.objectStore("blobs").delete(hash);
     tx.oncomplete = () => resolve();
-    tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("清除书籍资源失败"));
+    tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("Could not clear book resources"));
   });
 }
 
@@ -53,6 +53,6 @@ export async function clearArchiveCache(): Promise<void> {
     const tx = db.transaction("blobs", "readwrite");
     tx.objectStore("blobs").clear();
     tx.oncomplete = () => resolve();
-    tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("清除文章资源失败"));
+    tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("Could not clear article resources"));
   });
 }

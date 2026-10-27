@@ -142,7 +142,7 @@ test("片段明显比回合碎时才提示切碎，否则不说话", () => {
     { windowMs: 24 * 3600_000, episodeGapMs: 5 * MIN },
   );
   assert.equal(fragmented.episodeCount, 1);
-  assert.ok(overviewInsights(fragmented).some((l) => l.includes("合成 1 个回合")));
+  assert.ok(overviewInsights(fragmented).some((l) => l.includes("form 1 episodes")));
 
   const clean = buildOverview(
     [session(0, MIN), session(30 * MIN, MIN)],
@@ -164,7 +164,7 @@ test("一半以上片段以切走结束且总时长够长时才提示切换频�
     now,
     { windowMs: 24 * 3600_000, episodeGapMs: MIN },
   );
-  assert.ok(overviewInsights(blurry).some((l) => l.includes("每小时切换")));
+  assert.ok(overviewInsights(blurry).some((l) => l.includes("Switches per hour:")));
 
   const brief = buildOverview([session(0, MIN, { endReason: "blur" })], now, {
     windowMs: 24 * 3600_000,
@@ -180,7 +180,7 @@ test("读到新内容的时长不足一半时提示，否则不提", () => {
     now,
     { windowMs: 24 * 3600_000, episodeGapMs: MIN },
   );
-  assert.ok(overviewInsights(lingering).some((l) => l.includes("25% 的专注时长")));
+  assert.ok(overviewInsights(lingering).some((l) => l.includes("25% of focused time")));
 
   const reading = buildOverview(
     [session(0, 15 * MIN, { wordsRead: 100 }), session(20 * MIN, 5 * MIN, { wordsRead: 0 })],

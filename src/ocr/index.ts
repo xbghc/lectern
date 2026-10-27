@@ -34,7 +34,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const lines = (data.blocks ?? []).flatMap((block) => block.paragraphs.flatMap((paragraph) =>
         paragraph.lines.map((line) => ({ text: line.text, confidence: line.confidence }))));
       const text = cleanOcrLines(lines);
-      return text ? { ok: true, text } : { ok: false, error: "图里没认出英文" };
+      return text ? { ok: true, text } : { ok: false, error: "No English text was detected in the image" };
     } catch (err) {
       return { ok: false, error: String(err) };
     }

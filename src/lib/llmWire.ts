@@ -113,7 +113,7 @@ function openaiText(content: unknown): string {
 const errorMessage = (v: unknown): string | undefined => {
   const e = obj(v);
   if (!e) return typeof v === "string" && v ? v : undefined;
-  return str(e.message) || str(e.type) || str(e.code) || "未知";
+  return str(e.message) || str(e.type) || str(e.code) || "Unknown";
 };
 
 export function readReply(protocol: LlmProtocol, data: Obj): WireReply {
@@ -128,7 +128,7 @@ export function readReply(protocol: LlmProtocol, data: Obj): WireReply {
       inputTokens: num(usage?.prompt_tokens),
       outputTokens: num(usage?.completion_tokens),
       stopReason,
-      ...(data.error !== undefined && !choice ? { error: errorMessage(data.error) ?? "未知" } : {}),
+      ...(data.error !== undefined && !choice ? { error: errorMessage(data.error) ?? "Unknown" } : {}),
       ...(refusal ? { refusal } : {}),
     };
   }
@@ -163,7 +163,7 @@ export interface WireStep {
 
 export function readEvent(protocol: LlmProtocol, ev: Obj): WireStep {
   if (protocol === "openai") {
-    if (ev.error !== undefined) return { error: errorMessage(ev.error) ?? "未知" };
+    if (ev.error !== undefined) return { error: errorMessage(ev.error) ?? "Unknown" };
     const step: WireStep = {};
     const choice = obj((Array.isArray(ev.choices) ? ev.choices : [])[0]);
     const delta = obj(choice?.delta);
@@ -210,7 +210,7 @@ export function readEvent(protocol: LlmProtocol, ev: Obj): WireStep {
     }
     case "error": {
       const e = obj(ev.error);
-      return { error: str(e?.message) || str(e?.type) || "未知" };
+      return { error: str(e?.message) || str(e?.type) || "Unknown" };
     }
     default:
       return {};

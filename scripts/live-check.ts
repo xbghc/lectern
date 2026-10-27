@@ -14,7 +14,7 @@ import type { LlmConfig, PartialTranslation, TranslateRequest } from "../src/typ
 
 const apiKey = process.env["MINIMAX_API_KEY"] ?? "";
 if (!apiKey) {
-  console.error("没有 MINIMAX_API_KEY，跳过。");
+  console.error("MINIMAX_API_KEY is not set. Skipping.");
   process.exit(2);
 }
 const CFG: LlmConfig = { ...DEFAULT_LLM, apiKey };
@@ -53,14 +53,14 @@ const want = (label: string): boolean => !only || label.includes(only);
 function show(label: string, r: Awaited<ReturnType<typeof translate>>, t: number): void {
   const { result: x, usage } = r;
   console.log(`\n━━ ${label}  [${ms(t)}, in ${usage.inputTokens} / out ${usage.outputTokens} tok]`);
-  console.log(`译文   : ${x.translation}`);
-  console.log(`音标词性: ${[x.phonetic, x.pos, x.lemma].filter(Boolean).join(" · ") || "—"}`);
-  console.log(`语境   : ${x.contextNote || "—"}`);
-  console.log(`用法   : ${x.usage ?? "—"}`);
-  if (x.vocab.length === 0) console.log("生词   : —");
+  console.log(`Translation: ${x.translation}`);
+  console.log(`Phonetic / part of speech: ${[x.phonetic, x.pos, x.lemma].filter(Boolean).join(" · ") || "—"}`);
+  console.log(`Context: ${x.contextNote || "—"}`);
+  console.log(`Usage: ${x.usage ?? "—"}`);
+  if (x.vocab.length === 0) console.log("Vocabulary: —");
   for (const v of x.vocab) {
     console.log(`  · ${v.word}  ${[v.phonetic, v.pos].filter(Boolean).join(" · ")}`);
-    console.log(`    ${v.meaning}${v.note ? `  ｜ ${v.note}` : ""}`);
+    console.log(`    ${v.meaning}${v.note ? `   |  ${v.note}` : ""}`);
   }
 }
 
@@ -71,7 +71,7 @@ async function one(label: string, over: Partial<TranslateRequest>): Promise<void
     show(label, await translate(req(over), CFG), t);
   } catch (err) {
     const e = err as LlmError;
-    console.log(`\n━━ ${label}  ✗ ${e.kind ?? "?"}：${e.message}`);
+    console.log(`\n━━ ${label}  ✗ ${e.kind ?? "?"}: ${e.message}`);
   }
 }
 
@@ -83,33 +83,33 @@ async function stream(label: string, over: Partial<TranslateRequest>): Promise<v
   let lastVocab = 0;
   const onPartial = (p: PartialTranslation): void => {
     const bits: string[] = [];
-    if (p.translation) bits.push("译文");
-    if (p.phonetic || p.pos) bits.push("音标/词性");
-    if (p.contextNote) bits.push("语境");
-    if (p.usage) bits.push("用法");
+    if (p.translation) bits.push("Translation");
+    if (p.phonetic || p.pos) bits.push("Phonetic / part of speech");
+    if (p.contextNote) bits.push("Context");
+    if (p.usage) bits.push("Usage");
     if (p.vocab.length > lastVocab) {
-      bits.push(`生词+${p.vocab.length - lastVocab}（${p.vocab[p.vocab.length - 1]!.word}）`);
+      bits.push(`Vocabulary+${p.vocab.length - lastVocab} (${p.vocab[p.vocab.length - 1]!.word})`);
       lastVocab = p.vocab.length;
     }
     marks.push(`${ms(t).padStart(7)}  ${bits.join(" ")}`);
   };
   try {
     const r = await translateStream(req(over), CFG, onPartial);
-    console.log(`\n━━ ${label}（流式）`);
+    console.log(`\n━━ ${label} (streaming)`);
     for (const m of marks) console.log("   " + m);
-    show("  └ 最终", r, t);
+    show("  └ Final", r, t);
   } catch (err) {
     const e = err as LlmError;
-    console.log(`\n━━ ${label}（流式）✗ ${e.kind ?? "?"}：${e.message}`);
+    console.log(`\n━━ ${label} (streaming) ✗ ${e.kind ?? "?"}: ${e.message}`);
   }
 }
 
-await one("单词 scrutiny", { text: "scrutiny", kind: "word", context: SENTENCE });
-await one("短语 under intense scrutiny", { text: "under intense scrutiny", kind: "phrase", context: SENTENCE });
-await one("整句", {});
-await one("整句·关掉讲解", { explainVocab: false });
-await stream("整句", {});
-await one("长选区（约 130 词，试 max_tokens=1024）", { text: PARA });
+await one("Word: scrutiny", { text: "scrutiny", kind: "word", context: SENTENCE });
+await one("Phrase: under intense scrutiny", { text: "under intense scrutiny", kind: "phrase", context: SENTENCE });
+await one("Sentence", {});
+await one("Sentence · Teaching notes disabled", { explainVocab: false });
+await stream("Sentence", {});
+await one("Long selection (about 130 words, max_tokens=1024)", { text: PARA });
 
 /*
  * 自动翻译上限（maxAutoSelectionWords = 200）这一档：
@@ -117,7 +117,7 @@ await one("长选区（约 130 词，试 max_tokens=1024）", { text: PARA });
  * 阈值从 40 抬到 200 的依据就在这条：它得在 max_tokens=1024 里装得下。
  */
 const AT_LIMIT = `${PARA} ${PARA.replace("Regulators", "Supervisors")}`.split(" ").slice(0, 200).join(" ");
-await one(`自动翻译上限（${AT_LIMIT.split(" ").length} 词，不弹确认的最大一份）`, {
+await one(`Auto-translation limit (${AT_LIMIT.split(" ").length} words, maximum without confirmation)`, {
   text: AT_LIMIT,
   context: AT_LIMIT,
 });
@@ -129,5 +129,5 @@ await one(`自动翻译上限（${AT_LIMIT.split(" ").length} 词，不弹确认
  */
 const HUGE = [PARA, PARA.replace("Regulators", "Supervisors"), PARA.slice(0, 400)].join(" ");
 console.log(`
-（下一条选区 ${HUGE.length} 字符，硬上限是 2000）`);
-await one("逼近硬上限的选区", { text: HUGE, context: HUGE });
+(Next selection: ${HUGE.length} characters, hard limit: 2000)`);
+await one("Selection near the hard limit", { text: HUGE, context: HUGE });

@@ -34,8 +34,8 @@ test("识别传 PNG，解析段界，并把 ML Kit 置信度换算给共用清�
 test("缺宿主或老宿主缺方法时拒绝截图和识别", async () => {
   for (const bridge of [undefined, {}]) {
     window.Native = bridge;
-    await assert.rejects(captureVisible(), /这个版本的宿主不支持截图翻译/);
-    await assert.rejects(recognizeNative("png"), /这个版本的宿主不支持截图翻译/);
+    await assert.rejects(captureVisible(), /Update the app to use screenshot translation/);
+    await assert.rejects(recognizeNative("png"), /Update the app to use screenshot translation/);
   }
 });
 
@@ -91,6 +91,6 @@ test("模型请求选择不会跟跳转的原生入口；旧宿主 fail closed�
   await nativeFetch("https://article.example/");
   assert.deepEqual([ordinary, safe], [1, 1]);
   delete window.Native.httpStartNoRedirect;
-  await assert.rejects(nativeFetch("https://model.example/v1/messages", { redirect: "error" }), /宿主版本过旧/);
+  await assert.rejects(nativeFetch("https://model.example/v1/messages", { redirect: "error" }), /Update the app to send model requests securely/);
   assert.deepEqual([ordinary, safe], [1, 1], "绝不退回会跟跳转的旧宿主方法");
 });

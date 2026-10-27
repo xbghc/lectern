@@ -18,19 +18,19 @@ export interface RuleChatOptions {
   placeholder?: string;
 }
 
-const verb = (c: RuleChange): string => (c.op === "add" ? `加进${c.label}` : `从${c.label}移出`);
+const verb = (c: RuleChange): string => (c.op === "add" ? `Add to ${c.label}` : `Remove from ${c.label}`);
 
 /** 一句话说清写进去了什么，也是补进对话记录里的那句，下一轮模型据此知道改没改成。 */
 export function appliedSummary(applied: readonly RuleChange[]): string {
-  return applied.length ? `已写入：${applied.map((c) => `${verb(c)} ${c.rule}`).join("；")}` : "没有写入任何改动";
+  return applied.length ? `Saved: ${applied.map((c) => `${verb(c)} ${c.rule}`).join("; ")}` : "No changes were saved";
 }
 
 export function ruleChatBox(opts: RuleChatOptions = {}): HTMLElement {
   const turns: RuleChatTurn[] = [];
   const log = el("div", { class: "rc-log", "aria-live": "polite" });
   const plan = el("div", { class: "rc-plan" });
-  const input = el("input", { type: "text", class: "rc-input", placeholder: opts.placeholder ?? "比如：知乎以后别记了；GitHub 上自动开翻译", "aria-label": "要怎么改名单" });
-  const sendBtn = el("button", { type: "submit", class: "btn" }, ["发送"]);
+  const input = el("input", { type: "text", class: "rc-input", placeholder: opts.placeholder ?? "For example: stop tracking Reddit; enable translation on GitHub", "aria-label": "How would you like to change the lists?" });
+  const sendBtn = el("button", { type: "submit", class: "btn" }, ["Send"]);
   const form = el("form", { class: "rc-ask" }, [input, sendBtn]);
   const root = el("div", { class: "rulechat" }, [log, plan, form]);
 
@@ -50,25 +50,25 @@ export function ruleChatBox(opts: RuleChatOptions = {}): HTMLElement {
 
   const showPlan = (reply: Extract<RuleChatReply, { ok: true }>): void => {
     plan.replaceChildren();
-    for (const r of reply.rejected) plan.append(el("div", { class: "rc-rejected small muted" }, [`没采用 ${r.rule}：${r.why}`]));
+    for (const r of reply.rejected) plan.append(el("div", { class: "rc-rejected small muted" }, [`Not applied: ${r.rule}: ${r.why}`]));
     if (reply.changes.length === 0) return;
     const boxes = reply.changes.map((c) => {
       const box = el("input", { type: "checkbox" });
       box.checked = true;
-      const detail = [c.reason, c.op === "add" && c.hits !== undefined ? `命中 ${c.hits} 篇已有记录` : ""].filter(Boolean).join(" · ");
+      const detail = [c.reason, c.op === "add" && c.hits !== undefined ? `Matches ${c.hits} saved articles` : ""].filter(Boolean).join(" · ");
       plan.append(el("label", { class: `rc-change rc-${c.op}` }, [
         box,
-        el("span", {}, [el("span", { class: "rc-what" }, [`${verb(c)}：`]), el("code", {}, [c.rule]), ...(detail ? [el("span", { class: "rc-why small muted" }, [detail])] : [])]),
+        el("span", {}, [el("span", { class: "rc-what" }, [`${verb(c)}: `]), el("code", {}, [c.rule]), ...(detail ? [el("span", { class: "rc-why small muted" }, [detail])] : [])]),
       ]));
       return { box, change: c };
     });
-    const ok = el("button", { type: "button", class: "btn rc-confirm" }, ["确认"]);
-    const no = el("button", { type: "button", class: "btn rc-cancel" }, ["不改了"]);
+    const ok = el("button", { type: "button", class: "btn rc-confirm" }, ["Confirm"]);
+    const no = el("button", { type: "button", class: "btn rc-cancel" }, ["Cancel"]);
     plan.append(el("div", { class: "rc-actions" }, [ok, no]));
 
     no.addEventListener("click", () => {
       plan.replaceChildren();
-      say("assistant", "（这次的改动没有采用）", "muted small");
+      say("assistant", "(These changes were not applied.)", "muted small");
       input.focus();
     });
     ok.addEventListener("click", () => {
@@ -87,12 +87,12 @@ export function ruleChatBox(opts: RuleChatOptions = {}): HTMLElement {
         }
         if (!res?.ok) {
           ok.disabled = no.disabled = false;
-          plan.append(el("div", { class: "rc-error small" }, [`没写进去：${res?.error ?? "后台没有应答"}`]));
+          plan.append(el("div", { class: "rc-error small" }, [`Could not save: ${res?.error ?? "The background service did not respond"}`]));
           return;
         }
         plan.replaceChildren();
         say("assistant", appliedSummary(res.applied), "rc-done");
-        for (const r of res.rejected) note(`没写入 ${r.rule}：${r.why}`);
+        for (const r of res.rejected) note(`Not saved: ${r.rule}: ${r.why}`);
         await opts.onApplied?.(res.applied);
         input.focus();
       })();
@@ -107,7 +107,7 @@ export function ruleChatBox(opts: RuleChatOptions = {}): HTMLElement {
     say("user", text);
     input.value = "";
     busy(true);
-    const waiting = note("正在理解…");
+    const waiting = note("Preparing changes…");
     void (async () => {
       let res: RuleChatReply;
       try {
@@ -123,7 +123,7 @@ export function ruleChatBox(opts: RuleChatOptions = {}): HTMLElement {
         turns.pop();
         log.lastElementChild?.remove();
         input.value = text;
-        note(`没理解成：${res?.error ?? "后台没有应答"}`, "rc-error");
+        note(`Could not interpret the request: ${res?.error ?? "The background service did not respond"}`, "rc-error");
         input.focus();
         return;
       }

@@ -102,8 +102,8 @@ test("抓取记录里的长字段被截断，null 的还是 null", async () => {
   const got = (await getFetchLog())[0];
   assert.ok(got);
   assert.ok(got.url.length < long.length);
-  assert.ok(got.url.includes("已截断"));
-  assert.ok(got.title?.includes("已截断"));
+  assert.ok(got.url.includes("truncated"));
+  assert.ok(got.title?.includes("truncated"));
   assert.equal(got.finalUrl, null);
   assert.equal(got.error, null);
 });
@@ -115,7 +115,7 @@ test("调用栈的上限比别的字段宽：切太短往往正好切掉出错�
   const got = (await getAppErrors())[0];
   assert.ok(got?.stack);
   assert.ok(got.stack.length > MAX_TEXT_CHARS);
-  assert.ok(got.stack.includes("已截断"));
+  assert.ok(got.stack.includes("truncated"));
 });
 
 test("落盘失败不往外抛：日志是附属品，不能反过来把阅读器搞坏", async () => {

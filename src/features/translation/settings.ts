@@ -57,6 +57,6 @@ export const MAX_AUTO_WORDS = 360;
 /** 这个功能的网址名单，交给名单对话（core/background/ruleChat.ts）。meaning 是写给模型看的。 */
 export const TRANSLATION_URL_LISTS: readonly UrlRuleList[] = [{
   key: "translationAllowedUrls" satisfies keyof TranslationSettings,
-  label: "翻译白名单",
-  meaning: "命中的页面自动开启划词翻译；不在名单里的页面默认不翻译，要在弹出面板里手动开。不影响专注记录。",
+  label: "Translation allowlist",
+  meaning: "Translation starts automatically on matching pages. Enable it manually in the popup for other pages. Focus tracking is independent.",
 }];

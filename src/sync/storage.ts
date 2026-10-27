@@ -61,7 +61,7 @@ export function indexedDriver(seed: () => Promise<Record<string, unknown>>, name
     await new Promise<void>((resolve,reject) => {
       const tx = db.transaction("state","readwrite"), store = tx.objectStore("state"), r = store.get("root");
       r.onsuccess = () => { if (!r.result) { const state = freshState(original); trackChanges(state,{},state.data,true); store.put(state,"root"); } };
-      tx.oncomplete = () => resolve(); tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("本地数据库初始化失败"));
+      tx.oncomplete = () => resolve(); tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("Could not initialize the local database"));
     });
   })().catch(error=>{initialized=undefined;throw error;});
   const run = async <T>(mode: IDBTransactionMode, fn: (state: SyncState) => T): Promise<T> => {
@@ -69,7 +69,7 @@ export function indexedDriver(seed: () => Promise<Record<string, unknown>>, name
     return new Promise<T>((resolve,reject) => {
       const tx = db.transaction("state", mode), store = tx.objectStore("state"), r = store.get("root"); let result: T; let error: unknown;
       r.onsuccess = () => { try { const state = r.result as SyncState; result = fn(state); if (mode === "readwrite") store.put(state,"root"); } catch (e) { error = e; tx.abort(); } };
-      tx.oncomplete = () => resolve(structuredClone(result)); tx.onerror = tx.onabort = () => reject(error ?? tx.error ?? new Error("本地数据保存失败"));
+      tx.oncomplete = () => resolve(structuredClone(result)); tx.onerror = tx.onabort = () => reject(error ?? tx.error ?? new Error("Could not save local data"));
     });
   };
   return { read: () => run("readonly",s => s), update: fn => run("readwrite",fn) };
@@ -319,7 +319,7 @@ export function projectRecords(state: SyncState): void {
  */
 export async function applyRemote(driver:StateDriver, records:SyncRecord[], cursor:number, expectedConfig?:SyncConfig):Promise<boolean> {
   return withDataLock(()=>driver.update(state=>{
-    if(expectedConfig && JSON.stringify(state.config)!==JSON.stringify(expectedConfig))throw new Error("同步配置已改变，本轮已停止");
+    if(expectedConfig && JSON.stringify(state.config)!==JSON.stringify(expectedConfig))throw new Error("Sync settings changed. This sync cycle was stopped.");
     let altered=false;
     for(const raw of records) {
       const r=validateRecord(raw);state.counter=Math.max(state.counter,r.stamp.counter); const key=recordKey(r);
@@ -356,7 +356,7 @@ export async function notifyProjection(altered=true):Promise<void> {
   try {void (chrome.runtime.sendMessage({type:"sync:updated"} satisfies BgToPage) as Promise<unknown>|undefined)?.catch?.(()=>undefined);} catch { /* 不在扩展里（测试），或扩展正在重载 */ }
 }
 export const localStorage = ():chrome.storage.StorageArea => installed ?? chrome.storage.local;
-export const syncDriver = ():StateDriver => {if(!driver)throw new Error("本地同步数据库尚未就绪");return driver;};
+export const syncDriver = ():StateDriver => {if(!driver)throw new Error("The local sync database is not ready");return driver;};
 export const hasSyncStorage = ():boolean => Boolean(driver);
 export function onLocalMutation(fn:()=>void):void {changed=fn;}
 export function installStorage(stateDriver:StateDriver, mirror?: (data:Record<string,unknown>)=>Promise<void>, cleanupLegacy?:()=>Promise<void>):void {

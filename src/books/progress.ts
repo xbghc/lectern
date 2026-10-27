@@ -27,7 +27,7 @@ export function bookProgress(book: Book, articles: readonly Pick<Article, "id" |
 export interface ResumeTarget { articleId: string; title: string; source: string; progress: number; lastSeenTs: number }
 export function readingResume(articles: readonly Article[], books: Record<string, Book>): ResumeTarget | null {
   const candidates: ResumeTarget[] = articles.filter(a => !a.finished && !parseChapterId(a.id)).map(a => ({
-    articleId: a.id, title: a.title || a.url, source: `${hostnameOf(a.url)} · 文章`,
+    articleId: a.id, title: a.title || a.url, source: `${hostnameOf(a.url)} · Article`,
     progress: a.trackedWords > 0 ? Math.round(Math.max(0, Math.min(1, a.wordsRead / a.trackedWords)) * 100) : 0, lastSeenTs: a.lastSeenTs,
   }));
   for (const book of Object.values(books)) {
@@ -35,7 +35,7 @@ export function readingResume(articles: readonly Article[], books: Record<string
     const chapter = resumeChapter(book, articles);
     const records = articles.filter(a => parseChapterId(a.id)?.bookId === book.id);
     candidates.push({ articleId: chapterId(book.id, chapter), title: book.title,
-      source: `第 ${chapter + 1} 章 · ${book.chapters.find(c => c.index === chapter)?.title ?? '本地书籍'}`,
+      source: `Chapter ${chapter + 1} · ${book.chapters.find(c => c.index === chapter)?.title ?? "Local book"}`,
       progress: bookProgress(book, articles), lastSeenTs: Math.max(book.addedTs, ...records.map(a => a.lastSeenTs)) });
   }
   return candidates.sort((a, b) => b.lastSeenTs - a.lastSeenTs)[0] ?? null;

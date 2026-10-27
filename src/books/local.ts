@@ -29,7 +29,7 @@ export async function getBook(id: string): Promise<Book | null> {
 }
 
 export async function saveBook(book: Book): Promise<void> {
-  if (!BOOK_ID.test(book.id)) throw new Error("书的标识无效");
+  if (!BOOK_ID.test(book.id)) throw new Error("Invalid book identifier");
   await localStorage().set({ [BOOKS_KEY]: { ...(await read()), [book.id]: book } });
 }
 
@@ -54,7 +54,7 @@ export async function deleteBook(id: string): Promise<void> {
   const ids = book.chapters.map(c => chapterId(id, c.index));
   for (let i = 0; i < ids.length; i += 200) {
     const result = await chrome.runtime.sendMessage({ type: "articles:delete", articleIds: ids.slice(i, i + 200) }) as { ok?: boolean; error?: string };
-    if (!result?.ok) throw new Error(result?.error || "删除阅读记录失败");
+    if (!result?.ok) throw new Error(result?.error || "Could not delete reading records");
   }
   const others = new Set(Object.values(books).filter(b => b.id !== id).flatMap(b => b.resources));
   await dropBlobs(book.resources.filter(hash => !others.has(hash)));
@@ -85,11 +85,11 @@ export async function hydrateBookImages(body: HTMLElement, resources: readonly A
   for (const { img, hash } of pending) {
     try {
       const resource = hash ? known.get(hash) : undefined;
-      if (!hash || !resource || !imageMime(resource.mime)) throw new Error("未知图片资源");
+      if (!hash || !resource || !imageMime(resource.mime)) throw new Error("Unknown image resource");
       let url = urls.get(hash);
       if (!url) {
         const blob = await cachedBlob(hash);
-        if (!blob || blob.size !== resource.size) throw new Error("图片不在本机");
+        if (!blob || blob.size !== resource.size) throw new Error("This image is not on your device");
         url = URL.createObjectURL(new Blob([blob], { type: resource.mime }));
         urls.set(hash, url);
         allocated.add(url);
@@ -98,7 +98,7 @@ export async function hydrateBookImages(body: HTMLElement, resources: readonly A
     } catch {
       missing++;
       const placeholder = document.createElement("span");
-      placeholder.textContent = img.alt ? `（图片未保存：${img.alt}）` : "（图片未保存）";
+      placeholder.textContent = img.alt ? `(Image not saved: ${img.alt})` : "(Image not saved)";
       img.replaceWith(placeholder);
     }
   }

@@ -48,17 +48,17 @@ export function validateArchiveCapture(value: unknown): ArchiveCapture {
     || !Array.isArray(payload.resources) || payload.resources.length > MAX_ARCHIVE_IMAGES
     || !Array.isArray(payload.missingResources) || payload.missingResources.length > 1000
     || payload.missingResources.some(url => typeof url !== "string" || !url)) {
-    throw new Error("文章内容格式不正确或超过大小限制");
+    throw new Error("Article content is invalid or exceeds the size limit");
   }
   const url = new URL(payload.url);
-  if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("不支持的文章地址");
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("Unsupported article URL");
   let bytes = 0;
   for (const resource of payload.resources) {
     if (!resource || typeof resource.url !== "string" || !resource.url || resource.url.length > MAX_RESOURCE_BYTES * 1.4
       || (resource.base64 !== undefined && (typeof resource.base64 !== "string" || resource.base64.length > MAX_RESOURCE_BYTES * 1.4))
-      || (resource.mime !== undefined && typeof resource.mime !== "string")) throw new Error("文章图片格式不正确");
+      || (resource.mime !== undefined && typeof resource.mime !== "string")) throw new Error("Invalid article image");
     bytes += resource.base64?.length ?? 0;
-    if (bytes > 36 * 1024 * 1024) throw new Error("文章图片超过传输大小限制");
+    if (bytes > 36 * 1024 * 1024) throw new Error("Article image exceeds the transfer size limit");
   }
   return payload;
 }
@@ -75,7 +75,7 @@ export async function hashBytes(bytes: Uint8Array): Promise<string> {
 
 /** Bound streaming bodies even when Content-Length is absent or dishonest. */
 export async function readArchiveBytes(response: Response, limit = MAX_RESOURCE_BYTES): Promise<Uint8Array> {
-  if (Number(response.headers.get("content-length")) > limit) throw new Error("文章资源超过大小限制");
+  if (Number(response.headers.get("content-length")) > limit) throw new Error("Article resources exceed the size limit");
   const reader = response.body?.getReader();
   if (!reader) return new Uint8Array();
   const chunks: Uint8Array[] = [];
@@ -85,7 +85,7 @@ export async function readArchiveBytes(response: Response, limit = MAX_RESOURCE_
       const chunk = await reader.read();
       if (chunk.done) break;
       size += chunk.value.byteLength;
-      if (size > limit) { await reader.cancel(); throw new Error("文章资源超过大小限制"); }
+      if (size > limit) { await reader.cancel(); throw new Error("Article resources exceed the size limit"); }
       chunks.push(chunk.value);
     }
   } finally { reader.releaseLock(); }
@@ -101,7 +101,7 @@ export function rewriteArchiveImages(html: string, hashes: ReadonlyMap<string, s
     const src = /\bsrc="([^"]*)"/i.exec(tag);
     const url = src?.[1]?.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
     const hash = url ? hashes.get(url) : undefined;
-    if (!hash || !ARCHIVE_HASH.test(hash)) return "<span>（图片未保存）</span>";
+    if (!hash || !ARCHIVE_HASH.test(hash)) return "<span>(Image not saved)</span>";
     return tag.replace(/\bsrc="[^"]*"/i, `src="fs-blob:${hash}"`);
   });
 }

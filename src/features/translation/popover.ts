@@ -116,7 +116,7 @@ const CSS = `
 /* ---- 讲解：用法一行，生词逐条 ---- */
 .usage { margin-top: 7px; color: #554e45; font-size: 13px; line-height: 1.8; }
 .usage::before {
-  content: "用法 · ";
+  content: "Usage · ";
   color: #8f8475; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
@@ -170,7 +170,7 @@ button:active { background: #f1ebe2; border-color: #a45531; color: #a45531; }
   color: #766d62; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
-.qq::before { content: "问 · "; }
+.qq::before { content: "Q · "; }
 /* 答案里的换行是模型自己分的段，留着 */
 .aa { margin-top: 3px; font-size: 13px; line-height: 1.8; color: #554e45; white-space: pre-wrap; }
 .askbar { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
@@ -452,7 +452,7 @@ export class Popover {
       backdrop.addEventListener("touchmove", event => event.preventDefault(), { passive: false });
       backdrop.addEventListener("wheel", event => event.preventDefault(), { passive: false });
       root.append(backdrop);
-      box.classList.add("reader-sheet"); box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "翻译与讲解"); box.setAttribute("aria-modal", "true");
+      box.classList.add("reader-sheet"); box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Translation and explanation"); box.setAttribute("aria-modal", "true");
       const resize = (): void => this.position();
       window.addEventListener("resize", resize);
       window.visualViewport?.addEventListener("resize", resize);
@@ -545,7 +545,7 @@ export class Popover {
     if (box && this.actions.presentation === "sheet") {
       if (!box.querySelector(".reader-sheet-close")) {
         const close = document.createElement("button"); close.type = "button"; close.className = "reader-sheet-close";
-        close.textContent = "×"; close.setAttribute("aria-label", "关闭翻译");
+        close.textContent = "×"; close.setAttribute("aria-label", "Close translation");
         close.addEventListener("click", () => this.actions.onClose?.()); box.prepend(close);
         close.focus({ preventScroll: true });
       }
@@ -616,7 +616,7 @@ export class Popover {
 
   showRecognizing(rect: DOMRect): void {
     // 认出来的多半是一段话，按整句预留：接着翻译会沿用这个框，等认完再挑边就晚了
-    this.showStreaming(rect, "正在识别图中文字…", "sentence");
+    this.showStreaming(rect, "Recognizing text in the image…", "sentence");
     this.recognizing = true;
     const n = this.stream!;
     n.termEl.insertAdjacentHTML("beforeend", ' <span class="spin"></span>');
@@ -754,8 +754,8 @@ export class Popover {
     this.render(
       rect,
       `<div class="head"><span class="term"></span></div>
-       <div class="meta">${source === "image" ? "识别出" : "选中了"} ${words} 个词，较长，确认后再翻译</div>
-       <div class="ctx"><button data-act="go">翻译这段</button></div>`,
+       <div class="meta">${source === "image" ? "Recognized" : "Selected"} ${words} words. Confirm to translate this longer passage.</div>
+       <div class="ctx"><button data-act="go">Translate passage</button></div>`,
       (box) => {
         this.fillTerm(box.querySelector(".term")!, term, 80);
         box.querySelector('[data-act="go"]')!.addEventListener("click", () => this.actions.onConfirm());
@@ -826,7 +826,7 @@ export class Popover {
   showError(rect: DOMRect, message: string, needsConfig: boolean): void {
     this.render(
       rect,
-      `<div class="meta err"></div>${needsConfig ? '<div class="ctx"><button data-act="opt">去设置</button></div>' : ""}`,
+      `<div class="meta err"></div>${needsConfig ? "<div class=\"ctx\"><button data-act=\"opt\">Open settings</button></div>" : ""}`,
       (box) => {
         // 配置类的失败不止「没填 Key」一种（还有没选服务商、没点同意），话由出错的地方说，这里照实显示
         box.querySelector(".err")!.textContent = truncate(message, 200);
@@ -864,7 +864,7 @@ export class Popover {
     this.ask = { qas, bar, answer: null, input: null, send: null, engaged: false };
 
     // 先只给一个按钮：输入框一上来就摆着，会把「看一眼译文就走」的常态压成一个表单
-    const open = iconButton("ask", "问", "就这段追问");
+    const open = iconButton("ask", "Ask", "Ask about this passage");
     open.addEventListener("click", () => this.openAsk());
     bar.append(open);
     this.position();
@@ -881,7 +881,7 @@ export class Popover {
     input.className = "qin";
     input.type = "text";
     input.maxLength = MAX_QUESTION_CHARS;
-    input.placeholder = "就这段问一句…";
+    input.placeholder = "Ask about this passage…";
     input.addEventListener("keydown", (e) => {
       // 输入法选词时的回车是「确认候选」，不是「发送」——中文输入第一下就会撞上
       if (e.key !== "Enter" || e.isComposing) return;
@@ -890,7 +890,7 @@ export class Popover {
     });
 
     // 回车也能发；写进 title 里，否则这条捷径没人知道
-    const send = iconButton("send", "↵", "发送（回车）");
+    const send = iconButton("send", "↵", "Send (Enter)");
     send.addEventListener("click", () => this.submitAsk());
 
     a.input = input;
@@ -961,7 +961,7 @@ export class Popover {
     const a = this.ask;
     if (!a?.answer) return;
     // 一个字都没吐出来（被截断、被拦）时别留个空框加转圈在那儿转；那句占位话直接显示，不打
-    this.tw.write(a.answer, text || "（这一问没有得到回答）", !text);
+    this.tw.write(a.answer, text || "(No answer was received.)", !text);
     a.answer = null;
     this.setAskBusy(false);
     this.position();
@@ -978,7 +978,7 @@ export class Popover {
       row.className = "ctx";
       const btn = document.createElement("button");
       btn.setAttribute("data-act", "opt");
-      btn.textContent = "去设置";
+      btn.textContent = "Open settings";
       btn.addEventListener("click", () => this.actions.onOpenOptions());
       row.append(btn);
       slot.after(row);

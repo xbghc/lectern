@@ -1,3 +1,4 @@
+import { quantity } from "../ui/text.ts";
 import "./boot.ts";
 import "../dashboard/index.ts";
 import { go, readerUrl } from "./boot.ts";
@@ -37,7 +38,7 @@ savedSection.open = true;
 savedSection.hidden = true;
 savedSection.className = "blacklist-section";
 const savedSummary = document.createElement("summary");
-savedSummary.textContent = "插件保存的文章";
+savedSummary.textContent = "Saved from the extension";
 const savedList = document.createElement("div");
 savedList.className = "list";
 savedSection.append(savedSummary, savedList);
@@ -61,23 +62,23 @@ async function renderSavedArticles(): Promise<void> {
     const meta = document.createElement("p");
     meta.className = "muted small";
     const available = await cachedBlob(archive.htmlHash).then(Boolean, () => false);
-    meta.textContent = `${hostnameOf(archive.url)} · ${available ? "正文已下载" : "打开以下载正文和图片"}`;
-    if (archive.missingResources?.length) meta.textContent += ` · ${archive.missingResources.length} 项资源未保存`;
+    meta.textContent = `${hostnameOf(archive.url)} · ${available ? "Text downloaded" : "Open to download text and images"}`;
+    if (archive.missingResources?.length) meta.textContent += ` · ${archive.missingResources.length} resources were not saved`;
     item.append(title, meta);
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "mini";
-    remove.textContent = "删除";
+    remove.textContent = "Delete";
     remove.addEventListener("click", () => {
-      if (!confirm(`删除「${archive.title || archive.url}」及其存档、阅读记录和文章回顾？划词与生词卡保留，删除会同步到其他设备。`)) return;
+      if (!confirm(`Delete “${archive.title || archive.url}” with its archive, reading history and review? Vocabulary and word cards will be kept. Deletion syncs to other devices.`)) return;
       remove.disabled = true;
       void chrome.runtime.sendMessage({ type: "articles:delete", articleIds: [archive.articleId] }).then(async (result: { ok?: boolean; error?: string }) => {
-        if (!result?.ok) throw new Error(result?.error || "删除失败");
+        if (!result?.ok) throw new Error(result?.error || "Could not delete");
         await renderSavedArticles();
       }).catch((err: unknown) => {
         // 另起一行说：以前写进了 meta，那行「域名 · 正文已下载」就此被错误盖掉，再也回不来
         remove.disabled = false;
-        problem.textContent = `没删掉：${reasonOf(err)}`;
+        problem.textContent = `Could not delete: ${reasonOf(err)}`;
         problem.hidden = false;
       });
     });
@@ -91,7 +92,7 @@ async function renderSavedArticles(): Promise<void> {
   if (turn !== archiveRender) return;
   savedList.replaceChildren(fragment);
   savedSection.hidden = archives.length === 0;
-  savedSummary.textContent = `插件保存的文章（${archives.length}）`;
+  savedSummary.textContent = `Saved from the extension (${archives.length})`;
 }
 void renderSavedArticles();
 window.addEventListener("focus-sync-updated", () => { void renderSavedArticles(); });
@@ -104,7 +105,7 @@ $("add").addEventListener("submit", (e) => {
   const url = pickUrl($<HTMLInputElement>("add-url").value);
   if (!url) {
     hint.hidden = false;
-    hint.textContent = "没认出网址，得是 http(s):// 开头的地址。";
+    hint.textContent = "Enter a valid URL starting with http:// or https://.";
     return;
   }
   location.href = readerUrl(url) + "&from=articles";
@@ -116,7 +117,7 @@ if (shared) {
   if (url) location.replace(readerUrl(url));
   else {
     hint.hidden = false;
-    hint.textContent = "分享过来的内容里没有网址。";
+    hint.textContent = "The shared content does not contain a URL.";
     $<HTMLDialogElement>("article-dialog").showModal();
   }
 }
@@ -149,7 +150,7 @@ function chapterRow(book: Book, index: number, title: string, words: number, don
   link.textContent = `${index + 1}. ${title}`;
   const meta = document.createElement("span");
   meta.className = "muted small";
-  meta.textContent = `${words} 字${done ? " · 已读完" : ""}`;
+  meta.textContent = `${quantity(words, "word")}${done ? " · Finished" : ""}`;
   item.append(link, meta);
   return item;
 }
@@ -187,13 +188,13 @@ async function renderBooks(): Promise<void> {
       return box;
     };
     const coverLink = document.createElement("a"); coverLink.className = "shelf-cover-link";
-    coverLink.href = readerUrl(target) + "&from=books"; coverLink.setAttribute("aria-label", `阅读《${book.title}》`);
+    coverLink.href = readerUrl(target) + "&from=books"; coverLink.setAttribute("aria-label", `Read “${book.title}”`);
     coverLink.append(coverNode()); row.append(coverLink);
     if (homeFragment.childElementCount < 2) {
       const preview = document.createElement("a"); preview.className = "phone-shelf-preview";
       preview.href = readerUrl(target) + "&from=articles";
       const info = document.createElement("div"); const name = document.createElement("h3"); name.textContent = book.title;
-      const detail = document.createElement("p"); detail.textContent = progress ? `已读 ${progress}%` : "尚未开始";
+      const detail = document.createElement("p"); detail.textContent = progress ? `Read ${progress}%` : "Not started";
       info.append(name, detail); preview.append(coverNode(), info); homeFragment.append(preview);
     }
     const title = document.createElement("div");
@@ -204,7 +205,7 @@ async function renderBooks(): Promise<void> {
     title.append(open);
     const pill = document.createElement("span");
     pill.className = `pill${done.size === book.chapters.length ? " done" : ""}`;
-    pill.textContent = `已读 ${progress}%`;
+    pill.textContent = `Read ${progress}%`;
     row.append(title, pill);
 
     const sub = document.createElement("div");
@@ -214,16 +215,16 @@ async function renderBooks(): Promise<void> {
     const tracked = book.chapters.flatMap(c => records.get(chapterId(book.id, c.index)) ?? []);
     const read = tracked.reduce((n, a) => n + a.wordsRead, 0);
     const ms = tracked.reduce((n, a) => n + a.totalMs, 0);
-    for (const part of [book.author, `${book.chapters.length} 节`, `约 ${words.toLocaleString("zh-CN")} 字`,
-      ms > 0 ? `已读 ${read.toLocaleString("zh-CN")} 字 · ${formatDuration(ms)}` : "还没读过",
-      book.missingResources > 0 ? `${book.missingResources} 张图未保存` : ""]) {
+    for (const part of [book.author, `${quantity(book.chapters.length, "chapter")}`, `About ${words.toLocaleString("en-US")} words`,
+      ms > 0 ? `Read ${read.toLocaleString("en-US")} words · ${formatDuration(ms)}` : "Not read yet",
+      book.missingResources > 0 ? `${book.missingResources} images were not saved` : ""]) {
       if (part) sub.append(Object.assign(document.createElement("span"), { textContent: part }));
     }
 
     const toc = document.createElement("details");
     toc.className = "book-toc";
     const summary = document.createElement("summary");
-    summary.textContent = "目录";
+    summary.textContent = "Contents";
     const chapters = document.createElement("div");
     chapters.className = "list";
     toc.append(summary, chapters);
@@ -240,16 +241,16 @@ async function renderBooks(): Promise<void> {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "mini";
-    remove.textContent = "删除";
+    remove.textContent = "Delete";
     remove.addEventListener("click", () => {
-      if (!confirm(`删除《${book.title}》？这本书的正文、图片和每一节的阅读记录都会清掉，划词与生词卡保留。`)) return;
+      if (!confirm(`Delete “${book.title}”? Its text, images and chapter reading records will be removed. Vocabulary and word cards will be kept.`)) return;
       remove.disabled = true;
       void deleteBook(book.id)
         .then(() => renderBooks())
         .catch((err: unknown) => {
           // 写在这张卡片上：#book-status 在导入那一行里，宿主不支持导入时整行是藏着的，写进去等于没说
           remove.disabled = false;
-          problem.textContent = `没删掉：${reasonOf(err)}`;
+          problem.textContent = `Could not delete: ${reasonOf(err)}`;
           problem.hidden = false;
         });
     });
@@ -264,9 +265,9 @@ async function renderBooks(): Promise<void> {
   if (turn !== bookRender) { for (const url of urls) URL.revokeObjectURL(url); return; }
   bookList.replaceChildren(fragment);
   $("home-books").replaceChildren(homeFragment);
-  $("home-books-count").textContent = `${books.length} 本 · `;
+  $("home-books-count").textContent = `${books.length} ${books.length === 1 ? "book" : "books"} · `;
   $("home-shelf").hidden = false;
-  if (!books.length) $("home-books").textContent = "还没有书籍，打开书架导入 EPUB。";
+  if (!books.length) $("home-books").textContent = "No books yet. Open your bookshelf to import an EPUB.";
   for (const url of coverUrls) URL.revokeObjectURL(url);
   coverUrls = urls;
   bookSection.hidden = books.length === 0;
@@ -275,7 +276,7 @@ async function renderBooks(): Promise<void> {
     // 只在第一次画的时候展开：用户收起来之后，一次同步或一次导入不该把它又掀开
     if (!shelfDrawn) (bookSection as HTMLDetailsElement).open = true;
     shelfDrawn = true;
-    $("book-summary").textContent = `我的书（${books.length}）`;
+    $("book-summary").textContent = `My books (${books.length})`;
   }
 }
 
@@ -291,7 +292,7 @@ async function importBook(uri?: string): Promise<void> {
   importing = true;
   $<HTMLButtonElement>("import-book").disabled = true;
   try {
-    say("正在打开文件…");
+    say("Opening file…");
     const picked = uri ? { uri, name: "" } : await pickEpub();
     if (!picked) { say(""); return; }
     const handle = await openEpub(picked.uri);
@@ -300,24 +301,24 @@ async function importBook(uri?: string): Promise<void> {
       const book = existing ?? await importEpub(
         { names: handle.names, bytes: handle.bytes },
         handle.hash,
-        picked.name || "未命名的书.epub",
+        picked.name || "Untitled book.epub",
         {
           parse: (text, mime) => new DOMParser().parseFromString(text, mime),
           doc: document,
           hash: importHash,
           sink: localSink(),
-          onProgress: (done, total) => say(`正在导入…${done}/${total} 节`),
+          onProgress: (done, total) => say(`Importing…${done}/${quantity(total, "chapter")}`),
         },
       );
       if (!existing) await saveBook(book);
       openBookId = book.id;
       await renderBooks();
-      say(existing ? `《${book.title}》已经在书架上了` : `《${book.title}》导入完成，共 ${book.chapters.length} 节`);
+      say(existing ? `“${book.title}” is already on your bookshelf` : `“${book.title}” imported: ${quantity(book.chapters.length, "chapter")}`);
     } finally {
       handle.close();
     }
   } catch (err) {
-    say(`导入失败：${err instanceof Error ? err.message : String(err)}`);
+    say(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
     importing = false;
     $<HTMLButtonElement>("import-book").disabled = false;
@@ -355,15 +356,15 @@ void (async () => {
   const act = document.createElement("a");
   act.href = "options.html#update";
   if (step.do === "ready") {
-    text.textContent = step.silent ? `新版本 ${version} 已下载，离开 App 后自动安装` : `新版本 ${version} 已下载`;
-    act.textContent = step.silent ? "现在就装" : "安装";
+    text.textContent = step.silent ? `New version ${version} downloaded; it will install after you leave the app` : `New version ${version} downloaded`;
+    act.textContent = step.silent ? "Install now" : "Install";
     act.addEventListener("click", (e) => {
       e.preventDefault();
       native()?.updateInstall?.();
     });
   } else {
-    text.textContent = `有新版本 ${version}`;
-    act.textContent = "去更新";
+    text.textContent = `New version available: ${version}`;
+    act.textContent = "Update";
     act.addEventListener("click", (e) => {
       e.preventDefault();
       void go("options.html#update");
@@ -372,7 +373,7 @@ void (async () => {
   const no = document.createElement("button");
   no.type = "button";
   no.className = "mini";
-  no.textContent = "不用了";
+  no.textContent = "Dismiss";
   no.addEventListener("click", () => {
     // 只跳过这一个版本；下一个照常提示。已经武装的也一并撤销——「不用了」说的就是别装
     skipVersion(version);

@@ -33,7 +33,7 @@ function parsed(text: string, mime: "application/xml" | "text/html", parse: Pars
   const doc = parse(text, mime);
   // 浏览器解析 XML 出错时不抛异常，而是给一份 <parsererror> 的文档
   if (mime === "application/xml" && doc.getElementsByTagName("parsererror").length > 0) {
-    throw new Error("EPUB 的 XML 结构不完整");
+    throw new Error("Incomplete XML structure in EPUB");
   }
   return doc;
 }
@@ -48,7 +48,7 @@ const text = (el: Element | null | undefined): string => (el?.textContent ?? "")
 export function packagePath(containerXml: string, parse: ParseXml): string {
   const doc = parsed(containerXml, "application/xml", parse);
   const full = tags(doc, "rootfile").map(el => el.getAttribute("full-path")).find(Boolean);
-  if (!full) throw new Error("这个 EPUB 里没有 container.xml 指向的主文档");
+  if (!full) throw new Error("The EPUB package document referenced by container.xml is missing");
   return resolvePath("", full);
 }
 
@@ -102,7 +102,7 @@ export function parsePackage(opfXml: string, opfPath: string, parse: ParseXml): 
     seen.add(item.href);
     spine.push({ href: item.href, mediaType: item.mediaType });
   }
-  if (spine.length === 0) throw new Error("这个 EPUB 的 spine 里没有正文");
+  if (spine.length === 0) throw new Error("The EPUB spine contains no readable content");
 
   const byProperty = (name: string): string | null =>
     [...items.values()].find(i => i.properties.split(/\s+/).includes(name))?.href ?? null;

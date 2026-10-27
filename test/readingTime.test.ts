@@ -211,26 +211,26 @@ test("没有可观测段落的记录估不了", () => {
 /* ---------- 文案 ---------- */
 
 test("formatEstimate：20 分钟内按分钟，往上按 5 分钟取整，过一小时报小时", () => {
-  assert.equal(formatEstimate(0), "不到 1 分钟");
-  assert.equal(formatEstimate(29_999), "不到 1 分钟");
-  assert.equal(formatEstimate(30_000), "约 1 分钟");
-  assert.equal(formatEstimate(12.4 * MIN), "约 12 分钟");
-  assert.equal(formatEstimate(19 * MIN), "约 19 分钟");
-  assert.equal(formatEstimate(22 * MIN), "约 20 分钟");
-  assert.equal(formatEstimate(23 * MIN), "约 25 分钟");
-  assert.equal(formatEstimate(58 * MIN), "约 1 小时");
-  assert.equal(formatEstimate(72 * MIN), "约 1 小时 10 分钟");
-  assert.equal(formatEstimate(75 * MIN), "约 1 小时 15 分钟");
-  assert.equal(formatEstimate(180 * MIN), "约 3 小时");
-  assert.equal(formatEstimate(-5), "不到 1 分钟");
+  assert.equal(formatEstimate(0), "Less than 1 min");
+  assert.equal(formatEstimate(29_999), "Less than 1 min");
+  assert.equal(formatEstimate(30_000), "About 1 min");
+  assert.equal(formatEstimate(12.4 * MIN), "About 12 min");
+  assert.equal(formatEstimate(19 * MIN), "About 19 min");
+  assert.equal(formatEstimate(22 * MIN), "About 20 min");
+  assert.equal(formatEstimate(23 * MIN), "About 25 min");
+  assert.equal(formatEstimate(58 * MIN), "About 1 h");
+  assert.equal(formatEstimate(72 * MIN), "About 1 h 10 min");
+  assert.equal(formatEstimate(75 * MIN), "About 1 h 15 min");
+  assert.equal(formatEstimate(180 * MIN), "About 3 h");
+  assert.equal(formatEstimate(-5), "Less than 1 min");
 });
 
 test("describeBasis 按依据措辞，并写明用的是近 30 天还是全部历史", () => {
   const base = { words: 100, ms: 1, wordsPerMinute: 142 };
-  assert.match(describeBasis({ ...base, basis: "default", windowDays: 0 }), /一般速度/);
-  assert.match(describeBasis({ ...base, basis: "personal", windowDays: 30 }), /近 30 天.*142/);
-  assert.match(describeBasis({ ...base, basis: "personal", windowDays: 0 }), /过往.*142/);
-  assert.match(describeBasis({ ...base, basis: "article", windowDays: 30 }), /这篇.*142/);
+  assert.match(describeBasis({ ...base, basis: "default", windowDays: 0 }), /typical reading pace/);
+  assert.match(describeBasis({ ...base, basis: "personal", windowDays: 30 }), /last 30 days.*142/);
+  assert.match(describeBasis({ ...base, basis: "personal", windowDays: 0 }), /previous reading pace.*142/);
+  assert.match(describeBasis({ ...base, basis: "article", windowDays: 30 }), /this article.*142/);
 });
 
 /* ---------- ParagraphTracker.remainingTarget ---------- */

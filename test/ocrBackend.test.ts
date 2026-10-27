@@ -65,17 +65,17 @@ test("识别原样转发 PNG 与后端成功或失败结果", async () => {
     warm: async () => undefined,
     recognize: async (png) => {
       seen.push(png);
-      return png === "abc" ? { ok: true, text: "tacit endorsement" } : { ok: false, error: "图里没认出英文" };
+      return png === "abc" ? { ok: true, text: "tacit endorsement" } : { ok: false, error: "No English text was detected in the image" };
     },
   });
   assert.deepEqual(await handle({ type: "ocr:recognize", png: "abc" }, {}), { ok: true, text: "tacit endorsement" });
-  assert.deepEqual(await handle({ type: "ocr:recognize", png: "empty" }, {}), { ok: false, error: "图里没认出英文" });
+  assert.deepEqual(await handle({ type: "ocr:recognize", png: "empty" }, {}), { ok: false, error: "No English text was detected in the image" });
   assert.deepEqual(seen, ["abc", "empty"]);
 });
 
 test("没有注入时识别给固定错误，预热仍可安全调用", async () => {
   assert.deepEqual(await handle({ type: "ocr:warm" }, {}), { ok: true });
-  assert.deepEqual(await handle({ type: "ocr:recognize", png: "abc" }, {}), { ok: false, error: "这个宿主不支持截图翻译" });
+  assert.deepEqual(await handle({ type: "ocr:recognize", png: "abc" }, {}), { ok: false, error: "Screenshot translation is unavailable in this app version" });
 });
 
 test("垫片两个截图重载都接到 capture，消息发送方包含窗口", async () => {
@@ -90,7 +90,7 @@ test("垫片两个截图重载都接到 capture，消息发送方包含窗口", 
 });
 
 test("垫片未提供截图能力时 reject，宿主自身的错误也不吞掉", async () => {
-  await assert.rejects(chrome.tabs.captureVisibleTab({ format: "png" }), /宿主不支持截图/);
+  await assert.rejects(chrome.tabs.captureVisibleTab({ format: "png" }), /Screen capture is unavailable/);
   setup({ capture: async () => { throw new Error("宿主截图失败"); } });
   await assert.rejects(chrome.tabs.captureVisibleTab(1, { format: "png" }), /宿主截图失败/);
 });
@@ -143,7 +143,7 @@ test("offscreen 忽略无关消息，预热等就绪，识别清洗行信息并�
   });
   assert.equal((await send("ocr:warm")).ok, true);
   assert.equal((await send("ocr:recognize", "abc")).text, "intensity");
-  assert.equal((await send("ocr:recognize", "empty")).error, "图里没认出英文");
+  assert.equal((await send("ocr:recognize", "empty")).error, "No English text was detected in the image");
   assert.equal((await send("ocr:recognize", "bad")).error, "Error: 识别失败");
 });
 

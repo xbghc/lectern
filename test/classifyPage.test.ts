@@ -44,8 +44,8 @@ async function failures(): Promise<LlmFailure[]> {
 
 test('内容审核拒掉：原因说人话，失败现场带网址和标题', async () => {
   replies = [() => new Response(REFUSAL, { status: 500 })];
-  const got = await classifyPage(URL_A, '某新闻', '正文', deps);
-  assert.deepEqual(got, { ok: false, reason: '模型服务商的内容审核拒绝了这段内容（input new_sensitive (1026)），这一页不记录' });
+  const got = await classifyPage(URL_A, '某新闻', "Article text", deps);
+  assert.deepEqual(got, { ok: false, reason: "The model provider's content filter rejected this text (input new_sensitive (1026)); this page is not tracked" });
   assert.equal(calls, 1, '拒答不重发');
   const [f] = await failures();
   assert.equal(f!.kind, 'refused');
@@ -54,33 +54,33 @@ test('内容审核拒掉：原因说人话，失败现场带网址和标题', as
 
 test('拒掉的页一小时内再打开不再去问，过了一小时、换一页都照常问', async () => {
   replies = [() => new Response(REFUSAL, { status: 500 })];
-  const first = await classifyPage(URL_A, '某新闻', '正文', deps);
+  const first = await classifyPage(URL_A, '某新闻', "Article text", deps);
   clock += REFUSAL_TTL_MS - 1;
-  assert.deepEqual(await classifyPage(URL_A, '某新闻', '正文', deps), first);
+  assert.deepEqual(await classifyPage(URL_A, '某新闻', "Article text", deps), first);
   assert.equal(calls, 1);
   assert.equal((await failures()).length, 1, '也不在诊断日志里多占一格');
 
   replies = [() => new Response(ARTICLE)];
-  assert.equal((await classifyPage('https://news.example.com/b', '另一篇', '正文', deps)).ok, true);
+  assert.equal((await classifyPage('https://news.example.com/b', '另一篇', "Article text", deps)).ok, true);
   clock += 1;
   replies = [() => new Response(ARTICLE)];
-  assert.equal((await classifyPage(URL_A, '某新闻', '正文', deps)).ok, true);
+  assert.equal((await classifyPage(URL_A, '某新闻', "Article text", deps)).ok, true);
   assert.equal(calls, 3);
 });
 
 test('别的失败不记住：普通的 HTTP 500 刷新就再问', async () => {
   replies = [() => new Response('{"error":{"message":"internal"}}', { status: 500 }), () => new Response(ARTICLE)];
-  const got = await classifyPage(URL_A, '某新闻', '正文', deps);
+  const got = await classifyPage(URL_A, '某新闻', "Article text", deps);
   assert.equal(got.ok, false);
-  assert.match(got.reason, /^文章判断失败：HTTP 500/);
-  assert.equal((await classifyPage(URL_A, '某新闻', '正文', deps)).ok, true);
+  assert.match(got.reason, /^Article classification failed: HTTP 500/);
+  assert.equal((await classifyPage(URL_A, '某新闻', "Article text", deps)).ok, true);
   assert.equal(calls, 2);
   assert.deepEqual(waits, [], 'HTTP 错误不重发');
 });
 
 test('断网：隔几秒重发，成了的话之前那几次记成人没看见的失败', async () => {
   replies = [offline, offline, () => new Response(ARTICLE)];
-  const got = await classifyPage(URL_A, '某新闻', '正文', deps);
+  const got = await classifyPage(URL_A, '某新闻', "Article text", deps);
   assert.deepEqual(got, { ok: true, isArticle: true, reason: '独立论述' });
   assert.deepEqual(waits, NETWORK_RETRY_MS);
   const log = await failures();
@@ -89,9 +89,9 @@ test('断网：隔几秒重发，成了的话之前那几次记成人没看见�
 
 test('一直断网：重发两次后照实报错，三次失败都是人撞上的', async () => {
   replies = [offline, offline, offline];
-  const got = await classifyPage(URL_A, '某新闻', '正文', deps);
+  const got = await classifyPage(URL_A, '某新闻', "Article text", deps);
   assert.equal(got.ok, false);
-  assert.match(got.reason, /^文章判断失败：网络错误/);
+  assert.match(got.reason, /^Article classification failed: Network error/);
   assert.equal(calls, 3);
   const log = await failures();
   assert.deepEqual(log.map((f) => [f.kind, f.recovered, f.request['retry']]), [['network', undefined, undefined], ['network', undefined, 1], ['network', undefined, 2]]);
@@ -101,7 +101,7 @@ test('一直断网：重发两次后照实报错，三次失败都是人撞上�
 test('没有 storage.session 也照常判别，只是记不住', async () => {
   (globalThis as Record<string, unknown>).chrome = { storage: { local } };
   replies = [() => new Response(REFUSAL, { status: 500 }), () => new Response(REFUSAL, { status: 500 })];
-  assert.equal((await classifyPage(URL_A, '某新闻', '正文', deps)).ok, false);
-  assert.equal((await classifyPage(URL_A, '某新闻', '正文', deps)).ok, false);
+  assert.equal((await classifyPage(URL_A, '某新闻', "Article text", deps)).ok, false);
+  assert.equal((await classifyPage(URL_A, '某新闻', "Article text", deps)).ok, false);
   assert.equal(calls, 2);
 });

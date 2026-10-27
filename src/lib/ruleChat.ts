@@ -131,7 +131,7 @@ export function parseRulePlan(
 ): { reply: string; changes: RuleChange[]; rejected: RuleRejected[] } {
   const o = raw && typeof raw === "object" ? raw as { reply?: unknown; changes?: unknown } : null;
   const reply = typeof o?.reply === "string" ? o.reply.trim().slice(0, 500) : "";
-  if (!o || (!reply && !Array.isArray(o.changes))) throw new Error("模型没有给出有效的回答");
+  if (!o || (!reply && !Array.isArray(o.changes))) throw new Error("The model did not return a valid answer");
   const changes: RuleChange[] = [];
   const rejected: RuleRejected[] = [];
   const seen = new Set<string>();
@@ -140,22 +140,22 @@ export function parseRulePlan(
     const text = typeof c.rule === "string" ? c.rule.trim().slice(0, 300) : "";
     const list = lists.find((l) => l.key === c.list);
     if (!text) continue;
-    if (!list) { rejected.push({ rule: text, why: "不认识要改的是哪份名单" }); continue; }
-    if (c.op !== "add" && c.op !== "remove") { rejected.push({ rule: text, why: "没说是加还是删" }); continue; }
+    if (!list) { rejected.push({ rule: text, why: "Unknown list" }); continue; }
+    if (c.op !== "add" && c.op !== "remove") { rejected.push({ rule: text, why: "Specify whether to add or remove the rule" }); continue; }
     const reason = typeof c.reason === "string" ? c.reason.trim().slice(0, 200) : "";
     const rules = current[list.key] ?? [];
     let rule: string;
     if (c.op === "remove") {
       const target = normalizeUrlRule(text) ?? text;
       const found = rules.find((r) => r.trim() === text || normalizeUrlRule(r) === target);
-      if (!found) { rejected.push({ rule: text, why: `${list.label}里没有这一条` }); continue; }
+      if (!found) { rejected.push({ rule: text, why: `${list.label} does not contain this rule` }); continue; }
       rule = found;
     } else {
       const normalized = normalizeUrlRule(text);
-      if (!normalized) { rejected.push({ rule: text, why: "写法不对：只能是域名，或不带参数的完整网址" }); continue; }
-      if (PUBLIC_SUFFIXES.has(normalized)) { rejected.push({ rule: text, why: "范围太宽：会命中这一整个国家后缀下的所有网站" }); continue; }
+      if (!normalized) { rejected.push({ rule: text, why: "Use a domain or a complete URL without query parameters" }); continue; }
+      if (PUBLIC_SUFFIXES.has(normalized)) { rejected.push({ rule: text, why: "This rule is too broad: it would match every site under this country-code suffix" }); continue; }
       const cover = coveredBy(normalized, rules);
-      if (cover) { rejected.push({ rule: text, why: normalizeUrlRule(cover) === normalized ? `已经在${list.label}里` : `已被 ${cover} 覆盖` }); continue; }
+      if (cover) { rejected.push({ rule: text, why: normalizeUrlRule(cover) === normalized ? `Already in ${list.label}` : `Already covered by ${cover}` }); continue; }
       rule = normalized;
     }
     const key = `${list.key}\n${c.op}\n${rule}`;
@@ -163,6 +163,6 @@ export function parseRulePlan(
     seen.add(key);
     changes.push({ list: list.key, label: list.label, op: c.op, rule, reason });
   }
-  const fallback = changes.length ? "打算这样改：" : rejected.length ? "提的改动都没法采用：" : "没听出要改什么，换个说法试试？";
+  const fallback = changes.length ? "Proposed changes: " : rejected.length ? "None of the proposed changes can be applied: " : "Could not determine the changes. Try rephrasing your request.";
   return { reply: reply || fallback, changes, rejected };
 }

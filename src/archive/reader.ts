@@ -15,12 +15,12 @@ export interface ArchivedArticle {
 }
 
 async function blobFor(hash: string): Promise<Blob> {
-  if (!ARCHIVE_HASH.test(hash)) throw new Error("文章资源索引格式不正确");
+  if (!ARCHIVE_HASH.test(hash)) throw new Error("Invalid article resource index");
   const existing = await cachedBlob(hash);
   if (existing) return existing;
   const response = await syncRequest(`/v1/blobs/${hash}`);
-  if (!response.ok) throw new Error(`文章资源下载失败：HTTP ${response.status}`);
-  if (Number(response.headers.get("content-length")) > MAX_RESOURCE_BYTES) throw new Error("文章资源超过大小限制");
+  if (!response.ok) throw new Error(`Article resource download failed: HTTP ${response.status}`);
+  if (Number(response.headers.get("content-length")) > MAX_RESOURCE_BYTES) throw new Error("Article resources exceed the size limit");
   const blob = new Blob([new Uint8Array(await readArchiveBytes(response))], { type: response.headers.get("content-type") ?? "application/octet-stream" });
   await cacheBlob(hash, blob);
   return blob;
@@ -33,7 +33,7 @@ export async function loadArchivedArticle(url: string): Promise<ArchivedArticle 
   const id = normalizeUrl(url);
   const manifest = archives[id] ?? Object.values(archives).find(item => normalizeUrl(item.url) === id);
   if (!manifest) return null;
-  if (!/^https?:\/\//i.test(manifest.url) || !Array.isArray(manifest.resources)) throw new Error("文章清单格式不正确");
+  if (!/^https?:\/\//i.test(manifest.url) || !Array.isArray(manifest.resources)) throw new Error("Invalid article manifest");
   const html = await (await blobFor(manifest.htmlHash)).text();
   return {
     url, finalUrl: manifest.url, title: manifest.title, savedTs: manifest.createdTs,
@@ -59,12 +59,12 @@ export async function hydrateArchiveImages(body: HTMLElement, manifest: ArchiveM
       const { img, hash } = pending.shift()!;
       try {
         const resource = hash ? resources.get(hash) : undefined;
-        if (!hash || !resource || !imageMime(resource.mime)) throw new Error("未知图片资源");
+        if (!hash || !resource || !imageMime(resource.mime)) throw new Error("Unknown image resource");
         let loaded = urls.get(hash);
         if (!loaded) {
           loaded = (async () => {
             const blob = await blobFor(hash);
-            if (blob.size !== resource.size) throw new Error("图片大小校验失败");
+            if (blob.size !== resource.size) throw new Error("Image size verification failed");
             const url = URL.createObjectURL(new Blob([blob], { type: resource.mime }));
             allocated.add(url);
             return url;
@@ -75,7 +75,7 @@ export async function hydrateArchiveImages(body: HTMLElement, manifest: ArchiveM
       } catch {
         missing++;
         const placeholder = document.createElement("span");
-        placeholder.textContent = img.alt ? `（图片未下载：${img.alt}）` : "（图片未下载，联网后重新打开可重试）";
+        placeholder.textContent = img.alt ? `(Image not downloaded: ${img.alt})` : "(Image not downloaded. Reopen while online to retry.)";
         img.replaceWith(placeholder);
       }
     }

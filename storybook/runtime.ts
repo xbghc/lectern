@@ -15,8 +15,8 @@ let syncStatus: SyncStatus = {
   enabled: options.state !== 'empty', baseUrl: options.state === 'empty' ? '' : 'https://sync.example.com',
   tokenSet: options.state !== 'empty', deviceId: 'storybook-device', pending: options.state === 'error' ? 3 : 0,
   lastSuccess: options.state === 'empty' ? null : Date.now() - 60_000,
-  error: options.state === 'error' ? '服务器暂时不可达（模拟）' : null, running: options.state === 'loading',
-  blocked: options.state === 'error' ? 2 : 0, blockedReasons: options.state === 'error' ? ['《旧文章》https://example.com/legacy：文章记录的 trackedWords、reachedBottom 字段缺失或不合规；名下 1 个专注时段一起留在本机'] : [],
+  error: options.state === 'error' ? "Server temporarily unreachable (preview)" : null, running: options.state === 'loading',
+  blocked: options.state === 'error' ? 2 : 0, blockedReasons: options.state === 'error' ? ["Legacy article, https://example.com/legacy: missing or invalid trackedWords or reachedBottom fields; 1 associated focus session remains on this device"] : [],
   blockedMaterials: options.state === 'error' ? 1 : 0,
   ...(options.state === 'empty' ? {} : { userId: 'preview-user', serverId: 'preview-server' }),
 };
@@ -33,7 +33,7 @@ Object.defineProperty(window, 'localStorage', { value: {
   clear: () => preferences.clear(), key: (index: number) => [...preferences.keys()][index] ?? null,
   get length() { return preferences.size; },
 } });
-window.fetch = async () => { throw new Error('Storybook 使用本地模拟数据，不发送网络请求'); };
+window.fetch = async () => { throw new Error("Storybook uses local sample data and does not send requests to external services"); };
 window.open = () => null;
 window.close = () => undefined;
 document.addEventListener('click', event => {
@@ -57,8 +57,8 @@ export const shim = installChromeShim({
       const at = seed.articles.findIndex(a => a.id === (raw as { articleId?: string }).articleId);
       return options.state === 'empty' || at < 0 ? { state: 'local', waiting: [], reasons: [] }
         : at === 0 ? { state: 'synced', waiting: [], reasons: [] }
-        : at === 1 ? { state: 'pending', waiting: [['专注时段', 1], ['段落', 12]], reasons: [] }
-        : { state: 'blocked', waiting: [['文章记录', 1], ['专注时段', 2]], reasons: ['文章记录的 trackedWords、reachedBottom 字段缺失或不合规'] };
+        : at === 1 ? { state: 'pending', waiting: [["Focus sessions", 1], ["Paragraphs", 12]], reasons: [] }
+        : { state: 'blocked', waiting: [["Article records", 1], ["Focus sessions", 2]], reasons: ["Missing or invalid trackedWords or reachedBottom fields"] };
     }
     if (sync.type.startsWith('sync:')) {
       if (sync.type === 'sync:disconnect') {
@@ -69,7 +69,7 @@ export const shim = installChromeShim({
         syncStatus = { ...syncStatus, enabled: false, running: false };
         return { ok: true, status: { ...syncStatus } };
       }
-      if (options.state === 'error') return { ok: false, error: '服务器暂时不可达（模拟）' };
+      if (options.state === 'error') return { ok: false, error: "Server temporarily unreachable (preview)" };
       if (sync.type === 'sync:configure') syncStatus = { ...syncStatus, enabled: true,
         baseUrl: sync.baseUrl ?? syncStatus.baseUrl, tokenSet: !!sync.token || syncStatus.tokenSet,
         userId: 'preview-user', serverId: 'preview-server', error: null };
@@ -81,21 +81,21 @@ export const shim = installChromeShim({
       case 'article:classify-history':
         if (options.state === 'loading') return new Promise(() => {});
         await new Promise(resolve => setTimeout(resolve, 200));
-        if (options.state === 'error' || msg.articleId.endsWith('article-2')) return { ok: false, reason: '正文抓取失败（HTTP 403），请打开原文后重试' };
+        if (options.state === 'error' || msg.articleId.endsWith('article-2')) return { ok: false, reason: "Could not fetch the article (HTTP 403). Open the original page and try again." };
         return { ok: true, isArticle: msg.articleId !== ARTICLE_URL, source: 'saved',
           reason: msg.articleId === ARTICLE_URL ? '这是目录和推荐链接集合，不是独立文章。（模拟结果）' : '正文围绕同一主题展开说明，是独立文章。（模拟结果）' };
       case 'article:classify':
         if (options.state === 'loading') return new Promise(() => {});
-        return options.state === 'error' ? { ok: false, reason: '文章判断失败：模型响应超时，请刷新重试' }
+        return options.state === 'error' ? { ok: false, reason: "Article detection failed: the model timed out. Refresh to try again." }
           : { ok: true, isArticle: options.state !== 'nonArticle', reason: '这是一篇完整文章' };
-      case 'articles:blacklist-suggest': return options.state === 'error' ? { ok: false, error: '模型响应超时（模拟）' }
+      case 'articles:blacklist-suggest': return options.state === 'error' ? { ok: false, error: "Model response timed out (preview)" }
         : { ok: true, suggestions: [{ pattern: msg.articleIds[0] || ARTICLE_URL, reason: '模拟建议：排除所选页面的具体路径。请核对该路径是否包含仍需记录的文章。' }] };
-      case 'llm:test': return options.state === 'error' ? { ok: false, error: '连接超时（模拟）' } : { ok: true, model: 'storybook-preview' };
+      case 'llm:test': return options.state === 'error' ? { ok: false, error: "Connection timed out (preview)" } : { ok: true, model: 'storybook-preview' };
       // 走真的读取，这样在预览里点「同意并开始」「撤回」能看到界面跟着变；只有「填没填过 Key」是按场景假装的
       case 'llm:get': return Promise.resolve(handle(msg, sender)).then(cfg => ({ ...(cfg as object), apiKeySet: options.state !== 'empty' }));
       case 'article:review': return { ok: true, review: seed.data[`r:${seed.articles[1]!.id}` as keyof typeof seed.data] };
       case 'review:assist': return { ok: true, text: '可以把 consolidate 和“把零散知识放在一起”联系起来。' };
-      case 'page:capture': return { ok: false, error: '截图需要真实浏览器扩展或安卓宿主；此处只预览界面。' };
+      case 'page:capture': return { ok: false, error: "Screenshots require the browser extension or Android app. This is an interface preview." };
       default: return handle(msg, sender);
     }
   },
@@ -103,7 +103,7 @@ export const shim = installChromeShim({
     port.onMessage.addListener((raw: unknown) => {
       const msg = raw as { type: string };
       if (msg.type === 'vocab-chat') {
-        if (options.state === 'error') port.postMessage({ type: 'vocab-chat-done', res: { ok: false, error: '连接超时（预览模拟），可以修改消息后重试。', needsConfig: true } });
+        if (options.state === 'error') port.postMessage({ type: 'vocab-chat-done', res: { ok: false, error: "Connection timed out (preview). You can edit your message and try again.", needsConfig: true } });
         else {
           const text = '我们先用 consolidate 练习一个真实的场景。\n\nWhat helps you consolidate what you learn from a book?\n\n用一两句英语回答，试着说明你的方法。';
           port.postMessage({ type: 'vocab-chat-partial', text: text.slice(0, 32) });
@@ -115,9 +115,9 @@ export const shim = installChromeShim({
   },
 });
 let pageState: PageState = options.state === 'nonArticle' || options.state === 'empty'
-  ? { tracked: false, reason: '未识别为文章页', translateHere: 'available', screenshot: 'available' }
-  : options.state === 'error' ? { tracked: false, reason: '文章判断失败：模型响应超时', translateHere: 'available', screenshot: 'available' }
-  : options.state === 'loading' ? { tracked: false, reason: 'LLM 正在判断是否为文章…', translateHere: 'available', screenshot: 'available' }
+  ? { tracked: false, reason: "Not identified as an article", translateHere: 'available', screenshot: 'available' }
+  : options.state === 'error' ? { tracked: false, reason: "Article detection failed: the model timed out", translateHere: 'available', screenshot: 'available' }
+  : options.state === 'loading' ? { tracked: false, reason: "AI is checking whether this page is an article…", translateHere: 'available', screenshot: 'available' }
   : { tracked: true, articleId: ARTICLE_URL, title: seed.articles[0]!.title,
       totalWords: 1500, trackedWords: 1400, wordsRead: 560, paragraphCount: 18, readParagraphCount: 7, activeSince: Date.now() - 125_000,
       screenshot: 'available' };

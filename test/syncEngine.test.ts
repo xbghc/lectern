@@ -148,12 +148,12 @@ test("sync configuration binds identity, permits same-user token rotation, and k
   assert.equal(stored.config.token, TOKEN_A);
   assert.doesNotMatch(JSON.stringify(stored.data), /private-device-token/);
   assert.doesNotMatch(JSON.stringify(stored.outbox), /private-device-token|local-llm-key/);
-  await assert.rejects(engine.configureSync(BASE, TOKEN_B, true), /另一个账号/);
+  await assert.rejects(engine.configureSync(BASE, TOKEN_B, true), /another account/);
   assert.equal((await driver.read()).config.token, TOKEN_A);
   await engine.configureSync(BASE, TOKEN_A2, true);
   assert.equal((await driver.read()).config.token, TOKEN_A2);
   const count = server.calls.length;
-  await assert.rejects(engine.testSync("https://different.example.test"), /Token/);
+  await assert.rejects(engine.testSync("https://different.example.test"), /token/);
   await assert.rejects(engine.testSync("https://user:pass@sync.example.test", TOKEN_A));
   assert.equal(server.calls.length, count);
   for (const request of server.calls) {
@@ -260,14 +260,14 @@ test("pausing while offline is entirely local and preserves queued edits; a revo
   assert.equal((await engine.runSync()).enabled, false);
   assert.equal(server.calls.length, count);
   assert.equal((await driver.read()).outbox.length, 1);
-  await assert.rejects(engine.syncRequest("/v1/blobs/" + "a".repeat(64)), /启用同步/);
+  await assert.rejects(engine.syncRequest("/v1/blobs/" + "a".repeat(64)), /Enable sync/);
   assert.equal(server.calls.length, count);
   server.offline = false;
   await driver.update(state => { state.config.enabled = true; });
   server.revoked = true;
   const unauthorized = await engine.runSync();
   assert.equal(unauthorized.enabled, false);
-  assert.match(unauthorized.error ?? "", /Token/);
+  assert.match(unauthorized.error ?? "", /token/);
   assert.equal((await driver.read()).outbox.length, 1);
   const failedRequests = server.calls.length;
   await engine.runSync();
@@ -279,11 +279,11 @@ test("server identity changes and a nonadvancing pull page preserve local operat
   const driver = device();
   await localStorage().set({ settings: { paragraphDwellMs: 111 } });
   server.serverId = "replacement-server";
-  assert.match((await engine.runSync()).error ?? "", /身份/);
+  assert.match((await engine.runSync()).error ?? "", /identity/);
   assert.equal(server.calls.filter(request => request.method === "POST").length, 0);
   server.serverId = "server-one";
   server.malformedPull = true;
-  assert.match((await engine.runSync()).error ?? "", /游标没有前进/);
+  assert.match((await engine.runSync()).error ?? "", /cursor did not advance/);
   assert.equal((await driver.read()).outbox.length, 1);
   assert.equal(server.calls.filter(request => request.method === "POST").length, 0);
 });
@@ -342,8 +342,8 @@ test("a record that fails validation stays queued with its article's dependents,
   assert.equal(status.pending, 2);
   // Told by reading material: which one is stuck, why, and what it holds back with it.
   assert.equal(status.blockedMaterials, 1);
-  assert.deepEqual(status.blockedReasons, [`《An article》${bad}：文章记录：Entity identity mismatch；名下 1 个专注时段一起留在本机`]);
-  assert.deepEqual(await engine.materialSync(bad), { state: "blocked", waiting: [["文章记录", 1], ["专注时段", 1]], reasons: ["文章记录：Entity identity mismatch"] });
+  assert.deepEqual(status.blockedReasons, [`“An article” ${bad}: Article records: Entity identity mismatch; related records: Focus sessions: 1 also kept on this device`]);
+  assert.deepEqual(await engine.materialSync(bad), { state: "blocked", waiting: [["Article records", 1], ["Focus sessions", 1]], reasons: ["Article records: Entity identity mismatch"] });
   assert.deepEqual(await engine.materialSync(good), { state: "synced", waiting: [], reasons: [] });
   assert.equal((await engine.materialSync("https://never.example/seen")).state, "local");
   const uploaded = [...server.account().records.values()].map(record => `${record.type} ${record.id}`).sort();
@@ -447,7 +447,7 @@ test("a reading material reports what of its own is still waiting, counting the 
       createdTs: 3_000, translation: "巩固", contextNote: "", pos: null, phonetic: null, lemma: "consolidate", usage: null, vocab: [], cardId: null }],
   });
   // A looked-up word is not the article's dependent on the wire, but it was looked up in it.
-  assert.deepEqual(await engine.materialSync(url), { state: "pending", waiting: [["专注时段", 1], ["划词", 1]], reasons: [] });
+  assert.deepEqual(await engine.materialSync(url), { state: "pending", waiting: [["Focus sessions", 1], ["Translations", 1]], reasons: [] });
   assert.equal((await driver.read()).outbox.find(op => op.record.type === "snippet")?.record.articleId, undefined);
   server.offline = false;
 

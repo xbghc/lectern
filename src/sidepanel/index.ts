@@ -31,7 +31,8 @@ async function render(): Promise<void> {
   catch (err) {
     // 后台刚醒或刚重启时会拒掉请求；不接的话这一栏就是一片空白
     list.textContent = "";
-    list.append(el("div", "empty", `读取失败：${err instanceof Error ? err.message : String(err)}\n点下面的「刷新」再试一次。`));
+    list.append(el("div", "empty", `Could not load: ${err instanceof Error ? err.message : String(err)}
+Select Refresh below to try again.`));
   }
 }
 
@@ -42,7 +43,7 @@ async function paint(list: HTMLElement): Promise<void> {
   const url = tab?.url;
   if (!url || !/^https?:/.test(url)) {
     $("where").textContent = "";
-    list.append(el("div", "empty", "当前标签页不是网页。"));
+    list.append(el("div", "empty", "The current tab is not a web page."));
     return;
   }
 
@@ -55,7 +56,7 @@ async function paint(list: HTMLElement): Promise<void> {
   const snippets = res?.snippets ?? [];
 
   if (snippets.length === 0) {
-    list.append(el("div", "empty", "这篇文章还没有划词。\n在正文里选中一段英文就会自动翻译。"));
+    list.append(el("div", "empty", "No translations in this article yet.\nEnable translation and select text in the article to look it up."));
     return;
   }
 

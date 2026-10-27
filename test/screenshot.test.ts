@@ -124,7 +124,7 @@ test("裁剪失败仍清理所有监听和位图", async () => {
 });
 
 test("无效截图拒绝且不留覆盖层", async () => {
-  await assert.rejects(selectRegion("bad"), /截图格式无效/);
+  await assert.rejects(selectRegion("bad"), /Invalid screenshot format/);
 });
 
 for (const dark of [true, false]) test(`真实裁剪管线：独立横纵比例、放大、${dark ? "反色" : "保留浅底"}与 PNG 编码`, async () => {

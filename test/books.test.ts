@@ -193,7 +193,7 @@ test("一章读不出来时只有这一章缺，别的章照常导入", async ()
   const sink = collector();
   const book = await importEpub(zip(partial), BOOK_ID, "x.epub", { parse, doc: sanitizeDoc, hash, sink });
   assert.equal(book.chapters.length, 2);
-  assert.match(sink.chapters.get(chapterId(BOOK_ID, 1))!.html, /没能读出来/);
+  assert.match(sink.chapters.get(chapterId(BOOK_ID, 1))!.html, /Could not read this chapter/);
   assert.match(sink.chapters.get(chapterId(BOOK_ID, 0))!.html, /Reading a book/);
 });
 
@@ -231,7 +231,7 @@ test("书的记录不进同步：协议只认 http(s) 的标识，推上去会�
     reviewEvents: [{ id: "e1", kind: "article", cardKey: chapter }, { id: "e2", kind: "article", cardKey: web }],
     [`p:${chapter}`]: [{ hash: "h", index: 0, words: 3, firstSeenTs: 1, dwellMs: 5 }],
     [`pos:${chapter}`]: { hash: "h", index: 0 },
-    [`t:${chapter}`]: { text: "正文" },
+    [`t:${chapter}`]: { text: "Article text" },
     [`r:${chapter}`]: { outline: [], questions: [] },
   });
   const pushed = state.outbox.map(op => `${op.record.type}:${op.record.id}`);

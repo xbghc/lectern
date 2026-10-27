@@ -36,7 +36,7 @@ export function ruleChatHandlers(lists: readonly UrlRuleList[]) {
   return {
     "rules:chat": async (m): Promise<RuleChatReply> => {
       const turns = Array.isArray(m.turns) ? m.turns.filter((t) => t && typeof t.text === "string" && t.text.trim()) : [];
-      if (turns.at(-1)?.role !== "user") return { ok: false, error: "先说一句要怎么改" };
+      if (turns.at(-1)?.role !== "user") return { ok: false, error: "Describe the changes you want first" };
       const current = listsOf(await getSettings(), lists);
       const pageUrl = typeof m.pageUrl === "string" && /^https?:\/\//i.test(m.pageUrl) ? m.pageUrl : undefined;
       const saved = await getLlmConfig();
@@ -45,7 +45,7 @@ export function ruleChatHandlers(lists: readonly UrlRuleList[]) {
       try {
         const result = await callMessages(config, ruleChatSystem(lists, current, pageUrl), ruleChatInput(turns));
         later(() => recordCall("ruleChat", config, result.timing, result.usage));
-        if (result.truncated) throw new Error("模型输出被截断，换个短一点的说法试试");
+        if (result.truncated) throw new Error("The model response was truncated. Try a shorter request.");
         const plan = parseRulePlan(extractJson(result.text), lists, current);
         return { ok: true, ...plan, changes: await withHits(plan.changes) };
       } catch (err) {

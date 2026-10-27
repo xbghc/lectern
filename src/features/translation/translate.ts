@@ -66,7 +66,7 @@ function describe(err: unknown): TranslateFailure {
  */
 function report(err: unknown, config: LlmConfig, ctx: FailureContext, count = true): TranslateFailure {
   if (err instanceof LlmError && err.raw) {
-    console.warn("[lectern] 模型输出解析失败", err.message, `stop_reason=${err.raw.stopReason}`, err.raw.text);
+    console.warn("[lectern] Could not parse model output", err.message, `stop_reason=${err.raw.stopReason}`, err.raw.text);
   }
   later(() => recordFailure(err, config, { ...ctx, countUsage: count }));
   return describe(err);
@@ -281,7 +281,7 @@ export function streamVocabularyChat(input: VocabularyChatRequest, onDelta: (tex
     try {
       const all = await getSnippets();
       const words = req.snippetIds.map(id => all.find(s => s.id === id && s.kind !== "sentence"));
-      if (words.some(w => !w)) return { ok: false, error: "选中的生词已不存在，请重新选词。", needsConfig: false };
+      if (words.some(w => !w)) return { ok: false, error: "A selected word no longer exists. Choose your words again.", needsConfig: false };
       const { text, usage, timing } = await callMessagesStream(config, VOCABULARY_CHAT_SYSTEM,
         buildVocabularyChatPrompt(req, words as Snippet[]), { signal: ctrl.signal, onDelta: value => onDelta(value.trimStart().slice(0, CHAT_ANSWER_CHARS)) });
       later(() => recordCall("assist", config, timing, usage));

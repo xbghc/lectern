@@ -79,7 +79,7 @@ test("商店拒收（比如版本号没涨、上一版还在审）：带着商�
     "https://token.test/token": [{ body: { access_token: "tok" } }],
     [`https://chromewebstore.googleapis.com/upload/v2/${ITEM}:upload`]: [{ status: 400, body: { error: { message: "Item is pending review" } } }],
   });
-  await assert.rejects(uploadToStore({ sa: SA, publisherId: "pub-1", zip: new Uint8Array(1) }, deps), /上传失败（HTTP 400）.*pending review/);
+  await assert.rejects(uploadToStore({ sa: SA, publisherId: "pub-1", zip: new Uint8Array(1) }, deps), /Upload failed \(HTTP 400\).*pending review/);
   assert.equal(calls.some((c) => c.url.endsWith(":publish")), false);
 });
 
@@ -88,12 +88,12 @@ test("处理失败的包不提交；只上传不提交时也不碰 publish", asy
     "https://token.test/token": [{ body: { access_token: "tok" } }],
     [`https://chromewebstore.googleapis.com/upload/v2/${ITEM}:upload`]: [{ body: { uploadState: "FAILED" } }],
   });
-  await assert.rejects(uploadToStore({ sa: SA, publisherId: "pub-1", zip: new Uint8Array(1) }, bad.deps), /没收下/);
+  await assert.rejects(uploadToStore({ sa: SA, publisherId: "pub-1", zip: new Uint8Array(1) }, bad.deps), /store rejected/);
   const draft = fake({
     "https://token.test/token": [{ body: { access_token: "tok" } }],
     [`https://chromewebstore.googleapis.com/upload/v2/${ITEM}:upload`]: [{ body: { crxVersion: "0.3.18", uploadState: "SUCCEEDED" } }],
   });
   const result = await uploadToStore({ sa: SA, publisherId: "pub-1", zip: new Uint8Array(1), publish: false }, draft.deps);
-  assert.equal(result.state, "只上传，未提交审核");
+  assert.equal(result.state, "Uploaded only; not submitted for review");
   assert.equal(draft.calls.length, 2);
 });

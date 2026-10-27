@@ -118,7 +118,7 @@ function phoneticNode(doc: Document, phonetic: string, word: string): HTMLElemen
   span.textContent = cut(phonetic, MAX_PHONETIC);
   if (!word.trim() || !canSpeak()) return span;
   span.className = "ph";
-  span.title = "点击朗读";
+  span.title = "Read aloud";
   span.addEventListener("click", () => void speak(word));
   return span;
 }

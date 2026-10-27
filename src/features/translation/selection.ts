@@ -250,16 +250,16 @@ export class SelectionTranslator {
     // 识别要好几秒，人可能已经滚过：之后重新贴位都照原文此刻的位置
     const here = this.anchorRect() ?? rect;
     if (!reply?.ok) {
-      this.popover.showError(here, reply?.error ?? "识别失败：后台未就绪", false);
-      this.trace?.complete("error", reply?.error ?? "识别失败：后台未就绪");
+      this.popover.showError(here, reply?.error ?? "Text recognition failed: background service unavailable", false);
+      this.trace?.complete("error", reply?.error ?? "Text recognition failed: background service unavailable");
       return;
     }
     this.popover.setTerm(reply.text);
     const settings = this.deps.settings();
     const verdict = judgeSelection(reply.text, settings);
     if (!verdict.ok) {
-      this.popover.showError(here, verdict.reason === "选区过长"
-        ? "识别文字过长，请缩小框选范围" : "没认出英文，请重新框选清晰的英文文字", false);
+      this.popover.showError(here, verdict.reason === "The selection is too long"
+        ? "Too much text was detected. Select a smaller area." : "No English text was detected. Select a clearer area.", false);
       this.trace?.complete("error", verdict.reason);
       return;
     }
@@ -291,7 +291,7 @@ export class SelectionTranslator {
   get visible(): boolean { return this.popover.hostElement !== null; }
 
   dismiss(): void {
-    this.trace?.finish("cancelled", "浮层关闭、选择改变或页面离开");
+    this.trace?.finish("cancelled", "Popover closed, selection changed or page left");
     this.trace = null;
     this.gestureStarted = null;
     this.inputTiming = null;

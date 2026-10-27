@@ -39,6 +39,6 @@ public class UpdateReceiver extends BroadcastReceiver {
         boolean bad = status == PackageInstaller.STATUS_FAILURE_INVALID
                 || status == PackageInstaller.STATUS_FAILURE_INCOMPATIBLE
                 || status == PackageInstaller.STATUS_FAILURE_CONFLICT;
-        UpdateInstaller.recordFailure(context, version, "状态 " + status + (message == null ? "" : "：" + message), bad);
+        UpdateInstaller.recordFailure(context, version, "Status " + status + (message == null ? "" : ": " + message), bad);
     }
 }

@@ -133,7 +133,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   const abandoned = (): TrackController | null => {
     if (opts.signal?.aborted !== true) return null;
     stopWatchingInput();
-    return idle("已切到另一篇");
+    return idle("Switched to another article");
   };
 
   const stored = await chrome.storage.local.get("settings");
@@ -146,7 +146,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   settings.articleExcludedUrls = (stored["settings"] as Partial<ReadingSettings> | undefined)?.articleExcludedUrls ?? settings.excludedDomains;
   if (isUrlExcluded(pageUrl, settings.articleExcludedUrls)) {
     stopWatchingInput();
-    return idle("命中文章记录黑名单");
+    return idle("Matched the reading blocklist");
   }
 
   const supplied = opts.extract?.();
@@ -156,13 +156,13 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   window.addEventListener("pagehide", left, { once: true });
   let decision: { ok: boolean; isArticle?: boolean; reason: string };
   try {
-    decision = opts.approvedArticle ? {ok:true,isArticle:true,reason:"已保存的文章"} : await chrome.runtime.sendMessage({ type: "article:classify", url: pageUrl,
+    decision = opts.approvedArticle ? {ok:true,isArticle:true,reason:"Saved article"} : await chrome.runtime.sendMessage({ type: "article:classify", url: pageUrl,
       title: supplied?.title || document.title,
       text: samplePage(supplied ? supplied.paragraphs.map(p => p.text).join("\n\n") : (document.body?.innerText || document.body?.textContent || "")),
     });
-  } catch { decision = { ok: false, reason: "文章判断失败，请刷新重试" }; }
+  } catch { decision = { ok: false, reason: "Article classification failed. Reload and try again." }; }
   window.removeEventListener("pagehide", left);
-  if (pageLeft) { stopWatchingInput(); return idle("已离开页面"); }
+  if (pageLeft) { stopWatchingInput(); return idle("Page left"); }
   const cancelled = abandoned();
   if (cancelled) return cancelled;
   // 判断期间设置可能已变化（比如刚把这一页加进了黑名单），再读一次。
@@ -174,7 +174,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   if (!decision?.ok || !decision.isArticle || isUrlExcluded(pageUrl, settings.articleExcludedUrls)) {
     stopWatchingInput();
     return idle(isUrlExcluded(pageUrl, settings.articleExcludedUrls)
-      ? "命中文章记录黑名单" : decision?.reason || "文章判断失败，请刷新重试");
+      ? "Matched the reading blocklist" : decision?.reason || "Article classification failed. Reload and try again.");
   }
   // Readability 只负责正文定位，不再决定页面是否属于文章。
   const article = supplied || await extractWithRetry(opts.signal)
@@ -185,7 +185,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   if (gone) return gone;
   if (!article) {
     stopWatchingInput();
-    return idle("未识别为文章页");
+    return idle("Not identified as an article");
   }
 
   const articleId = normalizeUrl(pageUrl);
@@ -583,7 +583,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
     scheduleBar(); // 开关、已读阈值都会改条上的样子
     if (isUrlExcluded(pageUrl, settings.articleExcludedUrls)) {
       finish("unload")();
-      excludedNow = "命中文章记录黑名单";
+      excludedNow = "Matched the reading blocklist";
     }
   };
   chrome.storage.onChanged.addListener(onSettingsChanged);
@@ -643,7 +643,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
     scrollToAnchor(target, p.offset);
     // 跳回来的那一刻顺便说一句还要读多久：「现在读还是待会儿读」最需要的就是这个数
     const left = estimateNow();
-    positionCard.show(p.index + 1, p.total, left.words > 0 ? "还需" + formatEstimate(left.ms) : undefined);
+    positionCard.show(p.index + 1, p.total, left.words > 0 ? "Remaining: " + formatEstimate(left.ms) : undefined);
 
     // 图片撑开、广告位插入都会把落点顶走，跳完再盯一会儿。
     // 用户一动手就收手：把正在读的画面抽走是最恼人的一种交互。

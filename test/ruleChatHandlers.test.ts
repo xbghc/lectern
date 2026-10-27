@@ -68,13 +68,13 @@ test("确认：在最新的名单上重新核、重新套，别的设置不碰",
   // 清单出来之后、点确认之前，别处（「本站始终开启」）已经把 github.com 加进去了
   await allowTranslationSite("https://github.com/x");
   const res = await apply([
-    { list: "articleExcludedUrls", label: "文章记录黑名单", op: "add", rule: "weibo.com", reason: "" },
-    { list: "articleExcludedUrls", label: "文章记录黑名单", op: "remove", rule: "zhihu.com", reason: "" },
-    { list: "translationAllowedUrls", label: "翻译白名单", op: "add", rule: "github.com", reason: "" },
+    { list: "articleExcludedUrls", label: "Reading blocklist", op: "add", rule: "weibo.com", reason: "" },
+    { list: "articleExcludedUrls", label: "Reading blocklist", op: "remove", rule: "zhihu.com", reason: "" },
+    { list: "translationAllowedUrls", label: "Translation allowlist", op: "add", rule: "github.com", reason: "" },
   ]);
   assert.ok(res.ok);
   assert.deepEqual(res.applied.map((c) => `${c.op} ${c.rule}`), ["add weibo.com", "remove zhihu.com"]);
-  assert.deepEqual(res.rejected, [{ rule: "github.com", why: "已经在翻译白名单里" }]);
+  assert.deepEqual(res.rejected, [{ rule: "github.com", why: "Already in Translation allowlist" }]);
   const s: Settings = await getSettings();
   assert.deepEqual(s.articleExcludedUrls, ["weibo.com"]);
   assert.deepEqual(s.translationAllowedUrls, ["nytimes.com", "github.com"]);
@@ -103,6 +103,6 @@ test("模型调用失败：说清原因，现场进诊断日志；最后一句�
   assert.deepEqual(f!.request, { message: "知乎别记了", pageUrl: null });
 
   const before = requests.length;
-  assert.deepEqual(await chat([{ role: "assistant", text: "你好" }]), { ok: false, error: "先说一句要怎么改" });
+  assert.deepEqual(await chat([{ role: "assistant", text: "你好" }]), { ok: false, error: "Describe the changes you want first" });
   assert.equal(requests.length, before);
 });

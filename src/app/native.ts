@@ -170,7 +170,7 @@ function requestImage(pending: Map<string, PendingImage>, start: (id: string) =>
 
 export function captureVisible(): Promise<string> {
   const bridge = native();
-  if (!bridge?.captureStart) return Promise.reject(new Error("这个版本的宿主不支持截图翻译"));
+  if (!bridge?.captureStart) return Promise.reject(new Error("Update the app to use screenshot translation"));
   const start = bridge.captureStart.bind(bridge);
   return requestImage(captures, start);
 }
@@ -186,13 +186,13 @@ export function systemBars(): ((hidden: boolean) => void) | undefined {
 
 export async function recognizeNative(png: string): Promise<OcrLine[]> {
   const bridge = native();
-  if (!bridge?.ocrStart) throw new Error("这个版本的宿主不支持截图翻译");
+  if (!bridge?.ocrStart) throw new Error("Update the app to use screenshot translation");
   const start = bridge.ocrStart.bind(bridge);
   const lines: unknown = JSON.parse(await requestImage(recognitions, (id) => start(id, png)));
   if (!Array.isArray(lines) || !lines.every((line: unknown) => {
     if (typeof line !== "object" || line === null || !("text" in line) || typeof line.text !== "string") return false;
     return !("confidence" in line) || (typeof line.confidence === "number" && Number.isFinite(line.confidence));
-  })) throw new Error("宿主返回的识别结果格式无效");
+  })) throw new Error("The app returned an invalid text-recognition result");
   // ML Kit 给 0–1，共用清洗器用 Tesseract 的 0–100 口径，否则正常文字也会被低于 30 的闸丢掉。
   return (lines as OcrLine[]).map((line) => line.confidence === undefined ? line
     : { ...line, confidence: line.confidence * 100 });
@@ -229,8 +229,8 @@ const callbacks: HostCallbacks["http"] = {
 /** 由宿主代发的 fetch。签名与 fetch 一致，只实现 llm.ts 与阅读器用到的那部分。 */
 export function nativeFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const bridge = native();
-  if (!bridge?.httpStart || !bridge.httpAbort) return Promise.reject(new TypeError("宿主没有提供 HTTP 桥"));
-  if (init.redirect === "error" && !bridge.httpStartNoRedirect) return Promise.reject(new TypeError("宿主版本过旧，不能安全发送模型请求，请更新 App"));
+  if (!bridge?.httpStart || !bridge.httpAbort) return Promise.reject(new TypeError("The app's HTTP bridge is unavailable"));
+  if (init.redirect === "error" && !bridge.httpStartNoRedirect) return Promise.reject(new TypeError("Update the app to send model requests securely"));
   const start = (init.redirect === "error" ? bridge.httpStartNoRedirect! : bridge.httpStart).bind(bridge);
   const abort = bridge.httpAbort.bind(bridge);
 
@@ -243,7 +243,7 @@ export function nativeFetch(input: RequestInfo | URL, init: RequestInit = {}): P
 
   return new Promise<Response>((resolve, reject) => {
     if (init.signal?.aborted) {
-      reject(new DOMException("已取消", "AbortError"));
+      reject(new DOMException("Canceled", "AbortError"));
       return;
     }
     let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
@@ -276,7 +276,7 @@ export function nativeFetch(input: RequestInfo | URL, init: RequestInit = {}): P
     };
     const onAbort = (): void => {
       abort(id);
-      fail(new DOMException("已取消", "AbortError"));
+      fail(new DOMException("Canceled", "AbortError"));
     };
     init.signal?.addEventListener("abort", onAbort, { once: true });
 
@@ -286,7 +286,7 @@ export function nativeFetch(input: RequestInfo | URL, init: RequestInit = {}): P
         settled = true;
         // 204/304 不能带 body；status 0 说明宿主那边连都没连上
         if (status <= 0) {
-          fail(new TypeError("网络错误"));
+          fail(new TypeError("Network error"));
           return;
         }
         const nobody = status === 204 || status === 304 || method === "HEAD";
@@ -313,14 +313,14 @@ export function nativeFetch(input: RequestInfo | URL, init: RequestInit = {}): P
       },
       error(message) {
         init.signal?.removeEventListener("abort", onAbort);
-        fail(new TypeError(message || "网络错误"));
+        fail(new TypeError(message || "Network error"));
       },
     });
 
     try {
       start(id, url, method, JSON.stringify(headers), body);
     } catch (err) {
-      fail(new TypeError(`宿主拒绝了请求：${String(err)}`));
+      fail(new TypeError(`The app rejected the request: ${String(err)}`));
     }
   });
 }
@@ -355,8 +355,8 @@ export function downloadUpdate(
   onProgress: (received: number, total: number) => void,
 ): Promise<void> {
   const bridge = native();
-  if (!bridge?.updateDownload) return Promise.reject(new Error("这个版本的宿主不会自动更新"));
-  if (downloading) return Promise.reject(new Error("已经在下载了"));
+  if (!bridge?.updateDownload) return Promise.reject(new Error("This app version does not support automatic updates"));
+  if (downloading) return Promise.reject(new Error("A download is already in progress"));
   const start = bridge.updateDownload.bind(bridge);
   return new Promise<void>((resolve, reject) => {
     downloading = {
@@ -367,14 +367,14 @@ export function downloadUpdate(
       },
       error: (message) => {
         downloading = null;
-        reject(new Error(message || "下载失败"));
+        reject(new Error(message || "Download failed"));
       },
     };
     try {
       start(url, expectedBytes);
     } catch (err) {
       downloading = null;
-      reject(new Error(`宿主拒绝了下载：${String(err)}`));
+      reject(new Error(`The app rejected the download: ${String(err)}`));
     }
   });
 }

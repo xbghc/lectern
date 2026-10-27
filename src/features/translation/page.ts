@@ -159,7 +159,7 @@ function onPort<R>(
 ): Promise<R> {
   return new Promise((resolve) => {
     if (signal.aborted) {
-      resolve(failed("已取消"));
+      resolve(failed("Canceled"));
       return;
     }
     let port: chrome.runtime.Port;
@@ -167,7 +167,7 @@ function onPort<R>(
       port = chrome.runtime.connect({ name: PORT_TRANSLATE });
     } catch (err) {
       // 扩展刚被重载时连不上，不该把页面搞崩
-      resolve(failed(`后台未就绪：${reasonOf(err)}`));
+      resolve(failed(`Background service unavailable: ${reasonOf(err)}`));
       return;
     }
 
@@ -181,7 +181,7 @@ function onPort<R>(
     };
     const onAbort = (): void => {
       close(); // background 侧的 onDisconnect 会顺手中止请求
-      finish(failed("已取消"));
+      finish(failed("Canceled"));
     };
     const finish = (res: R): void => {
       if (settled) return;
@@ -199,7 +199,7 @@ function onPort<R>(
     });
     port.onDisconnect.addListener(() => {
       // 正常收尾时 finish 已经落定，这里只兜住 SW 中途挂掉的情况
-      finish(failed("与后台的连接中断"));
+      finish(failed("Connection to the background service was interrupted"));
     });
     port.postMessage(req);
   });
@@ -250,11 +250,11 @@ function makeTranslator(articleId: string, url: string, title: () => string, set
     settings,
     contextOf: paragraphContext,
     recognize: async (png, signal): Promise<OcrReply> => {
-      if (signal.aborted) return { ok: false, error: "已取消" };
+      if (signal.aborted) return { ok: false, error: "Canceled" };
       const reply = await chrome.runtime.sendMessage({ type: "ocr:recognize", png }) as OcrReply | undefined;
       // Tesseract 不能中断；让后台那次跑完，前台只丢弃结果。
-      return signal.aborted ? { ok: false, error: "已取消" }
-        : reply ?? { ok: false, error: "识别失败：后台未就绪" };
+      return signal.aborted ? { ok: false, error: "Canceled" }
+        : reply ?? { ok: false, error: "Text recognition failed: background service unavailable" };
     },
     translate: streamTranslate,
     ask: streamAsk,
@@ -281,7 +281,7 @@ function screenshotAction(getTranslator: () => SelectionTranslator, allowed: () 
           const reply = await chrome.runtime.sendMessage({ type: "page:capture" }) as
             { ok: boolean; dataUrl?: string; error?: string } | undefined;
           if (mine !== seq || !allowed()) return;
-          if (!reply?.ok || !reply.dataUrl) throw new Error(reply?.error ?? "截图失败：后台未就绪或此页面不支持截图");
+          if (!reply?.ok || !reply.dataUrl) throw new Error(reply?.error ?? "Screen capture failed: the background service or page is unavailable");
           const result = await selectRegion(reply.dataUrl);
           if (mine !== seq || !allowed() || !result) return;
           await translator.translateImage(result.png, result.rect);

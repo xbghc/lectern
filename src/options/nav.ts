@@ -19,7 +19,7 @@ export function setupSectionNav(): void {
 
   const nav = document.createElement("nav");
   nav.className = "section-nav";
-  nav.setAttribute("aria-label", "设置分区");
+  nav.setAttribute("aria-label", "Settings sections");
   const links = new Map<HTMLFieldSetElement, HTMLAnchorElement>();
   for (const section of sections) {
     const group = section.dataset.navGroup;

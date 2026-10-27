@@ -68,7 +68,7 @@ const LOCAL_ONLY_KEYS: ReadonlySet<string> = new Set(["llmUsage", "llmTiming", "
  */
 export async function updateLocalOnly(keys: readonly string[], change: (values: Record<string, unknown>) => Record<string, unknown>): Promise<void> {
   const stray = keys.find((k) => !LOCAL_ONLY_KEYS.has(k));
-  if (stray !== undefined) throw new Error(`${stray} 不是本机专用的键`);
+  if (stray !== undefined) throw new Error(`${stray} is not a device-local storage key`);
   if (hasSyncStorage()) {
     await syncDriver().update((state) => {
       Object.assign(state.data, change(Object.fromEntries(keys.map((k) => [k, state.data[k]]))));
@@ -588,8 +588,8 @@ export async function importBundle(raw: unknown): Promise<ImportOutcome> {
     incoming = parseBundle(raw);
     const extra=(raw as {reviewHistory?:{version?:unknown;records?:unknown}}).reviewHistory;
     if(extra!==undefined) {
-      if(extra.version!==1||!Array.isArray(extra.records))throw new Error("复习历史格式不兼容");
-      history=extra.records.map(value=>{const r=validateRecord(value);if(!["card","articleCard","reviewEvent"].includes(r.type))throw new Error("复习历史包含不支持的数据类型");return r;});
+      if(extra.version!==1||!Array.isArray(extra.records))throw new Error("Incompatible review history format");
+      history=extra.records.map(value=>{const r=validateRecord(value);if(!["card","articleCard","reviewEvent"].includes(r.type))throw new Error("Review history contains an unsupported record type");return r;});
     }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

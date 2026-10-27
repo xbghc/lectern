@@ -41,7 +41,7 @@ export async function getLlmLog(): Promise<LlmFailure[]> {
 
 /** 超长的截掉尾部并留个标记，别让一条坏输出把日志撑爆。 */
 export function clip(s: string, max: number): string {
-  return s.length > max ? `${s.slice(0, max)}…[已截断，原长 ${s.length}]` : s;
+  return s.length > max ? `${s.slice(0, max)}…[truncated; original length: ${s.length}]` : s;
 }
 
 /** 进日志之前收一收：超长的原文和请求字段截尾。 */

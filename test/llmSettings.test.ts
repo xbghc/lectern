@@ -60,7 +60,7 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     input("baseUrl", "https://model.example:8443/v2");
     await save();
     assert.equal(saves, 1);
-    assert.match(doc.getElementById("llm-status")!.textContent!, /换了服务地址/);
+    assert.match(doc.getElementById("llm-status")!.textContent!, /The endpoint changed/);
     input("apiKey", initial.apiKey); // 模拟自动回填/过时 UI 带回旧值，后台仍必须拒绝继承。
     await save();
     assert.equal((await getLlmConfig()).apiKey, "");
@@ -76,11 +76,11 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     input("baseUrl", "https://model.example:8443/v3");
     failSave = "reply";
     await save();
-    assert.match(doc.getElementById("llm-status")!.textContent!, /保存失败：synthetic save failure/);
+    assert.match(doc.getElementById("llm-status")!.textContent!, /Could not save: synthetic save failure/);
     assert.deepEqual(await driver.read(), beforeFailure);
     failSave = "throw";
     await save();
-    assert.match(doc.getElementById("llm-status")!.textContent!, /保存失败：synthetic transport failure/);
+    assert.match(doc.getElementById("llm-status")!.textContent!, /Could not save: synthetic transport failure/);
     assert.deepEqual(await driver.read(), beforeFailure);
     assert.equal(tests, 0, "未同意和保存失败都不能触发测试请求");
 
@@ -89,7 +89,7 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     for (const failure of ["reply", "throw"] as const) {
       failSave = failure;
       await consent("agree");
-      assert.match(doc.getElementById("llm-status")!.textContent!, /同意失败：synthetic/);
+      assert.match(doc.getElementById("llm-status")!.textContent!, /Could not save consent: synthetic/);
       assertConsent(false);
       assert.deepEqual(await driver.read(), beforeFailure);
     }
@@ -101,11 +101,11 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     for (const failure of ["reply", "throw"] as const) {
       failSave = failure;
       await save();
-      assert.match(doc.getElementById("llm-status")!.textContent!, /保存失败：synthetic/);
+      assert.match(doc.getElementById("llm-status")!.textContent!, /Could not save: synthetic/);
       assertConsent(true);
       assert.deepEqual(await driver.read(), agreed);
       await consent("revoke");
-      assert.match(doc.getElementById("llm-status")!.textContent!, /撤回同意失败：synthetic/);
+      assert.match(doc.getElementById("llm-status")!.textContent!, /Could not withdraw consent: synthetic/);
       assertConsent(true);
       assert.deepEqual(await driver.read(), agreed);
     }
@@ -120,7 +120,7 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
       assert.deepEqual(await getLlmConfig(), { ...previousConfig, consentAt: null });
       assert.equal(doc.getElementById("llm-status")!.textContent, "");
       await consent("agree");
-      assert.match(doc.getElementById("llm-status")!.textContent!, /同意失败/);
+      assert.match(doc.getElementById("llm-status")!.textContent!, /Could not save consent/);
       assertConsent(false);
       assert.equal((await getLlmConfig()).consentAt, null, "无效地址不能重新启用");
       // 下一轮先恢复有效配置，在设置页上重新进入已同意状态。

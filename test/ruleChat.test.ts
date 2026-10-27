@@ -16,8 +16,8 @@ import {
  */
 
 const LISTS: UrlRuleList[] = [
-  { key: "articleExcludedUrls", label: "文章记录黑名单", meaning: "不记录" },
-  { key: "translationAllowedUrls", label: "翻译白名单", meaning: "自动翻译" },
+  { key: "articleExcludedUrls", label: "Reading blocklist", meaning: "不记录" },
+  { key: "translationAllowedUrls", label: "Translation allowlist", meaning: "自动翻译" },
 ];
 const current = {
   articleExcludedUrls: ["ZhiHu.com", "https://example.com/search"],
@@ -40,9 +40,9 @@ test("规则整理成名单里的样子：域名小写、去掉 *.，网址去�
 test("正常的加和删：加的是整理过的写法，删的是名单里原样那一条", () => {
   const got = plan([add("articleExcludedUrls", "Weibo.com"), remove("articleExcludedUrls", "zhihu.com"), remove("translationAllowedUrls", "github.com")]);
   assert.deepEqual(got.changes.map((c) => [c.list, c.op, c.rule, c.label]), [
-    ["articleExcludedUrls", "add", "weibo.com", "文章记录黑名单"],
-    ["articleExcludedUrls", "remove", "ZhiHu.com", "文章记录黑名单"],
-    ["translationAllowedUrls", "remove", "*.github.com", "翻译白名单"],
+    ["articleExcludedUrls", "add", "weibo.com", "Reading blocklist"],
+    ["articleExcludedUrls", "remove", "ZhiHu.com", "Reading blocklist"],
+    ["translationAllowedUrls", "remove", "*.github.com", "Translation allowlist"],
   ]);
   assert.deepEqual(got.rejected, []);
   assert.equal(got.reply, "好的");
@@ -62,26 +62,26 @@ test("挡掉的几种，各说为什么", () => {
   ]);
   assert.deepEqual(got.changes, []);
   assert.deepEqual(got.rejected.map((r) => [r.rule, r.why]), [
-    ["co.uk", "范围太宽：会命中这一整个国家后缀下的所有网站"],
-    ["https://zhihu.com/question/1", "已被 ZhiHu.com 覆盖"],
-    ["www.zhihu.com", "已被 ZhiHu.com 覆盖"],
-    ["zhihu.com", "已经在文章记录黑名单里"],
-    ["https://example.com/search/advanced", "已被 https://example.com/search 覆盖"],
-    ["zhihu", "写法不对：只能是域名，或不带参数的完整网址"],
-    ["weibo.com", "翻译白名单里没有这一条"],
-    ["a.com", "不认识要改的是哪份名单"],
-    ["b.com", "没说是加还是删"],
+    ["co.uk", "This rule is too broad: it would match every site under this country-code suffix"],
+    ["https://zhihu.com/question/1", "Already covered by ZhiHu.com"],
+    ["www.zhihu.com", "Already covered by ZhiHu.com"],
+    ["zhihu.com", "Already in Reading blocklist"],
+    ["https://example.com/search/advanced", "Already covered by https://example.com/search"],
+    ["zhihu", "Use a domain or a complete URL without query parameters"],
+    ["weibo.com", "Translation allowlist does not contain this rule"],
+    ["a.com", "Unknown list"],
+    ["b.com", "Specify whether to add or remove the rule"],
   ]);
-  assert.equal(parseRulePlan({ changes: [add("articleExcludedUrls", "co.uk")] }, LISTS, current).reply, "提的改动都没法采用：");
+  assert.equal(parseRulePlan({ changes: [add("articleExcludedUrls", "co.uk")] }, LISTS, current).reply, "None of the proposed changes can be applied: ");
 });
 
 test("重复的只留一条；模型只回了话没提改动也行；什么都没给算失败", () => {
   const got = plan([add("articleExcludedUrls", "weibo.com"), add("articleExcludedUrls", "WEIBO.com")]);
   assert.equal(got.changes.length, 1);
   assert.deepEqual(parseRulePlan({ reply: "你说的是哪个网站？", changes: [] }, LISTS, current), { reply: "你说的是哪个网站？", changes: [], rejected: [] });
-  assert.equal(parseRulePlan({ changes: [] }, LISTS, current).reply, "没听出要改什么，换个说法试试？");
-  assert.throws(() => parseRulePlan(null, LISTS, current), /模型没有给出有效的回答/);
-  assert.throws(() => parseRulePlan({ answer: 1 }, LISTS, current), /模型没有给出有效的回答/);
+  assert.equal(parseRulePlan({ changes: [] }, LISTS, current).reply, "Could not determine the changes. Try rephrasing your request.");
+  assert.throws(() => parseRulePlan(null, LISTS, current), /The model did not return a valid answer/);
+  assert.throws(() => parseRulePlan({ answer: 1 }, LISTS, current), /The model did not return a valid answer/);
 });
 
 test("套改动：加的接在末尾，删的按整理后的样子比，别的原样不动", () => {
@@ -106,15 +106,15 @@ test("设置页的名单框：没动过就换成存储里的，动过就在手�
 
 test("给模型的说明带上各份名单的现状；有当前页就说清「这个站」指它，没有就让它问", () => {
   const withPage = ruleChatSystem(LISTS, current, "https://www.zhihu.com/question/1?x=1");
-  assert.match(withPage, /articleExcludedUrls「文章记录黑名单」：不记录/);
+  assert.match(withPage, /articleExcludedUrls「Reading blocklist」：不记录/);
   assert.match(withPage, /"translationAllowedUrls":\["\*\.github\.com","nytimes\.com"\]/);
   assert.match(withPage, /用户正开着这一页：https:\/\/www\.zhihu\.com\/question\/1\?x=1/);
   assert.match(ruleChatSystem(LISTS, current), /这次没有开着的页面/);
 });
 
 test("只带最近几句对话", () => {
-  const turns = Array.from({ length: MAX_TURNS + 3 }, (_, i) => ({ role: i % 2 ? "assistant" as const : "user" as const, text: `第 ${i} 句` }));
+  const turns = Array.from({ length: MAX_TURNS + 3 }, (_, i) => ({ role: i % 2 ? "assistant" as const : "user" as const, text: `Chapter ${i} 句` }));
   const sent = JSON.parse(ruleChatInput(turns)).history as Array<{ text: string }>;
   assert.equal(sent.length, MAX_TURNS);
-  assert.equal(sent.at(-1)!.text, `第 ${MAX_TURNS + 2} 句`);
+  assert.equal(sent.at(-1)!.text, `Chapter ${MAX_TURNS + 2} 句`);
 });

@@ -98,7 +98,7 @@ g["chrome"] = {
   },
   runtime: {
     sendMessage: async (msg: { type?: string }) => {
-      if (msg.type === "article:classify") return { ok: true, isArticle: classifyAsArticle, reason: "未识别为文章页" };
+      if (msg.type === "article:classify") return { ok: true, isArticle: classifyAsArticle, reason: "Not identified as an article" };
       sent.push(msg);
       // 角标只在后台确认建卡之后才弹，见 track.ts 的 maybeShowFinished
       return msg?.type === "article:finished" ? { ok: true, marked: true } : undefined;
@@ -192,7 +192,7 @@ test("非文章页：不留设置监听，也不挂任何页面监听", async ()
   settingsListeners = 0;
   scrolls = 0;
   const ctl = await startTracking({ url: FIRST, focus: "assume", extract: () => null });
-  assert.deepEqual(ctl.state(), { tracked: false, reason: "未识别为文章页" });
+  assert.deepEqual(ctl.state(), { tracked: false, reason: "Not identified as an article" });
   assert.equal(settingsListeners, 0);
   assert.equal(scrolls, 0);
   classifyAsArticle = true;
@@ -221,7 +221,7 @@ test("还在等 LLM 判断时 popup 看得到在等什么；等到之前就被�
     const container = doc.getElementById("art")!;
     const f = readingPlugin({ focus: "assume", extract: () => extractFromContainer(container, "渡口") }).start(ctxOf(FIRST));
     await new Promise((r) => setImmediate(r));
-    assert.deepEqual(f.state(), { tracked: false, reason: "LLM 正在判断是否为文章…" });
+    assert.deepEqual(f.state(), { tracked: false, reason: "AI is checking whether this page is an article…" });
 
     f.stop("unload");
     respond({ ok: true, isArticle: true, reason: "是文章" });
@@ -244,7 +244,7 @@ test("起不来：popup 要说得出原因", async () => {
   try {
     const f = readingPlugin({ focus: "assume" }).start(ctxOf(FIRST));
     await new Promise((r) => setImmediate(r));
-    assert.match(f.state().reason ?? "", /初始化失败/);
+    assert.match(f.state().reason ?? "", /Initialization failed/);
   } finally {
     chromeMock.storage.local.get = realGet;
   }
@@ -287,7 +287,7 @@ function fakePlugin(rounds: Round[], tracked = true): PagePlugin<FakeFeature, bo
 
 test("开张之前 popup 看到的是「初始化中」", () => {
   const host = createPageHost({ a: fakePlugin([]) });
-  assert.deepEqual(host.state(), { tracked: false, reason: "初始化中" });
+  assert.deepEqual(host.state(), { tracked: false, reason: "Initializing" });
   assert.equal(host.get("a"), null);
 });
 

@@ -140,22 +140,22 @@ export function overviewInsights(o: Overview): string[] {
 
   if (o.episodeCount > 0 && o.sessionCount / o.episodeCount >= 1.5) {
     out.push(
-      `${o.sessionCount} 个片段合成 ${o.episodeCount} 个回合：注意力常在几分钟内回到同一篇文章，` +
-        `片段中位数（${formatDuration(o.medianMs)}）低估了连续投入，回合中位 ${formatDuration(o.episodeMedianMs)} 更接近真实。`,
+      `${o.sessionCount} sessions form ${o.episodeCount} episodes: you often return to the same article within a few minutes. ` +
+        `The median session (${formatDuration(o.medianMs)}) understates sustained attention; the median episode of ${formatDuration(o.episodeMedianMs)} is more representative.`,
     );
   }
 
   const switching = o.byReason.blur.count + o.byReason.hidden.count;
   if (o.totalMs >= 10 * 60_000 && switching / o.sessionCount >= 0.5) {
     out.push(
-      `每小时切换 ${Math.round(o.switchesPerHour)} 次：一半以上的片段以切到别处结束` +
-        `（对照：Mark 等人测得信息工作者约每 47 秒切换一次，≈ ${Math.round(MARK_SWITCHES_PER_HOUR)} 次/时）。`,
+      `Switches per hour: ${Math.round(o.switchesPerHour)}. More than half of your sessions end by switching away` +
+        ` (for comparison, Mark and colleagues observed information workers switching about every 47 seconds, approximately ${Math.round(MARK_SWITCHES_PER_HOUR)} switches/hour).`,
     );
   }
 
   if (o.totalMs >= 10 * 60_000 && o.readingMs / o.totalMs < 0.5) {
     out.push(
-      `只有 ${Math.round((o.readingMs / o.totalMs) * 100)}% 的专注时长读到了新段落——其余是回看、停留，或页面开着没在读。`,
+      `Only ${Math.round((o.readingMs / o.totalMs) * 100)}% of focused time involved new paragraphs. The rest was rereading, pausing or leaving the page open.`,
     );
   }
   return out;

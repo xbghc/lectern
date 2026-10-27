@@ -58,11 +58,11 @@ const tokenUri = (sa: ServiceAccount): string => sa.token_uri ?? "https://oauth2
 /** 非 2xx 一律带着响应体报错：商店的报错原因（版本号没涨、上一版在审）都写在体里。 */
 async function json(res: Response, what: string): Promise<Record<string, unknown>> {
   const text = await res.text();
-  if (!res.ok) throw new Error(`${what}失败（HTTP ${res.status}）：${text.slice(0, 2000)}`);
+  if (!res.ok) throw new Error(`${what} failed (HTTP ${res.status}): ${text.slice(0, 2000)}`);
   try {
     return JSON.parse(text) as Record<string, unknown>;
   } catch {
-    throw new Error(`${what}的响应不是 JSON：${text.slice(0, 500)}`);
+    throw new Error(`${what} returned a non-JSON response: ${text.slice(0, 500)}`);
   }
 }
 
@@ -72,8 +72,8 @@ async function accessToken(sa: ServiceAccount, deps: UploadDeps): Promise<string
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: signedJwt(sa, deps.now()) }),
   });
-  const token = (await json(res, "换取访问令牌")).access_token;
-  if (typeof token !== "string" || !token) throw new Error("换取访问令牌：响应里没有 access_token");
+  const token = (await json(res, "Exchange access token")).access_token;
+  if (typeof token !== "string" || !token) throw new Error("Access token exchange: response has no access_token");
   return token;
 }
 
@@ -96,27 +96,27 @@ export async function uploadToStore(opts: UploadOptions, deps: UploadDeps = DEFA
 
   const uploaded = await json(
     await deps.fetch(`${API}/upload/v2/${item}:upload`, { method: "POST", headers: { ...auth, "content-type": "application/zip" }, body: opts.zip as BodyInit }),
-    "上传",
+    "Upload",
   );
-  deps.log(`上传：${JSON.stringify(uploaded)}`);
+  deps.log(`Upload: ${JSON.stringify(uploaded)}`);
   let state = uploaded.uploadState;
   // 大包是异步处理的：商店先回一个「处理中」，要自己去问结果
   for (let i = 0; inProgress(state) && i < 30; i++) {
     await deps.wait(5_000);
-    const status = await json(await deps.fetch(`${API}/v2/${item}:fetchStatus`, { headers: auth }), "查询上传状态");
+    const status = await json(await deps.fetch(`${API}/v2/${item}:fetchStatus`, { headers: auth }), "Check upload status");
     state = status.lastAsyncUploadState;
-    deps.log(`处理中：${String(state)}`);
+    deps.log(`Processing: ${String(state)}`);
   }
-  if (inProgress(state)) throw new Error("商店处理这个包超过两分半还没完，稍后到开发者后台看结果");
-  if (failed(state)) throw new Error(`商店没收下这个包：${String(state)}`);
+  if (inProgress(state)) throw new Error("Store processing exceeded 2.5 minutes. Check the developer dashboard later.");
+  if (failed(state)) throw new Error(`The store rejected this package: ${String(state)}`);
   const crxVersion = typeof uploaded.crxVersion === "string" ? uploaded.crxVersion : "";
 
-  if (opts.publish === false) return { crxVersion, state: "只上传，未提交审核" };
+  if (opts.publish === false) return { crxVersion, state: "Uploaded only; not submitted for review" };
   const published = await json(
     await deps.fetch(`${API}/v2/${item}:publish`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: "{}" }),
-    "提交审核",
+    "Submit for review",
   );
-  deps.log(`提交审核：${JSON.stringify(published)}`);
+  deps.log(`Review submission: ${JSON.stringify(published)}`);
   return { crxVersion, state: String(published.state ?? "") };
 }
 
@@ -126,16 +126,16 @@ async function main(): Promise<void> {
   const raw = process.env.CWS_SERVICE_ACCOUNT_JSON;
   const publisherId = process.env.CWS_PUBLISHER_ID;
   if (!file || !raw || !publisherId) {
-    console.error("用法：CWS_SERVICE_ACCOUNT_JSON=<密钥文件内容> CWS_PUBLISHER_ID=<发布者 ID> store-upload.ts <zip> [--no-publish]");
+    console.error("Usage: CWS_SERVICE_ACCOUNT_JSON=<key-file-contents> CWS_PUBLISHER_ID=<publisher-id> store-upload.ts <zip> [--no-publish]");
     process.exit(2);
   }
   let sa: ServiceAccount;
   try {
     sa = JSON.parse(raw) as ServiceAccount;
   } catch {
-    throw new Error("CWS_SERVICE_ACCOUNT_JSON 不是合法的 JSON：要的是服务账号密钥文件的全部内容");
+    throw new Error("CWS_SERVICE_ACCOUNT_JSON must contain the complete service account key file as valid JSON");
   }
-  if (!sa.client_email || !sa.private_key) throw new Error("CWS_SERVICE_ACCOUNT_JSON 里缺 client_email 或 private_key");
+  if (!sa.client_email || !sa.private_key) throw new Error("CWS_SERVICE_ACCOUNT_JSON is missing client_email or private_key");
   const result = await uploadToStore({
     sa,
     publisherId: publisherId.trim(),
@@ -143,7 +143,7 @@ async function main(): Promise<void> {
     publish: !args.includes("--no-publish"),
     ...(process.env.CWS_EXTENSION_ID ? { extensionId: process.env.CWS_EXTENSION_ID } : {}),
   });
-  console.log(`版本 ${result.crxVersion || "?"}：${result.state}`);
+  console.log(`Version ${result.crxVersion || "?"}: ${result.state}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

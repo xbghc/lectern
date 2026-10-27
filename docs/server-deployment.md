@@ -1,15 +1,15 @@
-# 后端部署与设备同步
+# Server deployment and device sync
 
-后端使用 Node.js、PostgreSQL 和持久文件目录。数据库保存用户、设备 Token 哈希、结构化记录、同步变更和资源索引；正文、图片、附件作为文件保存。后端不会抓取原网站或调用模型，正常运行不需要主动访问外部互联网。客户端继续独立保存业务数据，服务器不可达时可继续阅读和复习，下次连接补同步。
+The server uses Node.js, PostgreSQL and a persistent file directory. PostgreSQL stores users, token hashes, structured records, sync changes and resource indexes; article bodies and images are files. The server does not fetch original sites or call models, and needs no outbound internet access during normal operation. Clients keep their own data and can read and review offline, syncing later.
 
-## 用 Docker Compose 部署
+## Docker Compose
 
-需要 Docker Engine 和 Compose v2。仓库根目录的 `compose.yaml` 启动两个容器：`server` 和 `postgres`；数据库不暴露主机端口，两个命名卷分别保存数据库和文章文件。
+Use Docker Engine and Compose v2. The root `compose.yaml` runs `server` and `postgres`, with no public database port and separate named volumes for the database and article files.
 
-1. 把 `compose.yaml` 和 `.env.example` 放入服务器上的同一个目录，将 `.env.example` 复制为 `.env`。
-2. 将 `FOCUS_SERVER_IMAGE` 改为已发布的 `ghcr.io/<仓库所有者>/lectern-server:<版本>`，或固定到镜像摘要 `@sha256:...`。镜像在新的 `v*` 标签触发 Server image 工作流成功后才存在，旧的 GitHub Release 不会自动补发镜像。
-3. 用 `openssl rand -hex 32` 生成数据库密码，填入 `POSTGRES_PASSWORD`。使用十六进制避免连接 URL 中的特殊字符转义问题。
-4. 按下文配置 HTTPS 入口和客户端来源，再启动服务。
+1. Copy `compose.yaml` and `.env.example` into a deployment directory, then copy `.env.example` to `.env`.
+2. Set `FOCUS_SERVER_IMAGE` to a published `ghcr.io/<owner>/lectern-server:<version>` or `@sha256:...` digest. Images are published by successful Server image runs for `v*` tags; old releases do not automatically gain images.
+3. Generate a database password with `openssl rand -hex 32` and set `POSTGRES_PASSWORD`. Hex avoids connection-URL escaping issues.
+4. Configure HTTPS and allowed client origins before starting.
 
 ```bash
 docker compose config --quiet
@@ -19,19 +19,19 @@ docker compose ps
 docker compose logs --tail=100 server
 ```
 
-后端启动时执行版本化数据库迁移。容器以非 root 用户运行，程序目录只读，文件写入 `/data` 对应的持久卷。若替换成宿主机绑定目录，需要让 UID 1000 可读写该目录。
+Startup applies versioned migrations. The non-root container has a read-only program directory and writes files under `/data`. If replacing its volume with a host directory, grant UID 1000 access.
 
-默认只监听主机 `127.0.0.1:8787`，由主机上的 HTTPS 反向代理转发到它。NAS 的代理若在另一个容器中，应让代理接入同一个 Docker 网络并访问 `server:3000`，或明确配置可达的绑定地址。直接供局域网或 VPN 访问时可以设置 `BIND_ADDRESS` 为相应网卡地址。正式客户端使用 HTTPS；仅本机开发地址允许明文 HTTP。
+The default host binding is `127.0.0.1:8787`, intended for an HTTPS reverse proxy. A proxy in another container can join the Docker network and use `server:3000`. For LAN or VPN access, explicitly set `BIND_ADDRESS` to a reachable interface. Production clients require HTTPS; plain HTTP is accepted only on local development hosts.
 
-反向代理保留 `Authorization` 请求头，允许 PUT/POST/GET/OPTIONS，JSON 请求上限至少 16 MiB，文件请求上限至少 32 MiB；读写超时需要覆盖慢速移动网络上的上传。只转发后端 API，不把文章文件目录公开为静态目录。客户端填写根地址，例如 `https://sync.example.com`，不附加 `/v1`。
+The proxy must preserve `Authorization`, support PUT/POST/GET/HEAD/OPTIONS, accept at least 16 MiB JSON requests and 32 MiB file requests, and allow slow mobile uploads. Proxy the API only; never expose the file directory as static hosting. Enter the root URL in clients, such as `https://sync.example.com`, without `/v1`.
 
-`CORS_ORIGINS` 是逗号分隔的准确来源列表，不带路径或末尾斜杠。安卓 App 来源是 `https://appassets.androidplatform.net`，模板已包含；浏览器预览、扩展或不同宿主若发送 `Origin`，按需要追加实际来源，例如 `chrome-extension://<扩展 ID>`。服务端不接受通配符来源。原生客户端未发送 `Origin` 的请求仍须通过 Token 鉴权。
+`CORS_ORIGINS` is a comma-separated list of exact origins without paths or trailing slashes. The template includes Android's `https://appassets.androidplatform.net`; add actual browser-preview or `chrome-extension://<extension-id>` origins as needed. Wildcards are not supported. Requests without Origin still require tokens.
 
-首次发布的 GHCR 包可能是私有的：部署者可以在 GitHub 的包设置中将其公开，或在拉取机器上使用具有 `read:packages` 权限的凭证登录 GHCR。该凭证仅用于下载镜像，与客户端同步 Token 无关。发布鉴权与包可见性见 [GitHub Container registry 文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)。
+A new GHCR package may be private. Publish its visibility in GitHub package settings or authenticate the deployment host with a `read:packages` credential. That image-pull credential is separate from client sync tokens.
 
-## 创建账号和设备 Token
+## Accounts and device tokens
 
-管理员命令直接访问数据库，不需要公开注册页面或额外的管理 API。以下命令在 Compose 目录执行：
+Run administrative commands from the Compose directory; no public registration page or management API is required.
 
 ```bash
 docker compose exec server npm run admin -- create-user alice
@@ -41,46 +41,44 @@ docker compose exec server npm run admin -- list-tokens <userId>
 docker compose exec server npm run admin -- revoke-token <tokenId>
 ```
 
-`create-user` 创建用户并签发首个 Token；`issue-token` 为同一用户增加凭证。将命令输出的 Token 保存到密码管理器并填入对应设备。数据库只保存哈希，无法从 `list-tokens` 找回 Token 原文；遗失时重新签发。每台设备建议使用不同 Token，丢失设备时可以单独吊销。不要把命令输出、`.env` 或 Token 提交到仓库。
+`create-user` creates an account and its first token; `issue-token` adds a credential to an existing account. Save the returned token in a password manager. Only its hash is stored, so a lost token cannot be recovered through `list-tokens`; issue a replacement. Prefer separate tokens for each device so they can be revoked individually. Keep tokens, command output and `.env` out of the repository.
 
-## 客户端连接
+## Connecting clients
 
-在插件和安卓的设置页打开「设备同步」，填写后端地址和该用户的 Token。先点击「测试连接」核对用户 ID 和服务器 ID，再点击「保存并启用同步」。测试不保存配置，也不上传阅读数据。
+In **Settings → Device sync**, enter the server URL and token. **Test connection** checks the user and server IDs without saving settings or uploading records. Then choose **Save and enable sync**.
 
-首次启用会合并本机已有记录和服务器上的账号数据。同步成功后，其他使用同一账号的设备即可拉取记录。页面显示是否启用、待上传数量、上次成功时间和错误原因，可以手动触发「立即同步」。阅读与翻译设置按字段同步，包括两份黑名单、读完判定、专注阈值、续读位置和文章回顾开关；字号、应用更新偏好、模型配置、API Key、诊断日志和同步 Token 保留在本机。Token 不进入 JSON 导出。
+The first sync merges existing local and account data. The status panel reports whether sync is enabled, queued changes, last success and errors. **Sync now** starts a manual cycle. Reading/translation preferences sync by field; model settings, keys, tokens, consent and device-specific preferences remain local. The translation allowlist is local. Diagnostic logs and usage counts upload separately when sync is enabled.
 
-- **暂停同步**：保留连接配置和待发送数据，本地继续记录。
-- **断开连接**：删除本机保存的 Token，保留本机业务数据和账号绑定。
-- **清除此设备记录**：断开同步、清除本地记录及绑定，保留普通设置与模型 API Key；不会请求删除服务器账号数据。
-- **更换账号**：先导出本机备份，再清除此设备记录，最后连接新账号。已绑定数据不能直接切换到另一用户或另一服务器，避免误上传。
+| Action | Effect |
+| --- | --- |
+| Pause sync | Keep connection settings and queued changes; continue recording locally. |
+| Disconnect | Remove the local token, keeping records and their account binding. |
+| Clear this device's records | Disconnect, clear local records and binding, preserve ordinary settings and model keys; do not delete server data. |
+| Change account/server | Export a backup, clear this device's records, then connect to the new identity. Already-bound data cannot silently switch accounts. |
 
-重新连接原账号会从服务器恢复记录。历史页主动删除文章会传播删除标记；这与清理单台设备的本地数据是两种操作。
+Reconnecting the original account restores server records. Explicit article deletion creates sync tombstones; it is different from clearing one device. Deleted translations sync too. Cards remain visible while any source remains; orphaned cards retain review history and regain their schedule when a matching source returns.
 
-划词删除会同步到其他设备；复习卡没有任何剩余来源时隐藏。如果另一台设备新增了同一词元的划词，保留该来源，卡片继续可用。无来源卡片的既有复习历史保留，日后再次划到同一词元时恢复原排期。
+New JSON exports can include review events and a scheduling baseline. Imports and sync deduplicate by event ID. Older card-only exports migrate as a baseline and cannot reconstruct historical ratings.
 
-新版 JSON 导出包含可选的复习历史记录及调度基线。使用新版客户端导入后，重复导入或继续联网同步都按原事件 ID 去重；旧版文件只有卡片状态，会作为已有排期基线迁移，无法补造此前的每次评分。
+Local records, pending operations and cursors persist together. Failed uploads or process exits can retry. The server deduplicates operation IDs and transactionally writes merged state and ordered changes. Incompatible protocol versions produce an error while preserving local data.
 
-设备本地数据、待发送操作和同步游标一起持久化；上传失败或进程退出后可以继续重试。服务端对操作 ID 去重，并在数据库事务中写入合并结果和有序变更。后端升级前后的客户端通过协议版本校验兼容性，不兼容时显示错误并保留本地数据。
+## Article files and resources
 
-## 文章文件与资源
+Clients upload article content; the server receives no source-site cookies and does not log in to websites. Files are scoped by user and content hash. Uploads verify size and SHA-256 before publishing an index. Downloads require a sync token; clients cannot choose disk paths.
 
-文章内容由客户端上传，服务端不接收原网站 Cookie，也不会重新登录网页。文件按用户和内容哈希存储，数据库只记录相对存储键；不同用户之间不共享资源授权。上传先写临时文件，验证大小和 SHA-256 后才发布文件索引。下载需要同步 Token，客户端不指定磁盘路径。
+1. Open the article in the desktop browser, log in if necessary, and let its text and images load.
+2. Choose **Save article to sync library** in the popup. Content is saved locally, then uploaded when connected.
+3. If images are missing, retry after loading finishes. Login, anti-hotlinking, cross-origin or interaction requirements can still prevent capture.
+4. Sync Android and open the saved article. Its body and images download on first open.
+5. **Available offline** means the downloaded content can be read without a network. Missing resources display a notice and can retry after reconnection.
 
-保存和阅读文章的操作：
+Syncing the list does not download the entire library. Ordinary URL caches do not become archives automatically; saved article-review text can sync separately. Archive readers neither execute source scripts nor refetch the original URL. Interactive sites may not reproduce fully.
 
-1. 在电脑浏览器中打开文章，完成网站登录并让正文、图片加载出来。
-2. 点击插件弹出面板的「保存文章到同步库」。正文和能取得的图片先保存在本机，连接同步服务器后上传。
-3. 保存结果若提示图片缺失，等原页面资源加载完成后重新保存；登录校验、防盗链、跨域限制或页面交互仍可能导致个别资源无法取得。
-4. 手机同步后，在首页的「插件保存的文章」中打开条目。首次打开会下载正文和图片，页面会显示下载结果。
-5. 页面显示「可离线阅读」后，已下载内容可在断网时继续使用。缺失图片会显示占位提示，恢复连接后重新打开重试。
+Change logs, operation receipts, tombstones and old article resources are retained for long-offline clients. Clearing one device does not delete server files. Do not manually remove individual files from the volume: database references may still exist. Monitor storage growth and back up both stores.
 
-同步文章清单不会提前下载整个文章库的资源；第一版在打开文章时下载。已有的普通链接解析缓存不会自动变成插件存档，文章回顾保存的正文文本可以独立同步。阅读器不会执行原站脚本，也不会为插件存档重新请求原网址；交互式网页不能保证完整复刻。
+## Diagnostics
 
-第一版保留同步变更、操作去重信息和删除标记，不按日期自动裁剪，以支持长时间离线的设备。文章文件不会因本机清理而被删除。不要手动删除文件卷中的单个文件；数据库里仍可能存在引用。长期运行需要根据实际数据增长安排备份和容量。
-
-## 诊断与日志
-
-后端每个请求写一行 JSON 日志（路由模板、状态码、耗时、字节数、用户 ID、同步批量大小），不含请求头、请求体、Token 和查询串；成功的 `/health` 探活不记。`compose.yaml` 把 `server` 的容器日志限制为 5 个 10 MiB 文件。
+Requests produce JSON logs containing route templates, status, duration, sizes, user IDs and batch counts. They exclude headers, bodies, tokens and query strings; successful health probes are omitted. Compose rotates server logs across five 10 MiB files.
 
 ```bash
 docker compose logs --no-log-prefix --since 24h server | grep '^{' | jq -c 'select(.ms > 500 or .status >= 500)'
@@ -88,31 +86,32 @@ docker compose exec -T server node dist/server/src/admin.js stats
 docker compose exec -T server node dist/server/src/admin.js check
 docker compose exec -T server node dist/server/src/admin.js show-record <userId> <type> <id>
 docker compose exec -T server node dist/server/src/admin.js usage [userId]
+docker compose exec -T server node dist/server/src/admin.js logs [userId] --hours=24
 ```
 
-`stats` 输出各表体积和每个用户的记录、变更日志、资源统计，只有数量、体积和标识符。`check` 是只读的一致性自检：存量记录能否通过当前协议校验、变更日志是否连续、资源文件与索引是否一致，发现 `error` 时退出码为 1。`show-record` 是唯一输出记录内容的命令，用于按 ID 查看某条记录的当前值、变更历史和各设备上传的原始操作。`usage` 汇总各设备上传的首页按钮点击计数：按平台（扩展 / App）分开，每个按钮近 7 天、近 30 天和累计的次数、用过它的用户数和设备数，一次没人点过的也列出来，用来决定界面上哪些东西该留、该藏。字段和问题类型见 [后端说明](../server/README.md#诊断)。排查时优先使用这些入口，不要直接连接数据库。
+`stats` reports counts, sizes and identifiers. `check` performs read-only protocol, log and file consistency checks and exits with 1 on errors. `show-record` exposes a selected record and its changes/operations. `usage` aggregates button counts by platform. `logs` exposes uploaded diagnostic content, including selected text and raw model responses. Use these interfaces for investigation rather than connecting directly to PostgreSQL. See the [server diagnostics reference](../server/README.md#diagnostics).
 
-## 配置项
+## Configuration
 
-| 变量 | 默认或要求 |
+| Variable | Default or requirement |
 | --- | --- |
-| `DATABASE_URL` | 必填；Compose 自动构造，直接运行时填写 PostgreSQL 连接地址 |
-| `HOST` / `PORT` | 直接运行默认 `0.0.0.0:8787`，容器内为 `0.0.0.0:3000` |
-| `DATA_DIR` | 直接运行默认 `./data`，容器为 `/data` |
-| `CORS_ORIGINS` | Compose 默认安卓 App 来源；多个来源用逗号分隔 |
-| `MAX_JSON_BYTES` | 默认 16 MiB，请求 JSON 上限 |
-| `MAX_BLOB_BYTES` | 默认 32 MiB，单文件上限 |
-| `MAX_USER_BLOB_BYTES` | 默认 2 GiB，用户文件配额 |
-| `FOCUS_SERVER_IMAGE` | Compose 必填，建议固定版本或摘要 |
-| `POSTGRES_IMAGE` | Compose 默认 `postgres:17-alpine` |
-| `POSTGRES_PASSWORD` | Compose 必填，首次创建数据库时使用 |
-| `BIND_ADDRESS` / `HTTP_PORT` | Compose 默认 `127.0.0.1:8787` |
+| `DATABASE_URL` | Required; constructed by Compose, or supplied directly |
+| `HOST` / `PORT` | Direct run: `0.0.0.0:8787`; container: `0.0.0.0:3000` |
+| `DATA_DIR` | Direct run: `./data`; container: `/data` |
+| `CORS_ORIGINS` | Android app origin by default; comma-separated |
+| `MAX_JSON_BYTES` | 16 MiB |
+| `MAX_BLOB_BYTES` | 32 MiB |
+| `MAX_USER_BLOB_BYTES` | 2 GiB |
+| `FOCUS_SERVER_IMAGE` | Required by Compose; pin a version or digest |
+| `POSTGRES_IMAGE` | `postgres:17-alpine` |
+| `POSTGRES_PASSWORD` | Required for initial database creation |
+| `BIND_ADDRESS` / `HTTP_PORT` | `127.0.0.1:8787` |
 
-数据库已初始化后，改 `.env` 中的密码不会自动更改数据库角色密码；需要同时通过数据库管理方式修改。不要直接更换 PostgreSQL 的主版本镜像，主版本升级需要对应的数据库升级或导出恢复流程。
+Changing `.env` after initialization does not change the PostgreSQL role's password automatically. Coordinate database administration when rotating it. PostgreSQL major-version upgrades require a supported upgrade or dump/restore process, not just a new image tag.
 
-## 更新、备份与恢复
+## Updates, backup and recovery
 
-更新前备份数据库和文件卷，修改 `.env` 中的后端镜像版本后执行：
+Back up the database and file volume, change the server image version in `.env`, then run:
 
 ```bash
 docker compose pull server
@@ -120,9 +119,9 @@ docker compose up -d server
 docker compose ps
 ```
 
-不要使用 `docker compose down -v` 更新；它会删除持久数据卷。数据库迁移可能不能被旧程序读取，回退前核对兼容性，必要时恢复与旧版本一起保存的备份。
+Do not update with `docker compose down -v`: it deletes persistent volumes. Migrations may not be readable by older binaries. Check rollback compatibility and restore a matching backup when required.
 
-下面是 Linux shell 下停止业务写入后的备份示例，备份期间不要执行修改数据的管理员命令：
+Example consistent backup with application writes stopped; do not run mutating admin commands during it:
 
 ```bash
 mkdir -p backup
@@ -132,9 +131,9 @@ docker compose run --rm --no-deps --entrypoint tar server -C /data -czf - . > ba
 docker compose start server
 ```
 
-确认每条命令成功，单独保存 `.env`、Compose 配置及镜像版本/摘要。备份包含私人阅读内容和 Token 哈希，应保存在受保护位置。只备份数据库会丢失文章文件，只备份文件会丢失用户、引用和同步身份。
+Check each command's exit status. Separately preserve `.env`, Compose configuration and image version/digest. Protect backups: they contain private reading content and credential hashes. Neither the database nor file archive alone is complete.
 
-在**新建且为空的恢复环境**中，使用备份时的程序与 PostgreSQL 主版本：
+Restore into a **new, empty environment**, using the application and PostgreSQL major version from the backup:
 
 ```bash
 docker compose up -d --wait postgres
@@ -144,26 +143,21 @@ docker compose run --rm --no-deps server npm run admin -- rotate-server-id
 docker compose up -d server
 ```
 
-恢复旧备份后，已有设备可能持有比备份更新的同步游标。上面的 `rotate-server-id` 会为恢复后的数据库生成新服务器身份，使设备停止向回退的同步历史继续写入；必须在接受客户端连接前执行，并重启全部后端实例。
+After restoring an older backup, devices may have cursors newer than its history. Run `rotate-server-id` **before accepting client connections** and restart all server instances. This prevents clients from writing against rolled-back history under the old identity.
 
-旧设备会提示服务器身份变化。先在各设备导出备份，确认尚未上传的记录已经保存，再清除此设备记录并连接恢复后的服务器，最后导入需要补回的本地记录。仅断开再连接不会解除旧身份绑定。JSON 备份不包含完整文章资源，因此尚未上传的文章内容也应先另行保存；已经上传的正文与图片从配套文件备份恢复。上线前使用测试设备核对账号、文章文件和新增记录同步。
+Devices will report the identity change. Export each device's remaining data, preserve unsynced article content separately, clear local records and connect to the restored server, then import the records you need to recover. Disconnecting alone does not clear the old binding. JSON exports omit full archive resources; previously uploaded bodies/images need the matching file backup. Verify account identity, archived files and new-record sync with a test device before reopening access.
 
-## GitHub Actions 镜像发布
+## Image publishing
 
-`.github/workflows/server.yml` 的行为如下：
+`.github/workflows/server.yml` checks client/server code, runs PostgreSQL integration tests and builds `linux/amd64` and `linux/arm64` images for main, PRs and manual runs without publishing. Successful `v*` tags publish to `ghcr.io/<owner>/lectern-server`.
 
-- 推送 `main`、创建 PR 或手动运行：执行客户端与后端检查、带 PostgreSQL 的集成测试，构建 `linux/amd64` 和 `linux/arm64` 镜像，不发布。
-- 推送 `v*` 标签：检查通过后发布到 `ghcr.io/<仓库所有者>/lectern-server`。根目录和 `server/package.json` 的版本必须与标签一致。
-- 发布标签包括版本号（例如 `0.3.5`）和 `sha-<完整提交 SHA>`；稳定版本额外更新 `latest`，预发布版本不更新 `latest`。
-- 工作流使用最小范围的 `GITHUB_TOKEN` 包写权限，Actions 固定到完整提交 SHA。镜像摘要在成功运行的 Summary 中显示。
+Root and server package versions and lockfiles must match the tag. Images receive version and full-commit `sha-…` tags; stable releases also update `latest`, prereleases do not. Workflows use scoped package-write permissions and pinned Actions. The run summary shows the digest. Production deployments should pin a version or digest.
 
-发布新版本时需要同步更新根目录和 `server/package.json` 及对应 lockfile；现有扩展/APK 发布流程仍由相同 `v*` 标签触发。正式服务器建议固定到版本或摘要，不自动追随 `latest`。
+The same tag triggers extension and APK releases. Builds and pulls need network access; the running server does not. For offline deployment, pull matching-architecture server/PostgreSQL images elsewhere, transfer them with `docker save`/`docker load`, then start with `docker compose up -d --pull never`.
 
-构建及拉取镜像需要联网，运行中的后端无需外网。完全离线服务器可在联网机器上拉取匹配目标 CPU 架构的后端和 PostgreSQL 镜像，通过 `docker save` 导出、传入服务器后 `docker load`，再用 `docker compose up -d --pull never` 启动。参考 [GitHub 发布镜像流程](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images) 和 [Docker 多平台构建](https://docs.docker.com/build/building/multi-platform/)。
+## Local development
 
-## 本地开发
-
-在仓库根目录安装客户端依赖，在 `server` 中安装后端依赖。Node.js 使用 22.14 或更新版本，准备一个独立 PostgreSQL 数据库后设置 `DATABASE_URL`：
+Use Node.js 22.14 or newer and a separate PostgreSQL development database:
 
 ```bash
 npm ci
@@ -173,4 +167,4 @@ npm --prefix server run admin -- create-user developer
 npm --prefix server start
 ```
 
-后端测试用 `npm --prefix server test`。设置 `DATABASE_URL` 时会运行数据库集成测试，应指向专用测试库。容器构建可在仓库根目录运行 `docker build -t lectern-server:dev .`，然后把该标签填入 Compose 的 `FOCUS_SERVER_IMAGE`。
+Set `DATABASE_URL` before the admin/start commands. Run `npm --prefix server test`; database integration tests require a dedicated test database. Build an image from the repository root with `docker build -t lectern-server:dev .`, then use that tag as `FOCUS_SERVER_IMAGE`.

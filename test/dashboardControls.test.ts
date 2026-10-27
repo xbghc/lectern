@@ -41,18 +41,18 @@ test("搜索收成一个键、筛选一下就切，点过什么攒成一批交�
   assert.equal(input.hasAttribute("inert"), true);
   assert.deepEqual(pressed(), ["true", "false", "false"]);
   assert.deepEqual(titles(), ["essay", "draft", "notes"]);
-  assert.equal(summary.textContent, "共 3 篇，读完 1 篇");
+  assert.equal(summary.textContent, "Articles: 3 · Finished: 1");
 
   // 点开：框展开并拿到焦点
   toggle.click();
   assert.equal(box.classList.contains("open"), true);
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
-  assert.equal(toggle.getAttribute("aria-label"), "收起搜索");
+  assert.equal(toggle.getAttribute("aria-label"), "Close search");
   assert.equal(input.hasAttribute("inert"), false);
   assert.equal(doc.activeElement, input);
   type("dr"); type("dra");
   assert.deepEqual(titles(), ["draft"]);
-  assert.equal(summary.textContent, "共 3 篇，读完 1 篇 · 显示 1 篇");
+  assert.equal(summary.textContent, "Articles: 3 · Finished: 1 · Showing 1");
 
   // 有词的时候走开，框留着——收起来的话筛选还在生效却看不见
   box.dispatchEvent(new dom.window.FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
@@ -87,13 +87,13 @@ test("搜索收成一个键、筛选一下就切，点过什么攒成一批交�
   filter("reading");
   assert.deepEqual(pressed(), ["false", "true", "false"]);
   assert.deepEqual(titles(), ["draft", "notes"]);
-  assert.equal(summary.textContent, "共 3 篇，读完 1 篇 · 显示 2 篇");
+  assert.equal(summary.textContent, "Articles: 3 · Finished: 1 · Showing 2");
   filter("done");
   assert.deepEqual(titles(), ["essay"]);
   // 和搜索叠着用
   toggle.click(); type("draft");
   assert.deepEqual(titles(), []);
-  assert.equal(doc.querySelector("#articles .empty")!.textContent, "没有匹配的文章");
+  assert.equal(doc.querySelector("#articles .empty")!.textContent, "No matching articles");
   toggle.click();
   filter("");
   assert.deepEqual(titles(), ["essay", "draft", "notes"]);

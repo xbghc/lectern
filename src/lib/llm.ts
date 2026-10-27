@@ -101,7 +101,7 @@ const REFUSAL_MESSAGE = /sensitive|\(102[67]\)|content_policy_violation|content_
 const REFUSAL_CODES = new Set([1026, 1027]);
 
 const refused = (detail: string, status?: number): LlmError =>
-  new LlmError(`模型服务商的内容审核拒绝了这段内容（${detail}）`, "refused", status);
+  new LlmError(`The model provider's content filter rejected this text (${detail})`, "refused", status);
 
 /** 错误体里那句话：JSON 的 `error.message`，不是 JSON（网关的 HTML 页）就截原文。 */
 function errorDetail(body: string): string {
@@ -118,12 +118,12 @@ function httpError(status: number, body: string): LlmError {
   const detail = errorDetail(body);
   if (REFUSAL_MESSAGE.test(detail)) return refused(detail, status);
   // 错误体通常是 JSON，但 401/网关错误可能是 HTML，截断后原样带出更好排查
-  return new LlmError(`HTTP ${status}：${body.slice(0, 300)}`, "http", status);
+  return new LlmError(`HTTP ${status}: ${body.slice(0, 300)}`, "http", status);
 }
 
 /** MiniMax 在 HTTP 200 里用 base_resp 报的业务错误（余额不足、鉴权失败、内容审核）。 */
 function baseRespError(code: number, message: string | undefined): LlmError {
-  const detail = `MiniMax 错误 ${code}：${message ?? ""}`;
+  const detail = `MiniMax error ${code}: ${message ?? ""}`;
   return REFUSAL_CODES.has(code) ? refused(detail) : new LlmError(detail, "http");
 }
 
@@ -203,7 +203,7 @@ async function postMessages(
 }
 
 /** 没同意过时各处看到的那句话。设置页顶部那段说明就是它指的地方。 */
-export const CONSENT_NEEDED = "还没有同意把内容发给模型服务：打开设置页，在顶部确认后才会开始";
+export const CONSENT_NEEDED = "Consent is required before sending content to your model provider. Open Settings and confirm at the top of the page.";
 
 /**
  * 发请求前的三道门：选没选模型服务，有没有密钥，有没有同意过把内容发给模型服务。
@@ -211,13 +211,13 @@ export const CONSENT_NEEDED = "还没有同意把内容发给模型服务：打�
  * 放在这里而不是各个调用方：所有请求都从下面两个函数出去，漏不掉。
  */
 function assertReady(config: LlmConfig): void {
-  if (!config.baseUrl || !config.model) throw new LlmError("还没有选模型服务：打开设置页，选一家并填上模型和 API Key", "config");
+  if (!config.baseUrl || !config.model) throw new LlmError("No model provider configured. Open Settings and choose a provider, model and API key.", "config");
   try {
     parseLlmBaseUrl(config.baseUrl);
   } catch (err) {
-    throw new LlmError(err instanceof Error ? err.message : "Base URL 不是有效的地址。", "config");
+    throw new LlmError(err instanceof Error ? err.message : "Enter a valid base URL.", "config");
   }
-  if (!config.apiKey) throw new LlmError("尚未填写 API Key：打开设置页填写", "config");
+  if (!config.apiKey) throw new LlmError("No API key configured. Enter one in Settings.", "config");
   if (!config.consentAt) throw new LlmError(CONSENT_NEEDED, "config");
 }
 
@@ -246,8 +246,8 @@ export async function callMessages(
     try {
       res = await postMessages(config, requestBody(config, system, userText, false), ctrl.signal, deps, count);
     } catch (err) {
-      if (ctrl.signal.aborted) throw new LlmError(`请求超时（${config.timeoutMs}ms）`, "timeout");
-      throw new LlmError(`网络错误：${String(err)}`, "network");
+      if (ctrl.signal.aborted) throw new LlmError(`Request timed out (${config.timeoutMs}ms)`, "timeout");
+      throw new LlmError(`Network error: ${String(err)}`, "network");
     } finally {
       clearTimeout(timer);
     }
@@ -255,7 +255,7 @@ export async function callMessages(
     if (!res.ok) throw httpError(res.status, await res.text().catch(() => ""));
 
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
-    if (!data || typeof data !== "object") throw new LlmError("响应不是合法 JSON", "parse");
+    if (!data || typeof data !== "object") throw new LlmError("The response is not valid JSON", "parse");
 
     const reply = readReply(config.protocol, data);
     if (reply.baseResp) throw baseRespError(reply.baseResp.code, reply.baseResp.message);
@@ -277,7 +277,7 @@ export async function callMessages(
 
 /** 响应体或流里带着的错误：审核拒答按字眼认出来，其余算服务端报错。 */
 const wireError = (message: string): LlmError =>
-  REFUSAL_MESSAGE.test(message) ? refused(message) : new LlmError(`模型返回错误：${message}`, "http");
+  REFUSAL_MESSAGE.test(message) ? refused(message) : new LlmError(`The model returned an error: ${message}`, "http");
 
 /* ==================== 流式 ==================== */
 
@@ -349,7 +349,7 @@ export async function callMessagesStream(
   deps: LlmDeps = { fetch: globalThis.fetch.bind(globalThis) },
 ): Promise<CallResult> {
   assertReady(config);
-  if (opts.signal?.aborted) throw new LlmError("已取消", "abort");
+  if (opts.signal?.aborted) throw new LlmError("Canceled", "abort");
 
   const now = deps.now ?? (() => performance.now());
   const t0 = now();
@@ -382,9 +382,9 @@ export async function callMessagesStream(
   /** 把底层异常翻译成带 kind 的 LlmError；超时和主动取消要能区分开。 */
   const wrap = (err: unknown): LlmError => {
     if (err instanceof LlmError) return err;
-    if (timedOut) return new LlmError(`请求超时（${config.timeoutMs}ms）`, "timeout");
-    if (ctrl.signal.aborted) return new LlmError("已取消", "abort");
-    return new LlmError(`网络错误：${String(err)}`, "network");
+    if (timedOut) return new LlmError(`Request timed out (${config.timeoutMs}ms)`, "timeout");
+    if (ctrl.signal.aborted) return new LlmError("Canceled", "abort");
+    return new LlmError(`Network error: ${String(err)}`, "network");
   };
 
   try {
@@ -396,7 +396,7 @@ export async function callMessagesStream(
     }
 
     if (!res.ok) throw httpError(res.status, await res.text().catch(() => ""));
-    if (!res.body) throw new LlmError("响应没有可读流", "parse");
+    if (!res.body) throw new LlmError("The response has no readable stream", "parse");
 
     let inputTokens = 0;
     let outputTokens = 0;
@@ -431,8 +431,8 @@ export async function callMessagesStream(
       stream.messageStop = true;
       stopReason ||= "stop";
     }
-    if (!stopReason) throw new LlmError("流式响应提前结束，未收到 stop_reason，请重试", "stream_interrupted");
-    if (!text) throw new LlmError("流式响应里没有任何文本", "parse");
+    if (!stopReason) throw new LlmError("The response stream ended without a stop reason. Try again.", "stream_interrupted");
+    if (!text) throw new LlmError("The response stream contained no text", "parse");
     return { text, stream, usage: { inputTokens, outputTokens }, stopReason, truncated: isTruncated(config.protocol, stopReason), timing: timing() };
   } catch (err) {
     // `wrap` 造的是新的 LlmError，而上面 !res.ok / !res.body / !text 那几处压根不过 wrap，
@@ -668,7 +668,7 @@ export function extractJson(text: string): unknown {
     /* 落到下面的花括号扫描 */
   }
   const start = trimmed.indexOf("{");
-  if (start === -1) throw new LlmError(`模型输出里找不到 JSON：${text.slice(0, 200)}`, "parse");
+  if (start === -1) throw new LlmError(`No JSON found in the model response: ${text.slice(0, 200)}`, "parse");
 
   const end = closeIndex(trimmed, start);
   let syntax: unknown;
@@ -686,10 +686,10 @@ export function extractJson(text: string): unknown {
   const head = trimmed.slice(0, 160);
   // 未转义或缺失的引号也会让扫描停在字符串里，不能据此建议增加 token。
   if (end === -1) {
-    throw new LlmError(`JSON 格式错误：结构未闭合或引号不匹配｜${head}`, "parse");
+    throw new LlmError(`Invalid JSON: incomplete structure or mismatched quotes | ${head}`, "parse");
   }
   // 带上出错处附近的原文：没有它，线上只剩一句"JSON 解析失败"，无从查起
-  throw new LlmError(`JSON 解析失败：${String(syntax)}｜${head}`, "parse");
+  throw new LlmError(`Could not parse JSON: ${String(syntax)} | ${head}`, "parse");
 }
 
 const str = (v: unknown): string | null => {
@@ -766,7 +766,7 @@ export function normalizeVocab(raw: unknown, selection: string): VocabNote[] {
 export function normalizeTranslation(raw: unknown, kind: SnippetKind, selection: string): TranslationResult {
   const o = (raw ?? {}) as Record<string, unknown>;
   const translation = str(o["translation"]);
-  if (!translation) throw new LlmError("模型没有返回 translation 字段", "parse");
+  if (!translation) throw new LlmError("The model did not return a translation field", "parse");
   return {
     translation,
     contextNote: str(o["context_note"]) ?? "",
@@ -789,7 +789,7 @@ function finishTranslation(res: CallResult, req: TranslateRequest, config: LlmCo
   try {
     if (res.truncated) {
       // 截断的 JSON 必然解析失败，直接给出可操作的提示而不是让它撞到 parse 错误
-      throw new LlmError(`输出被 max_tokens(${config.maxTokens}) 截断，请在设置里调大`, "token_limit");
+      throw new LlmError(`Output was truncated by max_tokens(${config.maxTokens}). Increase the limit in Settings.`, "token_limit");
     }
     return normalizeTranslation(extractJson(res.text), req.kind, req.text);
   } catch (err) {

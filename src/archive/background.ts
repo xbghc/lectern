@@ -18,19 +18,19 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
 
 async function resourceBlob(resource: ArchiveCapture["resources"][number]): Promise<Blob> {
   if (resource.base64) {
-    if (resource.base64.length > MAX_RESOURCE_BYTES * 1.4) throw new Error("图片超过大小限制");
+    if (resource.base64.length > MAX_RESOURCE_BYTES * 1.4) throw new Error("Image exceeds the size limit");
     const mime = imageMime(resource.mime ?? "");
-    if (!mime) throw new Error("不支持的图片格式");
+    if (!mime) throw new Error("Unsupported image format");
     const raw = atob(resource.base64);
     return new Blob([Uint8Array.from(raw, ch => ch.charCodeAt(0))], { type: mime });
   }
   const url = new URL(resource.url);
-  if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("不支持的图片地址");
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("Unsupported image URL");
   const response = await fetch(url.href, { credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(12_000) });
-  if (!response.ok) throw new Error(`图片返回 HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Image request returned HTTP ${response.status}`);
   const mime = imageMime(response.headers.get("content-type") ?? "");
-  if (!mime) throw new Error("不支持的图片格式");
-  if (Number(response.headers.get("content-length")) > MAX_RESOURCE_BYTES) throw new Error("图片超过大小限制");
+  if (!mime) throw new Error("Unsupported image format");
+  if (Number(response.headers.get("content-length")) > MAX_RESOURCE_BYTES) throw new Error("Image exceeds the size limit");
   const bytes = await readArchiveBytes(response);
   return new Blob([new Uint8Array(bytes)], { type: mime });
 }
@@ -50,7 +50,7 @@ export function saveArchive(payload: ArchiveCapture): Promise<{ ok: true; manife
         if (!resource || typeof resource.url !== "string") continue;
         try {
           const blob = await resourceBlob(resource);
-          if (blob.size > MAX_RESOURCE_BYTES || totalBytes + blob.size > MAX_ARCHIVE_BYTES) throw new Error("文章资源超过大小限制");
+          if (blob.size > MAX_RESOURCE_BYTES || totalBytes + blob.size > MAX_ARCHIVE_BYTES) throw new Error("Article resources exceed the size limit");
           totalBytes += blob.size;
           const hash = await hashBytes(new Uint8Array(await blob.arrayBuffer()));
           await cacheBlob(hash, blob);
@@ -66,10 +66,10 @@ export function saveArchive(payload: ArchiveCapture): Promise<{ ok: true; manife
     const manifest: ArchiveManifest = {
       articleId: payload.articleId, version: crypto.randomUUID(), url: payload.url,
       title: String(payload.title || payload.url).slice(0, 2000), htmlHash,
-      resources: [...resources.values()], missingResources: [...missing].slice(0, 1000).map(url => url.startsWith("data:") ? "内嵌图片未保存" : url.slice(0, 8192)), createdTs: Date.now(),
+      resources: [...resources.values()], missingResources: [...missing].slice(0, 1000).map(url => url.startsWith("data:") ? "Embedded image was not saved" : url.slice(0, 8192)), createdTs: Date.now(),
     };
     await withDataLock(() => syncDriver().update(state => {
-      if (state.deviceId !== deviceId) throw new Error("本机数据已清除，请重新保存文章");
+      if (state.deviceId !== deviceId) throw new Error("Local data was cleared. Save the article again.");
       const before = structuredClone(state.data);
       state.data[ARCHIVES_KEY] = { ...state.data[ARCHIVES_KEY], [manifest.articleId]: manifest };
       state.data[ARCHIVE_PENDING_KEY] = { ...state.data[ARCHIVE_PENDING_KEY], [manifest.articleId]: manifest };
@@ -93,16 +93,16 @@ export function flushArchives(): Promise<void> {
         try {
           const exists = await syncRequest(`/v1/blobs/${hash}`, { method: "HEAD" });
           if (exists.ok) continue;
-          if (exists.status !== 404) throw new Error(`资源检查失败：HTTP ${exists.status}`);
+          if (exists.status !== 404) throw new Error(`Resource check failed: HTTP ${exists.status}`);
         } catch (err) {
           if ((err as { status?: number }).status !== 404) throw err;
         }
         const blob = await cachedBlob(hash);
-        if (!blob) throw new Error("本地文章资源缺失，请重新保存文章");
+        if (!blob) throw new Error("Some local article resources are missing. Save the article again.");
         const response = await syncRequest(`/v1/blobs/${hash}`, {
           method: "PUT", headers: { "Content-Type": blob.type || "application/octet-stream" }, body: blob,
         });
-        if (!response.ok) throw new Error(`文章资源上传失败：HTTP ${response.status}`);
+        if (!response.ok) throw new Error(`Article resource upload failed: HTTP ${response.status}`);
       }
       const state = await syncDriver().read();
       const record = (state.data.archivePendingRecords?.[manifest.articleId] ?? state.records[recordKey({ type: "archive", id: manifest.articleId })]) as SyncRecord | undefined;
@@ -112,7 +112,7 @@ export function flushArchives(): Promise<void> {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...manifest, stamp: record.stamp, generation: record.generation, opId: `archive:${manifest.version}` }),
       });
-      if (!response.ok) throw new Error(`文章发布失败：HTTP ${response.status}`);
+      if (!response.ok) throw new Error(`Article publication failed: HTTP ${response.status}`);
       await serial(async () => {
         await withDataLock(() => syncDriver().update(state => {
           if (state.data[ARCHIVE_PENDING_KEY]?.[manifest.articleId]?.version === manifest.version) {

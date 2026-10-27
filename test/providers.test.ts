@@ -15,7 +15,7 @@ test("快照：两家协议的本家都在，地址和协议是对的", () => {
 });
 
 test("快照：每一家都拼得出一个合法的请求地址，id 不重复，也没有谁占了「自定义」这个名字", () => {
-  assert.ok(PROVIDERS.length > 100, `只有 ${PROVIDERS.length} 家，像是没取全`);
+  assert.ok(PROVIDERS.length > 100, `Only ${PROVIDERS.length} 家，像是没取全`);
   assert.equal(new Set(PROVIDERS.map((p) => p.id)).size, PROVIDERS.length);
   for (const p of PROVIDERS) {
     assert.ok(p.name && (p.protocol === "openai" || p.protocol === "anthropic"), p.id);

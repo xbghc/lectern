@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 要上传的版本标签，例如 v0.3.18
+        description: Release tag to upload, for example v0.3.19
         required: true
         type: string
 
@@ -30,14 +30,14 @@ permissions:
 
 jobs:
   upload:
-    name: 上传并提交审核
+    name: Upload and submit for review
     runs-on: ubuntu-latest
     env:
       TAG: ${{ inputs.tag }}
       CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
       CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
     steps:
-      - name: 没配凭据就跳过
+      - name: Skip when credentials are missing
         id: creds
         run: |
           if [ -n "$CWS_SERVICE_ACCOUNT_JSON" ] && [ -n "$CWS_PUBLISHER_ID" ]; then
@@ -55,12 +55,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: 取这次发布的扩展包
+      - name: Download release extension package
         if: steps.creds.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download "$TAG" --pattern "lectern-extension-$TAG.zip"
 
-      - name: 上传到商店并提交审核
+      - name: Upload to store and submit for review
         if: steps.creds.outputs.ok == 'true'
         run: node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/store-upload.ts "lectern-extension-$TAG.zip"

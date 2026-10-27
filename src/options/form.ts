@@ -123,7 +123,7 @@ function renderStatus(): void {
   saveBar.classList.toggle("is-dirty", changed > 0);
   revertBtn.hidden = changed === 0;
   status.classList.toggle("error", flashing?.error ?? false);
-  status.textContent = flashing ? flashing.msg : changed > 0 ? `${changed} 项修改尚未保存` : "";
+  status.textContent = flashing ? flashing.msg : changed > 0 ? `${changed} unsaved changes` : "";
 }
 
 function flash(msg: string, error = false): void {
@@ -170,7 +170,7 @@ window.addEventListener("beforeunload", (e) => {
 $("save").addEventListener("click", async () => {
   const next = collect();
   if (next.stallTimeoutMs <= next.idleTimeoutMs) {
-    const msg = "stallTimeout 需要大于 idleTimeout，否则永远轮不到发呆判定";
+    const msg = "The stall timeout must be longer than the idle timeout.";
     // 保存条可能离这两个框一千多像素：把错报在框上，浏览器会自己滚过去
     markThresholds(msg);
     fields.stall.reportValidity();
@@ -179,7 +179,7 @@ $("save").addEventListener("click", async () => {
   }
   await chrome.runtime.sendMessage({ type: "settings:set", settings: next });
   load(next);
-  flash("已保存，对已打开的页面立即生效");
+  flash("Saved. Changes apply to open pages immediately.");
 });
 
 /*
@@ -188,7 +188,7 @@ $("save").addEventListener("click", async () => {
  */
 const lines = (text: string): string[] => text.split("\n").map((line) => line.trim()).filter(Boolean);
 $("rule-chat").append(ruleChatBox({
-  placeholder: "比如：知乎和微博以后别记了；GitHub 上自动开翻译",
+  placeholder: "For example: stop tracking Reddit and X; enable translation on GitHub",
   onApplied: async (applied) => {
     const stored = (await chrome.runtime.sendMessage({ type: "settings:get" })) as Settings;
     const boxes = [["articleExcludedUrls", fields.excluded], ["translationAllowedUrls", fields.translationAllowed]] as const;
@@ -206,7 +206,7 @@ revertBtn.addEventListener("click", () => {
   if (!baseline) return;
   markThresholds("");
   load(baseline);
-  flash("已撤销，回到上次保存的值");
+  flash("Restored the last saved settings");
 });
 
 $("reset").addEventListener("click", () => {
@@ -218,7 +218,7 @@ $("reset").addEventListener("click", () => {
     translationAllowedUrls: kept.translationAllowedUrls,
   });
   markThresholds("");
-  flash(changedCount() > 0 ? "已填回默认值（名单不动），点保存才生效" : "已经是默认值了");
+  flash(changedCount() > 0 ? "Defaults restored; lists were kept. Save to apply." : "Already using the defaults");
 });
 
 $("export").addEventListener("click", async () => {
@@ -230,7 +230,7 @@ $("export").addEventListener("click", async () => {
     JSON.stringify(bundle, null, 2),
     $<HTMLAnchorElement>("download"),
   );
-  dataStatus.textContent = `已导出 ${bundle.sessions.length} 个 session / ${bundle.articles.length} 篇文章${note ? "，" + note : ""}`;
+  dataStatus.textContent = `Exported ${bundle.sessions.length} sessions / ${bundle.articles.length} articles${note ? ", " + note : ""}`;
 });
 
 $("import").addEventListener("click", () => $<HTMLInputElement>("import-file").click());
@@ -238,22 +238,22 @@ $<HTMLInputElement>("import-file").addEventListener("change", async (e) => {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
-  dataStatus.textContent = "正在合并…";
+  dataStatus.textContent = "Merging…";
   try {
     const raw: unknown = JSON.parse(await file.text());
     const res = (await chrome.runtime.sendMessage({ type: "data:import", bundle: raw })) as ImportOutcome;
-    dataStatus.textContent = res.ok ? res.message : `导入失败：${res.error}`;
+    dataStatus.textContent = res.ok ? res.message : `Import failed: ${res.error}`;
   } catch (err) {
-    dataStatus.textContent = `读取失败：${err instanceof Error ? err.message : String(err)}`;
+    dataStatus.textContent = `Could not load: ${err instanceof Error ? err.message : String(err)}`;
   }
   // 清掉选择，同一个文件才能再选一次
   input.value = "";
 });
 
 $("clear").addEventListener("click", async () => {
-  if (!confirm("清除此设备的阅读记录和离线文章，并断开同步？服务器和其他设备的数据不受影响，设置与模型密钥保留。清理前请导出需要保留的数据。")) return;
+  if (!confirm("Clear reading records and offline articles on this device and disconnect sync? Server data and other devices will not be affected. Settings and model credentials will be kept. Export any data you want to keep first.")) return;
   await chrome.runtime.sendMessage({ type: "data:clear" });
-  dataStatus.textContent = "已清空";
+  dataStatus.textContent = "Cleared";
 });
 
 void chrome.runtime.sendMessage({ type: "settings:get" }).then((s: Settings) => load(s ?? DEFAULT_SETTINGS));
@@ -285,18 +285,18 @@ function fillConsent(at: number | null): void {
   consented = at !== null;
   $("consent").hidden = consented;
   $("consent-state").hidden = !consented;
-  if (at !== null) $("consent-date").textContent = new Date(at).toLocaleDateString("zh-CN");
+  if (at !== null) $("consent-date").textContent = new Date(at).toLocaleDateString("en-US");
 }
 async function setConsent(at: number | null): Promise<void> {
-  const action = at === null ? "撤回同意" : "同意";
+  const action = at === null ? "withdraw consent" : "save consent";
   try {
     const result = await chrome.runtime.sendMessage({ type: "llm:set", config: { consentAt: at } }) as { ok?: boolean; error?: string };
     if (!result?.ok) {
-      llmStatus.textContent = `${action}失败：${result?.error ?? "未知错误"}`;
+      llmStatus.textContent = `Could not ${action}: ${result?.error ?? "Unknown error"}`;
       return;
     }
   } catch (err) {
-    llmStatus.textContent = `${action}失败：${err instanceof Error ? err.message : "未知错误"}`;
+    llmStatus.textContent = `Could not ${action}: ${err instanceof Error ? err.message : "Unknown error"}`;
     return;
   }
   // 只在持久化成功后更新同意状态；不重载其它未保存的表单内容。
@@ -310,7 +310,7 @@ function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
   fillConsent(cfg.consentAt ?? null);
   // 密钥不回显：后台只回传"设没设过"。留空提交表示保持不变。
   llmFields.apiKey.value = "";
-  llmFields.apiKey.placeholder = cfg.apiKeySet ? "已设置，留空则保持不变" : "尚未设置";
+  llmFields.apiKey.placeholder = cfg.apiKeySet ? "Configured; leave blank to keep it" : "Not configured";
   picker.show(cfg);
   saved = { baseUrl: cfg.baseUrl, apiKeySet: !!cfg.apiKeySet };
   llmFields.maxTokens.value = String(cfg.maxTokens);
@@ -328,17 +328,17 @@ $("save-llm").addEventListener("click", async () => {
   const model = llmFields.model.value.trim();
   const key = llmFields.apiKey.value.trim();
   // 这几样缺了哪样请求都发不出去，存下来只会换成一条更晚、更绕的报错
-  if (!picker.provider()) return void (llmStatus.textContent = "先在上面选一家服务商（清单里没有就选「自定义地址」）。");
+  if (!picker.provider()) return void (llmStatus.textContent = "Choose a provider above, or select Custom endpoint.");
   try {
     baseUrl = normalizeLlmBaseUrl(llmFields.baseUrl.value);
   } catch (err) {
-    llmStatus.textContent = err instanceof Error ? err.message : "Base URL 不是有效的地址。";
+    llmStatus.textContent = err instanceof Error ? err.message : "Enter a valid base URL.";
     return;
   }
-  if (!model) return void (llmStatus.textContent = "填上模型名：从候选里挑，或照服务商文档手填。");
+  if (!model) return void (llmStatus.textContent = "Choose a model or enter its name from your provider's documentation.");
   // 后台也会清掉旧密钥（见 setLlmConfig），这里先拦下说明白，免得人以为是保存坏了
   if (saved.apiKeySet && !key && !sameLlmOrigin(baseUrl, saved.baseUrl)) {
-    return void (llmStatus.textContent = "换了服务地址：请填上这一家的 API Key。原来那把是上一家的，不会发到新地址去。");
+    return void (llmStatus.textContent = "The endpoint changed. Enter an API key for this provider; the previous key will not be sent to the new endpoint.");
   }
   const patch: Partial<LlmConfig> = {
     provider: picker.provider(),
@@ -354,26 +354,26 @@ $("save-llm").addEventListener("click", async () => {
   try {
     result = await chrome.runtime.sendMessage({ type: "llm:set", config: patch }) as typeof result;
   } catch (err) {
-    llmStatus.textContent = `保存失败：${err instanceof Error ? err.message : "未知错误"}`;
+    llmStatus.textContent = `Could not save: ${err instanceof Error ? err.message : "Unknown error"}`;
     return;
   }
   if (!result?.ok) {
-    llmStatus.textContent = `保存失败：${result?.error ?? "未知错误"}`;
+    llmStatus.textContent = `Could not save: ${result?.error ?? "Unknown error"}`;
     return;
   }
   // 测试连接也是一次请求：没同意过就不发，说清楚卡在哪儿
   if (!consented) {
-    llmStatus.textContent = "已保存。在页面顶部点「同意并开始」之后才会发请求。";
+    llmStatus.textContent = "Saved. Select Agree and start at the top of this page to enable model requests.";
     await loadLlm();
     return;
   }
-  llmStatus.textContent = "已保存，正在测试…";
+  llmStatus.textContent = "Saved. Testing connection…";
   const res = (await chrome.runtime.sendMessage({ type: "llm:test" })) as {
     ok: boolean;
     error?: string;
     model?: string;
   };
-  llmStatus.textContent = res.ok ? `连接正常（${res.model}）` : `连接失败：${res.error ?? "未知错误"}`;
+  llmStatus.textContent = res.ok ? `Connected (${res.model})` : `Connection failed: ${res.error ?? "Unknown error"}`;
   await loadLlm();
 });
 
@@ -382,8 +382,8 @@ async function loadLlm(): Promise<void> {
   fillLlm(cfg ?? { ...DEFAULT_LLM, apiKeySet: false });
   const u = (await chrome.runtime.sendMessage({ type: "llm:usage" })) as LlmUsage;
   $("usage").textContent = u.requests
-    ? `累计 ${u.requests} 次请求（失败 ${u.errors} 次），输入 ${u.inputTokens} tokens，输出 ${u.outputTokens} tokens。`
-    : "还没有调用过。";
+    ? `Total: ${u.requests} requests (failed: ${u.errors}), input: ${u.inputTokens} tokens, output: ${u.outputTokens} tokens.`
+    : "No model requests yet.";
 }
 
 void loadLlm();
@@ -397,7 +397,7 @@ const logApp = $("log-app");
 
 /** 提示里报的条数。六份都要数：只报失败的话，用户不知道翻译轨迹（带选中的文本）和抓取记录也一起带出去了。 */
 const counts = (b: LlmLogBundle): string =>
-  `${b.failures.length} 条失败 + ${b.timings.length} 条耗时 + ${b.translations.length} 条翻译轨迹 + ${b.fetches.length} 条抓取 + ${b.errors.length} 条错误 + ${Object.keys(b.usage.days).length} 天的按钮计数`;
+  `${b.failures.length} failures + ${b.timings.length} timings + ${b.translations.length} translation traces + ${b.fetches.length} fetches + ${b.errors.length} errors + ${Object.keys(b.usage.days).length} days of interaction counts`;
 /** App 的设置页也要用它（分享日志），所以导出。 */
 export async function fetchLog(): Promise<LlmLogBundle> {
   return (await chrome.runtime.sendMessage({ type: "llm:log" })) as LlmLogBundle;
@@ -407,8 +407,8 @@ async function loadLog(): Promise<void> {
   const bundle = await fetchLog();
   const last = bundle.failures.at(-1);
   logSummary.textContent = last
-    ? `${bundle.failures.length} 条失败记录，最近一次 ${new Date(last.ts).toLocaleString()}，${SOURCE_LABEL[last.source]}：${last.message.slice(0, 120)}`
-    : "还没有失败记录。";
+    ? `${bundle.failures.length} failures; latest: ${new Date(last.ts).toLocaleString("en-US")}, ${SOURCE_LABEL[last.source]}: ${last.message.slice(0, 120)}`
+    : "No failures recorded.";
   logTiming.textContent = timingLine(bundle.timings);
   logApp.textContent = appLogLine(bundle.fetches, bundle.errors);
   renderUsage(bundle);
@@ -422,8 +422,8 @@ function renderUsage(bundle: LlmLogBundle): void {
   const usage = summarizeUiUsage(bundle.usage, Date.now());
   const unused = usage.rows.filter((row) => row.total === 0).length;
   $("usage-summary").textContent = usage.since
-    ? `首页按钮使用统计：自 ${usage.since} 起，${usage.activeDays} 天有记录，${usage.rows.length} 项里 ${unused} 项一次没用过`
-    : "首页按钮使用统计：还没有记录，打开首页点几下就有了";
+    ? `Dashboard interactions: since ${usage.since}, ${usage.activeDays} active days; ${usage.rows.length} actions, ${unused} never used`
+    : "No dashboard interactions recorded yet.";
   const body = $("usage-rows");
   body.textContent = "";
   for (const row of usage.rows) {
@@ -443,9 +443,9 @@ $("log-copy").addEventListener("click", async () => {
   // 点击是用户手势，剪贴板写入不需要额外权限
   try {
     await navigator.clipboard.writeText(JSON.stringify(bundle, null, 2));
-    logStatus.textContent = `已复制 ${counts(bundle)} 到剪贴板`;
+    logStatus.textContent = `Copied ${counts(bundle)} to the clipboard`;
   } catch {
-    logStatus.textContent = "复制失败，改用下载吧";
+    logStatus.textContent = "Could not copy. Try downloading instead.";
   }
 });
 
@@ -458,12 +458,12 @@ $("log-download").addEventListener("click", async () => {
     JSON.stringify(bundle, null, 2),
     $<HTMLAnchorElement>("log-file"),
   );
-  logStatus.textContent = `已下载 ${counts(bundle)}${note ? "，" + note : ""}`;
+  logStatus.textContent = `Downloaded ${counts(bundle)}${note ? ", " + note : ""}`;
 });
 
 $("log-clear").addEventListener("click", async () => {
   await chrome.runtime.sendMessage({ type: "llm:log-clear" });
-  logStatus.textContent = "已清空";
+  logStatus.textContent = "Cleared";
   await loadLog();
 });
 

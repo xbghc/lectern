@@ -112,8 +112,8 @@ export class PositionCard {
     const card = document.createElement("div");
     card.className = "card";
     // 三个插值都是自己算出来的数字和固定文案，没有来自网页的内容
-    card.innerHTML = `<div class="label"><span class="title">已回到上次读到的位置</span><span class="sub">第 ${at} 段 / 共 ${total} 段${remaining ? " · " + remaining : ""}</span></div>
-       <button data-act="top">回到顶部</button>`;
+    card.innerHTML = `<div class="label"><span class="title">Returned to your reading position</span><span class="sub">Paragraph ${at} of ${total}${remaining ? " · " + remaining : ""}</span></div>
+       <button data-act="top">Back to top</button>`;
     card.querySelector('[data-act="top"]')!.addEventListener("click", () => {
       this.hide();
       this.actions.onTop();

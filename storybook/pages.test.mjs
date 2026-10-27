@@ -5,34 +5,34 @@ import { compilePages } from '../.storybook/pages-plugin.mjs';
 
 const pages = await compilePages();
 const scenarios = [
-  ['popup', 'populated', 'current', '正在计时'],
-  ['popup', 'empty', 'current', '还没有'],
-  ['popup', 'error', 'current', '文章判断失败'],
-  ['popup', 'populated', 'translation', '划词翻译'],
-  ['dashboard', 'populated', 'articles', '共 3 篇'],
-  ['dashboard', 'empty', 'articles', '还没有阅读记录'],
+  ['popup', 'populated', 'current', "Tracking focus"],
+  ['popup', 'empty', 'current', "No focus sessions yet"],
+  ['popup', 'error', 'current', "Article detection failed"],
+  ['popup', 'populated', 'translation', "Text translation"],
+  ['dashboard', 'populated', 'articles', "Articles: 3"],
+  ['dashboard', 'empty', 'articles', "No reading history yet"],
   ['dashboard', 'populated', 'words', 'consolidate'],
-  ['dashboard', 'populated', 'stats', '今日最长连续'],
-  ['app', 'populated', 'books', '深度阅读的技艺'],
-  ['dashboard', 'populated', 'review', '显示答案'],
+  ['dashboard', 'populated', 'stats', "Longest session today"],
+  ['app', 'populated', 'books', "The Art of Deep Reading"],
+  ['dashboard', 'populated', 'review', "Show answer"],
   ['dashboard', 'populated', 'articleReview', 'Understanding the browser event loop'],
-  ['dashboard', 'populated', 'classification', 'LLM：非文章'],
-  ['dashboard', 'error', 'classification', '判别失败'],
-  ['app', 'populated', 'classification', 'LLM：非文章'],
-  ['options', 'populated', 'articles', '文章记录黑名单'],
-  ['options', 'error', 'articles', '1 篇阅读材料（连同名下共 2 项记录）没通过校验，留在本机没有上传'],
-  ['appOptions', 'error', 'articles', '1 篇阅读材料（连同名下共 2 项记录）没通过校验，留在本机没有上传'],
+  ['dashboard', 'populated', 'classification', "AI: not an article"],
+  ['dashboard', 'error', 'classification', "AI: classification failed"],
+  ['app', 'populated', 'classification', "AI: not an article"],
+  ['options', 'populated', 'articles', "Reading blocklist"],
+  ['options', 'error', 'articles', "1 reading item (including 2 records) failed validation and remain on this device"],
+  ['appOptions', 'error', 'articles', "1 reading item (including 2 records) failed validation and remain on this device"],
   ['sidepanel', 'populated', 'articles', 'consolidate'],
-  ['app', 'populated', 'articles', '共 3 篇'],
-  ['app', 'populated', 'articles', '深度阅读的技艺'],
-  ['appOptions', 'populated', 'articles', '设置'],
-  ['app', 'populated', 'stats', '近 30 天'],
-  ['chat', 'populated', 'articles', '把读过的词，用起来'],
-  ['chat', 'empty', 'articles', '还没有可练习的生词'],
+  ['app', 'populated', 'articles', "Articles: 3"],
+  ['app', 'populated', 'articles', "The Art of Deep Reading"],
+  ['appOptions', 'populated', 'articles', "Settings"],
+  ['app', 'populated', 'stats', "Last 30 days"],
+  ['chat', 'populated', 'articles', "Put your reading into words."],
+  ['chat', 'empty', 'articles', "No words to practice yet"],
   ['reader', 'populated', 'articles', 'Attention is a practice'],
-  ['reader', 'populated', 'bookReader', '开篇：为什么越读越快，记住的越少'],
-  ['reader', 'loading', 'articles', 'LLM 正在判断'],
-  ['reader', 'empty', 'articles', '抓不到这一页'],
+  ['reader', 'populated', 'bookReader', "Introduction: Reading Faster, Remembering Less"],
+  ['reader', 'loading', 'articles', "AI is checking"],
+  ['reader', 'empty', 'articles', "Could not fetch this page"],
 ];
 for (const [page, state, tab, expected] of scenarios) test(`${page}: ${state} / ${tab}`, async () => {
   const html = pages[page].replace('<!--PREVIEW_CONFIG-->', `<script>window.__PREVIEW__=${JSON.stringify({ page, state, tab })}</script>`);
@@ -85,12 +85,12 @@ test('sync settings keep secrets out of status, require a new token for a new ad
     const { document, chrome } = dom.window;
     const token = document.getElementById('sync-token');
     assert.equal(token.value, '');
-    assert.ok(document.getElementById('sync-summary').textContent.includes('同步已启用'));
+    assert.ok(document.getElementById('sync-summary').textContent.includes("Sync enabled"));
     const before = await chrome.runtime.sendMessage({ type: 'data:export' });
     document.getElementById('sync-url').value = 'https://other.example.com';
     document.getElementById('sync-test').click();
     await settle();
-    assert.ok(document.getElementById('sync-feedback').textContent.includes('重新填写 Token'));
+    assert.ok(document.getElementById('sync-feedback').textContent.includes("Re-enter your token"));
     assert.equal((await chrome.runtime.sendMessage({ type: 'sync:get' })).baseUrl, 'https://sync.example.com');
     document.getElementById('sync-url').value = 'https://sync.example.com';
     token.value = 'preview-secret-never-rendered';
@@ -148,7 +148,7 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     const links = [...document.querySelectorAll('.section-nav a')];
     assert.equal(links.length, document.querySelectorAll('body > fieldset').length);
     assert.ok(links.every(link => document.getElementById(link.getAttribute('href').slice(1))?.tagName === 'FIELDSET'));
-    assert.deepEqual([...document.querySelectorAll('.section-nav p')].map(p => p.textContent), ['连接', '偏好', '维护']);
+    assert.deepEqual([...document.querySelectorAll('.section-nav p')].map(p => p.textContent), ["Connections", "Preferences", "Maintenance"]);
 
     // 刚读进来的值不算修改；模型那组字段不归「保存」管，改了也不算
     assert.equal(bar.classList.contains('is-dirty'), false);
@@ -159,7 +159,7 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     type('finishRatio', '85');
     type('excluded', 'https://example.com/search\nnews.example.com');
     assert.equal(bar.classList.contains('is-dirty'), true);
-    assert.equal(status.textContent, '2 项修改尚未保存');
+    assert.equal(status.textContent, "2 unsaved changes");
     assert.equal(revert.hidden, false);
 
     // 恢复默认只动开关和阈值，名单原样留着
@@ -218,7 +218,7 @@ test('sync section keeps its explanation behind the title button and its diagnos
     const info = document.querySelector('#sync-settings legend button.info');
     const about = document.getElementById('sync-about');
     // The button's glyph is not part of the section's name.
-    assert.equal(document.querySelector('.section-nav a').textContent, '设备同步');
+    assert.equal(document.querySelector('.section-nav a').textContent, "Device sync");
     assert.equal(about.hidden, true);
     info.click();
     assert.equal(about.hidden, false);
@@ -233,14 +233,14 @@ test('sync section keeps its explanation behind the title button and its diagnos
     assert.equal(info.getAttribute('aria-expanded'), 'false');
 
     assert.equal(document.getElementById('sync-details').open, false);
-    assert.match(document.getElementById('sync-summary').textContent, /^同步已启用 · 上次同步 /);
+    assert.match(document.getElementById('sync-summary').textContent, /^Sync enabled · Last sync: /);
     assert.equal(document.getElementById('sync-dot').dataset.tone, 'ok');
-    assert.deepEqual([...document.querySelectorAll('#sync-facts dt')].map(dt => dt.textContent), ['上次成功', '待上传', '账号', '服务器', '本设备']);
+    assert.deepEqual([...document.querySelectorAll('#sync-facts dt')].map(dt => dt.textContent), ["Last successful sync", "Pending upload", "Account", "Server", "This device"]);
     // The answer to a button press stays beside the buttons, outside the collapsed panel.
     document.getElementById('sync-test').click();
     await settle();
     const feedback = document.getElementById('sync-feedback');
-    assert.ok(feedback.textContent.includes('连接成功'));
+    assert.ok(feedback.textContent.includes("Connection successful"));
     assert.equal(feedback.closest('details'), null);
     assert.deepEqual(Array.from(healthy.dom.window.__previewErrors), []);
   } finally { healthy.close(); }
@@ -249,11 +249,11 @@ test('sync section keeps its explanation behind the title button and its diagnos
   try {
     await settle();
     const { document } = failing.dom.window;
-    assert.equal(document.getElementById('sync-summary').textContent, '同步已启用 · 服务器暂时不可达（模拟）');
+    assert.equal(document.getElementById('sync-summary').textContent, "Sync enabled · Server temporarily unreachable (preview)");
     assert.equal(document.getElementById('sync-dot').dataset.tone, 'error');
-    assert.deepEqual([...document.querySelectorAll('#sync-facts dt')].map(dt => dt.textContent).slice(0, 4), ['错误', '上次成功', '待上传', '无法上传']);
+    assert.deepEqual([...document.querySelectorAll('#sync-facts dt')].map(dt => dt.textContent).slice(0, 4), ["Error", "Last successful sync", "Pending upload", "Could not upload"]);
     assert.equal(document.querySelectorAll('#sync-facts li').length, 1);
-    assert.ok(document.querySelector('#sync-facts li').textContent.startsWith('《旧文章》'));
+    assert.ok(document.querySelector('#sync-facts li').textContent.startsWith("Legacy article"));
   } finally { failing.close(); }
 
   const app = open('appOptions', 'populated');
@@ -262,7 +262,7 @@ test('sync section keeps its explanation behind the title button and its diagnos
     const { document } = app.dom.window;
     assert.equal(document.querySelector('button.info'), null);
     assert.equal(document.getElementById('sync-about').hidden, false);
-    assert.equal(document.getElementById('sync-settings').closest('details').querySelector('summary strong').textContent, '设备同步');
+    assert.equal(document.getElementById('sync-settings').closest('details').querySelector('summary strong').textContent, "Device sync");
   } finally { app.close(); }
 });
 
@@ -292,17 +292,17 @@ test('an article card unfolds into its own focus sessions, looked-up words and s
       for (const index of [0, 1, 2]) { toggle(index).click(); await settle(); }
       const details = [...document.querySelectorAll('.material-detail')];
       assert.equal(details.length, 3, page);
-      assert.deepEqual([...details[0].querySelectorAll('h4')].map(h => h.textContent.split(' · ')[0]), ['专注时段', '划词', '同步']);
+      assert.deepEqual([...details[0].querySelectorAll('h4')].map(h => h.textContent.split(' · ')[0]), ["Focus sessions", "Translations", "Sync"]);
       assert.ok(details[0].textContent.includes('consolidate'));
-      assert.ok(details[0].querySelector('.sync-line').textContent.startsWith('已同步到服务器'));
-      assert.ok(details[1].textContent.includes('这篇里还没有划过词'));
-      assert.ok(details[1].querySelector('.sync-line').textContent.includes('1 个专注时段、12 个段落'));
+      assert.ok(details[0].querySelector('.sync-line').textContent.startsWith("Synced to the server"));
+      assert.ok(details[1].textContent.includes("No saved translations for this article yet"));
+      assert.ok(details[1].querySelector('.sync-line').textContent.includes("Focus sessions: 1, Paragraphs: 12"));
       assert.ok(details[2].querySelector('.sync-reason').textContent.includes('trackedWords'));
       // Survives the list being redrawn, and folds back.
       const search = document.getElementById('q-article');
       search.value = ''; search.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       assert.equal(document.querySelectorAll('.material-detail').length, 3, page);
-      assert.equal(toggle(0).textContent, '收起');
+      assert.equal(toggle(0).textContent, "Collapse");
       toggle(0).click();
       assert.equal(document.querySelectorAll('.material-detail').length, 2, page);
       assert.deepEqual(Array.from(dom.window.__previewErrors), []);
@@ -335,17 +335,17 @@ test('popup focus and translation controls stay independent, and tab changes pre
     await settle();
     assert.equal(document.querySelector('[role=switch]').getAttribute('aria-checked'), 'false');
     const draft = document.querySelector('.rc-input');
-    draft.value = '这个站点以后不记录';
+    draft.value = "Stop tracking this site";
     document.getElementById('tab-focus').click();
     await settle();
     assert.ok(document.querySelector('.focus-current').classList.contains('is-active'));
     document.querySelector('.focus-control').click();
     await settle();
-    assert.ok(document.querySelector('.current-state').textContent.includes('本页已暂停'));
+    assert.ok(document.querySelector('.current-state').textContent.includes("Paused on this page"));
     document.getElementById('tab-translation').click();
     await settle();
     assert.equal(document.querySelector('[role=switch]').getAttribute('aria-checked'), 'false');
-    assert.equal(document.querySelector('.rc-input').value, '这个站点以后不记录');
+    assert.equal(document.querySelector('.rc-input').value, "Stop tracking this site");
     assert.deepEqual(await chrome.runtime.sendMessage({ type: 'settings:get' }), settings);
     document.querySelector('[role=switch]').click();
     await settle();
@@ -357,7 +357,7 @@ test('popup focus and translation controls stay independent, and tab changes pre
     assert.equal(changed.translateEnabled, settings.translateEnabled);
     document.getElementById('tab-focus').click();
     await settle();
-    assert.ok(document.querySelector('.current-state').textContent.includes('本页已暂停'));
+    assert.ok(document.querySelector('.current-state').textContent.includes("Paused on this page"));
     assert.deepEqual(Array.from(dom.window.__previewErrors), []);
   } finally { close(); }
 });
@@ -381,9 +381,9 @@ test('Android reading entry, local reader preferences and chapter navigation use
   try {
     await settle();
     const { document, chrome } = dom.window;
-    assert.ok(document.querySelector('.atitle').textContent.includes('开篇'));
+    assert.ok(document.querySelector('.atitle').textContent.includes("Introduction"));
     assert.equal(document.querySelectorAll('.reader-chapter').length, 2);
-    assert.equal(document.querySelector('.reader-chapter[aria-current]').textContent.includes('开篇'), true);
+    assert.equal(document.querySelector('.reader-chapter[aria-current]').textContent.includes("Introduction"), true);
     const before = await chrome.runtime.sendMessage({ type: 'settings:get' });
     document.getElementById('reader-font').click();
     document.getElementById('reader-bookmark').click();
@@ -431,7 +431,7 @@ test('vocabulary chat selects actual words, streams a reply and keeps history an
     const choices = document.querySelectorAll('.chat-word-option');
     choices[0].click();
     document.querySelector('.chat-word-option[aria-pressed=true]').click();
-    assert.match(document.getElementById('picker-count').textContent, /至少/);
+    assert.match(document.getElementById('picker-count').textContent, /at least/);
     document.getElementById('picker-close').click();
     const input = document.getElementById('chat-input');
     input.value = 'I consolidate my knowledge by explaining it.'; input.dispatchEvent(new Event('input'));
@@ -466,10 +466,10 @@ test('failed or stopped vocabulary chat preserves input and marks partial answer
         input.value = 'new draft'; input.dispatchEvent(new Event('input'));
         document.getElementById('chat-stop').click();
         assert.equal(input.value, 'new draft');
-        assert.match(document.getElementById('chat-status').textContent, /停止/);
+        assert.match(document.getElementById('chat-status').textContent, /stopped/);
       } else {
         assert.equal(document.getElementById('chat-config').hidden, false);
-        assert.match(document.getElementById('chat-input').value, /情景对话/);
+        assert.match(document.getElementById('chat-input').value, /role-play/);
       }
       await chatSettle();
       const saved = (await chrome.storage.local.get('vocabulary-chats'))['vocabulary-chats'];

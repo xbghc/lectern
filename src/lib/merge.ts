@@ -380,10 +380,10 @@ export const IMPORTABLE_SCHEMAS: ReadonlyArray<number> = [3, 4];
  * 但也不能让一条坏记录把导入搞崩。
  */
 export function parseBundle(raw: unknown): DataSet {
-  if (!isObj(raw)) throw new Error("不是有效的导出文件");
+  if (!isObj(raw)) throw new Error("This is not a valid export file");
   const schema = raw["schema"];
   if (!num(schema) || !IMPORTABLE_SCHEMAS.includes(schema)) {
-    throw new Error(`不认识的导出格式（schema ${String(schema)}），只支持 ${IMPORTABLE_SCHEMAS.join(" / ")}`);
+    throw new Error(`Unsupported export format (schema ${String(schema)}); supported versions: ${IMPORTABLE_SCHEMAS.join(" / ")}`);
   }
   const data = emptyDataSet();
   for (const a of arr(raw["articles"], isArticle)) data.articles[a.id] = a;
@@ -402,12 +402,12 @@ export function parseBundle(raw: unknown): DataSet {
 /** 给界面的一句话。 */
 export function describeReport(r: MergeReport): string {
   const parts: string[] = [];
-  if (r.articlesAdded || r.articlesUpdated) parts.push(`文章新增 ${r.articlesAdded}、更新 ${r.articlesUpdated}`);
-  if (r.sessionsAdded || r.sessionsUpdated) parts.push(`专注片段新增 ${r.sessionsAdded}、更新 ${r.sessionsUpdated}`);
-  if (r.snippetsAdded) parts.push(`划词新增 ${r.snippetsAdded}`);
-  if (r.cardsAdded || r.cardsMerged) parts.push(`生词卡新增 ${r.cardsAdded}、合并 ${r.cardsMerged}`);
-  if (r.articleCardsAdded) parts.push(`文章卡新增 ${r.articleCardsAdded}`);
-  if (r.reviewsAdded) parts.push(`回顾材料新增 ${r.reviewsAdded}`);
-  if (r.positionsUpdated) parts.push(`阅读位置更新 ${r.positionsUpdated}`);
-  return parts.length ? `已合并：${parts.join("；")}` : "没有新内容，本机已经有这些记录了";
+  if (r.articlesAdded || r.articlesUpdated) parts.push(`Articles added: ${r.articlesAdded}, updated: ${r.articlesUpdated}`);
+  if (r.sessionsAdded || r.sessionsUpdated) parts.push(`Sessions added: ${r.sessionsAdded}, updated: ${r.sessionsUpdated}`);
+  if (r.snippetsAdded) parts.push(`Translations added: ${r.snippetsAdded}`);
+  if (r.cardsAdded || r.cardsMerged) parts.push(`Word cards added: ${r.cardsAdded}, merged: ${r.cardsMerged}`);
+  if (r.articleCardsAdded) parts.push(`Article cards added: ${r.articleCardsAdded}`);
+  if (r.reviewsAdded) parts.push(`Reviews added: ${r.reviewsAdded}`);
+  if (r.positionsUpdated) parts.push(`Reading positions updated: ${r.positionsUpdated}`);
+  return parts.length ? `Merged: ${parts.join("; ")}` : "No new data. These records are already on your device.";
 }

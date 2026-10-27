@@ -77,7 +77,7 @@ export const translationHandlers = {
   "review:assist": async (m) => {
     const [cards, snippets] = await Promise.all([getCards(), getSnippets()]);
     const card = cards.find((c) => c.id === m.cardId);
-    if (!card) return { ok: false, error: "卡片不存在" };
+    if (!card) return { ok: false, error: "Card not found" };
     const view = attachSnippets([card], snippets)[0]!;
     const s = view.snippet;
     return await handleAssist(m.mode, {

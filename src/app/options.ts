@@ -35,12 +35,12 @@ import {
  */
 
 const bar = document.createElement("nav");
-bar.className = "phone-settings-nav"; bar.setAttribute("aria-label", "主导航");
-for (const [name, href, glyph] of [["阅读", "index.html#articles", "book"], ["生词", "index.html#words", "words"], ["设置", "options.html", "settings"]] as const) {
+bar.className = "phone-settings-nav"; bar.setAttribute("aria-label", "Main navigation");
+for (const [name, href, glyph] of [["Reading", "index.html#articles", "book"], ["Vocabulary", "index.html#words", "words"], ["Settings", "options.html", "settings"]] as const) {
   const link = document.createElement("a"); link.href = href;
   const label = document.createElement("span"); label.textContent = name;
   link.append(icon(glyph), label);
-  if (name === "设置") { link.className = "active"; link.setAttribute("aria-current", "page"); link.addEventListener("click", e => e.preventDefault()); }
+  if (name === "Settings") { link.className = "active"; link.setAttribute("aria-current", "page"); link.addEventListener("click", e => e.preventDefault()); }
   else link.addEventListener("click", e => { if (!leaveAnyway()) e.preventDefault(); });
   bar.append(link);
 }
@@ -50,7 +50,7 @@ document.body.append(bar);
  * 带着没保存的修改离开要问一声。扩展里靠 beforeunload，WebView 不弹那个框，两条退路都得自己拦：
  * 底部导航，和系统的返回键（宿主先来问 beforeBack，回 true 表示这一下我接了、别退）。
  */
-const leaveAnyway = (): boolean => !hasUnsavedChanges() || confirm("有修改还没保存，离开就丢了。确定离开？");
+const leaveAnyway = (): boolean => !hasUnsavedChanges() || confirm("You have unsaved changes. Leave without saving?");
 hostHooks.beforeBack = () => !leaveAnyway();
 
 const bridge = native();
@@ -76,7 +76,7 @@ function addShare(afterId: string, label: string, filename: () => string, load: 
         shareFile(filename(), "application/json", JSON.stringify(data, null, 2));
         btn.textContent = label;
       } catch (err) {
-        btn.textContent = `没读出来：${reasonOf(err)}`;
+        btn.textContent = `Could not load: ${reasonOf(err)}`;
       } finally {
         btn.disabled = false;
       }
@@ -85,10 +85,10 @@ function addShare(afterId: string, label: string, filename: () => string, load: 
   anchor.after(btn);
 }
 
-addShare("export", "分享导出文件…", () => `lectern-${stamp()}.json`, () =>
+addShare("export", "Share exported data…", () => `lectern-${stamp()}.json`, () =>
   chrome.runtime.sendMessage({ type: "data:export" }),
 );
-addShare("log-download", "分享日志…", () => `lectern-llm-log-${stamp()}.json`, fetchLog);
+addShare("log-download", "Share logs…", () => `lectern-llm-log-${stamp()}.json`, fetchLog);
 
 /* ==================== 更新 ==================== */
 
@@ -103,7 +103,7 @@ function addUpdateSection(): void {
 
   const box = document.createElement("fieldset");
   const legend = document.createElement("legend");
-  legend.textContent = "更新";
+  legend.textContent = "Updates";
   box.append(legend);
 
   const selfUpdate = canSelfUpdate();
@@ -113,7 +113,7 @@ function addUpdateSection(): void {
   check.className = "field check";
   const autoLabel = document.createElement("label");
   autoLabel.htmlFor = "update-auto";
-  autoLabel.textContent = "每天检查一次新版本";
+  autoLabel.textContent = "Check for updates daily";
   const auto = document.createElement("input");
   auto.id = "update-auto";
   auto.type = "checkbox";
@@ -122,7 +122,7 @@ function addUpdateSection(): void {
   auto.addEventListener("change", () => setAutoCheck(auto.checked));
   const autoHint = document.createElement("span");
   autoHint.className = "hint";
-  autoHint.textContent = "只问 GitHub「最新的一次发布是哪个版本」，不带阅读记录，也不带当前版本号";
+  autoHint.textContent = "Only asks GitHub for the latest release. Reading data and your current version are not sent.";
   check.append(autoLabel, auto, autoHint);
   box.append(check);
 
@@ -132,7 +132,7 @@ function addUpdateSection(): void {
     install.className = "field check";
     const installLabel = document.createElement("label");
     installLabel.htmlFor = "update-install";
-    installLabel.textContent = "自动下载并安装";
+    installLabel.textContent = "Download and install automatically";
     const installBox = document.createElement("input");
     installBox.id = "update-install";
     installBox.type = "checkbox";
@@ -142,8 +142,8 @@ function addUpdateSection(): void {
     const installHint = document.createElement("span");
     installHint.className = "hint";
     installHint.textContent =
-      "只在不按流量计费的网络上下载；下好之后等你离开 App 再装（正读着文章时不装）。" +
-      "Android 12 起、且允许过「安装未知应用」时不用再点确认；否则下好后首页会给一个「安装」。";
+      "Downloads on unmetered networks, then waits until you leave the app to install. " +
+      "On Android 12 or later, installation can proceed automatically once unknown-app installation is allowed. Otherwise, an Install button appears on the home screen.";
     install.append(installLabel, installBox, installHint);
     box.append(install);
   }
@@ -152,24 +152,24 @@ function addUpdateSection(): void {
   row.className = "row";
   const checkBtn = document.createElement("button");
   checkBtn.type = "button";
-  checkBtn.textContent = "检查更新";
+  checkBtn.textContent = "Check for updates";
   const installBtn = document.createElement("button");
   installBtn.type = "button";
   installBtn.className = "primary";
-  installBtn.textContent = "下载并安装";
+  installBtn.textContent = "Download and install";
   installBtn.hidden = true;
   const skipBtn = document.createElement("button");
   skipBtn.type = "button";
-  skipBtn.textContent = "跳过这个版本";
+  skipBtn.textContent = "Skip this version";
   skipBtn.hidden = true;
   const status = document.createElement("span");
   status.className = "muted small";
   const failed = lastFailure();
   const ready = readyVersion();
-  status.textContent = `当前版本 ${currentVersion()}`
-    + (ready ? `，${ready} 已下载` : "")
+  status.textContent = `Current version: ${currentVersion()}`
+    + (ready ? `, ${ready} downloaded` : "")
     // 自动安装是在人不在的时候做的，没成的话这儿是唯一看得见原因的地方
-    + (failed?.message ? `；上次自动安装${failed.version ? ` ${failed.version}` : ""}没成：${failed.message}` : "");
+    + (failed?.message ? `; last automatic installation${failed.version ? ` ${failed.version}` : ""} failed: ${failed.message}` : "");
   row.append(checkBtn, installBtn, skipBtn, status);
   box.append(row);
 
@@ -187,16 +187,16 @@ function addUpdateSection(): void {
     // 系统装不上签名不一致的包，会甩一句没头没尾的「应用未安装」，
     // 与其让人对着它猜，不如提前说清楚
     foot.textContent =
-      "装着的是 debug 签名的包（自己构建或从 CI 的 Artifacts 下的），" +
-      "覆盖不上正式签名的发布版。要换过去：先在上面导出数据，卸载，装新包，再导入回来。";
+      "This app uses a debug signature (a local build or CI artifact). " +
+      "It cannot be upgraded with an official release. Export your data, uninstall this build, install the release, then import your data.";
     installBtn.remove();
   } else if (!selfUpdate) {
-    foot.textContent = "这个版本的 App 还不会自己下载升级包，去 Releases 页面手动下一个。";
+    foot.textContent = "This app version cannot download updates. Download one from the Releases page.";
     installBtn.remove();
   } else {
     foot.textContent =
-      "App 不走应用商店，升级包来自 GitHub Releases，下好之后由系统的安装器接手" +
-      "（第一次会问要不要允许「安装未知应用」）。数据存在 App 自己的存储里，覆盖安装不动它。";
+      "Updates are downloaded from GitHub Releases and installed by Android " +
+      "(you may be asked to allow unknown-app installation). Upgrading preserves the app's stored data.";
   }
 
   /*
@@ -205,7 +205,7 @@ function addUpdateSection(): void {
    */
   const linkLine = document.createElement("p");
   linkLine.className = "update-link muted small";
-  linkLine.textContent = `自己下的话：${RELEASES_PAGE}`;
+  linkLine.textContent = `Manual download: ${RELEASES_PAGE}`;
   box.append(linkLine);
 
   let found: Update | null = null;
@@ -221,19 +221,19 @@ function addUpdateSection(): void {
   checkBtn.addEventListener("click", () => {
     void (async () => {
       checkBtn.disabled = true;
-      status.textContent = "正在检查…";
+      status.textContent = "Checking…";
       show(null);
       try {
         markChecked();
         const update = await checkForUpdate();
         if (!update) {
-          status.textContent = `已经是最新的（${currentVersion()}）`;
+          status.textContent = `Up to date (${currentVersion()})`;
           return;
         }
         show(update);
-        status.textContent = `有新版本 ${update.version}（${mb(update.apk.size)}），当前 ${currentVersion()}`;
+        status.textContent = `New version available: ${update.version} (${mb(update.apk.size)}); current version: ${currentVersion()}`;
       } catch (err) {
-        status.textContent = `检查失败：${err instanceof Error ? err.message : String(err)}`;
+        status.textContent = `Update check failed: ${err instanceof Error ? err.message : String(err)}`;
       } finally {
         checkBtn.disabled = false;
       }
@@ -246,17 +246,17 @@ function addUpdateSection(): void {
     void (async () => {
       installBtn.disabled = true;
       checkBtn.disabled = true;
-      status.textContent = "正在下载…";
+      status.textContent = "Downloading…";
       try {
         await downloadAndInstall(update, (received, total) => {
           // 对方没报长度时 total 是 0，只报已下多少
           status.textContent = total
-            ? `正在下载 ${mb(received)} / ${mb(total)}`
-            : `正在下载 ${mb(received)}`;
+            ? `Downloading ${mb(received)} / ${mb(total)}`
+            : `Downloading ${mb(received)}`;
         });
-        status.textContent = "下载完成，按系统提示完成安装";
+        status.textContent = "Downloaded. Follow Android's prompts to install.";
       } catch (err) {
-        status.textContent = `下载失败：${err instanceof Error ? err.message : String(err)}`;
+        status.textContent = `Download failed: ${err instanceof Error ? err.message : String(err)}`;
         installBtn.disabled = false;
       } finally {
         checkBtn.disabled = false;
@@ -266,7 +266,7 @@ function addUpdateSection(): void {
 
   skipBtn.addEventListener("click", () => {
     if (found) skipVersion(found.version);
-    status.textContent = "这个版本不再提示了，下一个版本照常提示";
+    status.textContent = "This version will be skipped. You will still be notified about the next release.";
     show(null);
   });
 

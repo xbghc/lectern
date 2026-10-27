@@ -23,14 +23,14 @@ export function readingPlugin(opts: ReadingOptions = {}): PagePlugin<ReadingFeat
     start: (ctx, carried) => {
       let paused = carried === true;
       let ctl: TrackController | null = null;
-      let reason = "初始化中";
+      let reason = "Initializing";
       let stopped: EndReason | null = null;
       void startTracking({
         ...opts,
         url: ctx.url,
         signal: ctx.signal,
         onClassifying: () => {
-          reason = "LLM 正在判断是否为文章…";
+          reason = "AI is checking whether this page is an article…";
           ctx.changed();
         },
         onTitle: ctx.info.setTitle,
@@ -42,7 +42,7 @@ export function readingPlugin(opts: ReadingOptions = {}): PagePlugin<ReadingFeat
           ctx.changed();
         },
         (err: unknown) => {
-          reason = `初始化失败：${reasonOf(err)}`;
+          reason = `Initialization failed: ${reasonOf(err)}`;
           ctx.changed();
         },
       );

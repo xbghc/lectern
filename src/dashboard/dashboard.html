@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,81 +8,81 @@
     <link rel="stylesheet" href="dashboard.css" />
   </head>
   <body class="dash">
-    <a class="skip-link" href="#main">跳到主要内容</a>
+    <a class="skip-link" href="#main">Skip to main content</a>
     <header class="app-sidebar">
       <a class="brand" href="#articles"><span data-icon="book"></span><span class="brand-name">Lectern</span></a>
-      <div class="brand-subtitle">读 书 台</div>
-      <p class="nav-label">你的阅读空间</p>
-      <nav aria-label="主导航">
-        <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>我的阅读</span></button>
-        <button data-tab="words" class="tab"><span data-icon="words"></span><span>生词本</span><span id="nav-word-count" class="nav-count"></span></button>
-        <button data-tab="review" class="tab"><span data-icon="review"></span><span>间隔复习</span><span id="due-badge" class="badge" hidden></span></button>
-        <button data-tab="stats" class="tab stats-nav"><span data-icon="chart"></span><span>阅读统计</span></button>
+      <div class="brand-subtitle">L E C T E R N</div>
+      <p class="nav-label">Your reading space</p>
+      <nav aria-label="Main navigation">
+        <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>My reading</span></button>
+        <button data-tab="words" class="tab"><span data-icon="words"></span><span>Vocabulary</span><span id="nav-word-count" class="nav-count"></span></button>
+        <button data-tab="review" class="tab"><span data-icon="review"></span><span>Spaced review</span><span id="due-badge" class="badge" hidden></span></button>
+        <button data-tab="stats" class="tab stats-nav"><span data-icon="chart"></span><span>Reading statistics</span></button>
 
-        <a id="to-options" href="#" class="settings-link"><span data-icon="settings"></span><span>偏好设置</span></a>
+        <a id="to-options" href="#" class="settings-link"><span data-icon="settings"></span><span>Preferences</span></a>
       </nav>
-      <div class="sidebar-quote">读过的每一页，<br>都成为你的一部分。</div>
-      <div class="sidebar-local"><strong><i></i>本地优先，安心阅读</strong><span>数据由你保管，节奏由你决定。</span></div>
+      <div class="sidebar-quote">Every page you read <br>becomes a part of you.</div>
+      <div class="sidebar-local"><strong><i></i>Read freely. Keep your data close.</strong><span>Your data. Your pace.</span></div>
     </header>
-    <div class="workspace-bar"><div class="breadcrumb">读书台 <span data-icon="chevron"></span><span id="workspace-title">我的阅读</span></div><button id="workspace-search" class="icon-btn" aria-label="搜索文章" title="搜索文章（Ctrl / ⌘ K）"><span data-icon="search"></span></button></div>
+    <div class="workspace-bar"><div class="breadcrumb">Workspace <span data-icon="chevron"></span><span id="workspace-title">My reading</span></div><button id="workspace-search" class="icon-btn" aria-label="Search articles" title="Search articles (Ctrl / ⌘ K)"><span data-icon="search"></span></button></div>
     <main id="main" class="dashboard-main">
 
 
     <!-- ---------------- 文章 ---------------- -->
     <section id="pane-articles" class="pane">
-      <div class="page-heading"><div><h1>把阅读，留在心里。</h1><p>继续昨日的好奇，也为新的想法留一点空间。</p></div><button id="add-article" class="primary add-trigger"><span data-icon="plus"></span><span>添加文章</span></button></div>
-      <div id="reading-metrics" class="reading-metrics" aria-label="阅读概览"></div>
+      <div class="page-heading"><div><h1>Make room for reading.</h1><p>Follow yesterday's curiosity. Leave room for a new idea.</p></div><button id="add-article" class="primary add-trigger"><span data-icon="plus"></span><span>Add article</span></button></div>
+      <div id="reading-metrics" class="reading-metrics" aria-label="Reading overview"></div>
       <div class="reading-layout"><div class="reading-main">
       <div id="continue-reading"></div>
-      <div class="section-heading"><h2>我的文章</h2><span>一点一滴，读过有迹</span></div>
+      <div class="section-heading"><h2>My articles</h2><span>A little each day, a lasting impression</span></div>
       <div class="article-controls">
       <div id="article-search" class="toolbar article-search">
-        <div id="finish-filter" class="filterbar" role="group" aria-label="按阅读状态筛选">
-          <button type="button" data-filter="" aria-pressed="true">全部</button>
-          <button type="button" data-filter="reading" aria-pressed="false">阅读中</button>
-          <button type="button" data-filter="done" aria-pressed="false">已读完</button>
+        <div id="finish-filter" class="filterbar" role="group" aria-label="Filter by reading status">
+          <button type="button" data-filter="" aria-pressed="true">All</button>
+          <button type="button" data-filter="reading" aria-pressed="false">In progress</button>
+          <button type="button" data-filter="done" aria-pressed="false">Finished</button>
         </div>
         <span id="article-summary" class="muted small"></span>
         <!-- 搜索平时收成一个键：用得少，不该常年占着一整行。框在键的左边展开，键不挪位置，再点一下就收 -->
         <div id="search-box" class="search-box">
-          <input id="q-article" type="search" placeholder="搜索标题或域名" aria-label="搜索标题或域名" autocomplete="off" inert />
-          <button id="search-toggle" type="button" class="mini" aria-label="搜索文章" title="搜索文章" aria-expanded="false" aria-controls="q-article">
+          <input id="q-article" type="search" placeholder="Search titles or domains" aria-label="Search titles or domains" autocomplete="off" inert />
+          <button id="search-toggle" type="button" class="mini" aria-label="Search articles" title="Search articles" aria-expanded="false" aria-controls="q-article">
             <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
           </button>
         </div>
       </div>
       <div id="article-actions" class="article-actions" hidden>
-        <label class="selection-toggle" title="全选当前搜索和筛选结果"><input id="select-articles" type="checkbox" aria-label="全选当前结果" /> 全选</label>
-        <span id="selection-count" class="muted small">已选 0 篇</span>
-        <button id="delete-articles" class="action-delete" disabled>删除所选</button>
-        <button id="classify-articles" aria-label="LLM 筛选所选文章" disabled>LLM 筛选</button>
-        <button id="suggest-blacklist" disabled>黑名单建议</button>
+        <label class="selection-toggle" title="Select all search and filter results"><input id="select-articles" type="checkbox" aria-label="Select all results" /> Select all</label>
+        <span id="selection-count" class="muted small">0 selected</span>
+        <button id="delete-articles" class="action-delete" disabled>Delete the selected </button>
+        <button id="classify-articles" aria-label="Filter selected articles with AI" disabled>AI filter</button>
+        <button id="suggest-blacklist" disabled>Blocklist suggestions</button>
       </div>
-      <button id="manage-articles" class="mini" aria-pressed="false">批量管理</button>
+      <button id="manage-articles" class="mini" aria-pressed="false">Manage articles</button>
       </div>
       <p id="article-action-status" class="muted small" role="status"></p>
-      <section id="classification-panel" class="classification-panel" hidden aria-label="LLM 文章筛选">
-        <div class="classification-heading"><strong>筛选结果</strong><span class="muted small">只判断文章类型 · 不自动删除</span></div>
+      <section id="classification-panel" class="classification-panel" hidden aria-label="AI article filter">
+        <div class="classification-heading"><strong>Filter results</strong><span class="muted small">Classifies pages only · Never deletes automatically</span></div>
         <p id="classification-progress" role="status" aria-live="polite"></p>
         <div class="toolbar">
-          <button id="select-nonarticles" disabled>勾选非文章</button>
-          <button id="retry-classification" disabled>重试失败项</button>
-          <button id="stop-classification" hidden>停止后续请求</button>
+          <button id="select-nonarticles" disabled>Select non-articles</button>
+          <button id="retry-classification" disabled>Retry failed</button>
+          <button id="stop-classification" hidden>Stop new requests</button>
         </div>
       </section>
-      <details id="blacklist-section" class="blacklist-section" hidden><summary>网址黑名单建议</summary><div id="blacklist-suggestions"></div></details>
+      <details id="blacklist-section" class="blacklist-section" hidden><summary>Suggested URL blocks</summary><div id="blacklist-suggestions"></div></details>
       <div id="articles" class="list"></div>
-      <div class="list-view-controls" role="group" aria-label="文章视图"><button data-view="list" class="icon-btn" aria-label="列表视图" aria-pressed="true"><span data-icon="list"></span></button><button data-view="grid" class="icon-btn" aria-label="网格视图" aria-pressed="false"><span data-icon="grid"></span></button></div>
-      </div><aside id="reading-rail" class="reading-rail" aria-label="阅读与复习"></aside></div>
+      <div class="list-view-controls" role="group" aria-label="Article view"><button data-view="list" class="icon-btn" aria-label="List view" aria-pressed="true"><span data-icon="list"></span></button><button data-view="grid" class="icon-btn" aria-label="Grid view" aria-pressed="false"><span data-icon="grid"></span></button></div>
+      </div><aside id="reading-rail" class="reading-rail" aria-label="Reading and review"></aside></div>
     </section>
 
     <!-- ---------------- 复习 ---------------- -->
     <section id="pane-review" class="pane" hidden>
-      <div class="page-heading"><div><h1>让记忆，再深一点。</h1><p>读过的词，值得再见一面。</p></div></div>
+      <div class="page-heading"><div><h1>Let the words stay with you.</h1><p>The words you have read are worth another look.</p></div></div>
       <!-- 两个队列不交错渲染：生词卡是一个词，文章卡是一整篇，节奏完全不同 -->
       <div class="segbar">
-        <button class="seg active" data-queue="words">生词<span id="seg-words-n" class="n"></span></button>
-        <button class="seg" data-queue="articles">文章<span id="seg-articles-n" class="n"></span></button>
+        <button class="seg active" data-queue="words">Vocabulary<span id="seg-words-n" class="n"></span></button>
+        <button class="seg" data-queue="articles">Articles <span id="seg-articles-n" class="n"></span></button>
       </div>
       <div id="review-stats" class="statbar"></div>
       <div id="review-area"></div>
@@ -90,26 +90,26 @@
 
     <!-- ---------------- 生词本 ---------------- -->
     <section id="pane-words" class="pane" hidden>
-      <div class="page-heading"><div><h1>在阅读中，慢慢积累。</h1><p>每个词，都有你遇见它的语境。</p></div><button id="words-review" class="primary">开始复习 <span data-icon="arrow"></span></button></div>
+      <div class="page-heading"><div><h1>Build your vocabulary, page by page.</h1><p>Every word carries the context where you found it.</p></div><button id="words-review" class="primary">Start review <span data-icon="arrow"></span></button></div>
       <div class="toolbar">
-        <input id="q-word" type="search" placeholder="搜索原文、译文或出处" />
+        <input id="q-word" type="search" placeholder="Search text, translations or sources" />
         <select id="kind-filter">
-          <option value="">全部粒度</option>
-          <option value="word">单词</option>
-          <option value="phrase">短语</option>
-          <option value="sentence">句子</option>
+          <option value="">All types</option>
+          <option value="word">Word</option>
+          <option value="phrase">Phrase</option>
+          <option value="sentence">Sentence</option>
         </select>
         <span id="word-summary" class="muted small"></span>
       </div>
       <div id="words" class="list"></div>
     </section>
 
-    <section id="pane-stats" class="pane" hidden><div class="page-heading"><div><h1>一点一滴，读过有迹。</h1><p>看看最近的阅读节奏，找到适合自己的步调。</p></div></div><div id="statistics"></div></section>
+    <section id="pane-stats" class="pane" hidden><div class="page-heading"><div><h1>A little each day, a lasting impression.</h1><p>Look back at your reading and find your own rhythm.</p></div></div><div id="statistics"></div></section>
     </main>
     <dialog id="article-dialog" class="article-dialog" aria-labelledby="add-title">
-      <div class="dialog-heading"><h2 id="add-title">添加一篇文章</h2><button id="close-add" class="icon-btn" type="button" aria-label="关闭添加文章">×</button></div>
-      <p class="muted">打开网页后，Lectern 会识别文章并记录阅读进度。</p>
-      <form id="add" class="addrow"><label class="visually-hidden" for="add-url">文章地址</label><input id="add-url" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required /><button id="add-go" type="submit" class="primary">阅读</button></form>
+      <div class="dialog-heading"><h2 id="add-title">Add an article</h2><button id="close-add" class="icon-btn" type="button" aria-label="Close add article">×</button></div>
+      <p class="muted">With your consent and a model configured, Lectern identifies articles and tracks your reading progress.</p>
+      <form id="add" class="addrow"><label class="visually-hidden" for="add-url">Article URL</label><input id="add-url" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required /><button id="add-go" type="submit" class="primary">Reading</button></form>
       <p id="add-hint" class="muted small" role="status" hidden></p>
     </dialog>
 

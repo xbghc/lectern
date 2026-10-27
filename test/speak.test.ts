@@ -99,7 +99,7 @@ test("音标可点，词性只是文字", () => {
   assert.equal(host.textContent, "/liːks/ · verb");
   const ph = host.querySelector(".ph")!;
   assert.equal(ph.textContent, "/liːks/");
-  assert.equal(ph.getAttribute("title"), "点击朗读");
+  assert.equal(ph.getAttribute("title"), "Read aloud");
 });
 
 test("点音标念的是词，不是音标", () => {

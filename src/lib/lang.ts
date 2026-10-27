@@ -70,9 +70,9 @@ export function judgeSelection(raw: string, limits: SelectionLimits): SelectionV
   const kind = classifyKind(text);
   const words = wordCountOf(text);
   const base = { text, kind, words, needsConfirm: false };
-  if (text.length < Math.max(1, limits.minSelectionChars)) return { ...base, ok: false, reason: "选区太短" };
-  if (text.length > HARD_MAX_CHARS) return { ...base, ok: false, reason: "选区过长" };
-  if (!hasLatin(text)) return { ...base, ok: false, reason: "不含英文" };
+  if (text.length < Math.max(1, limits.minSelectionChars)) return { ...base, ok: false, reason: "The selection is too short" };
+  if (text.length > HARD_MAX_CHARS) return { ...base, ok: false, reason: "The selection is too long" };
+  if (!hasLatin(text)) return { ...base, ok: false, reason: "No English text found" };
   return { ...base, ok: true, needsConfirm: words > limits.maxAutoSelectionWords };
 }
 

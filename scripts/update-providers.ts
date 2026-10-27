@@ -109,11 +109,11 @@ async function main(): Promise<void> {
     .filter((p): p is Preset => p !== null)
     .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }) || a.id.localeCompare(b.id));
   for (const id of Object.keys(OVERRIDES)) {
-    if (!presets.some((p) => p.id === id)) throw new Error(`models.dev 里找不到 ${id}：是改了 id，还是数据没取全？`);
+    if (!presets.some((p) => p.id === id)) throw new Error(`Not found in models.dev: ${id}: check for a changed ID or incomplete source data.`);
   }
   writeFileSync(OUT, render(presets, new Date().toISOString().slice(0, 10)));
   const count = (protocol: Protocol): number => presets.filter((p) => p.protocol === protocol).length;
-  console.log(`${presets.length} 家（OpenAI 协议 ${count("openai")}，Anthropic 协议 ${count("anthropic")}），源数据共 ${Object.keys(source).length} 家 → ${OUT}`);
+  console.log(`${presets.length} providers (OpenAI: ${count("openai")}, Anthropic: ${count("anthropic")}); source providers: ${Object.keys(source).length} → ${OUT}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

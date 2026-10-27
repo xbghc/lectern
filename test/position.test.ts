@@ -167,8 +167,8 @@ const text = (sel: string): string =>
 test("show 挂出提示并说明跳到了第几段", () => {
   card.show(5, 10);
   assert.ok(card.hostElement);
-  assert.equal(text(".title"), "已回到上次读到的位置");
-  assert.equal(text(".sub"), "第 5 段 / 共 10 段");
+  assert.equal(text(".title"), "Returned to your reading position");
+  assert.equal(text(".sub"), "Paragraph 5 of 10");
 });
 
 test("重复 show 不会挂出第二个", () => {
@@ -239,7 +239,7 @@ test("没挂出来时 hide 不炸", () => {
 
 test("带上剩余时间时，说明里跟一句还需多久", () => {
   card.show(5, 10, "还需约 12 分钟");
-  assert.equal(text(".sub"), "第 5 段 / 共 10 段 · 还需约 12 分钟");
+  assert.equal(text(".sub"), "Paragraph 5 of 10 · 还需约 12 分钟");
 });
 
 /* ==================== 跨设备：偏移是别人的屏幕上量的 ==================== */

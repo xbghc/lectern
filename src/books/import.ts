@@ -43,7 +43,7 @@ export interface ImportEnv {
 function bookTitle(title: string, fileName: string): string {
   const clean = title.trim();
   if (clean && clean.toLowerCase() !== "unknown") return clean.slice(0, 300);
-  return fileName.replace(/\.epub$/i, "").trim() || "未命名的书";
+  return fileName.replace(/\.epub$/i, "").trim() || "Untitled book";
 }
 
 export async function importEpub(zip: ZipSource, id: string, fileName: string, env: ImportEnv): Promise<Book> {
@@ -53,7 +53,7 @@ export async function importEpub(zip: ZipSource, id: string, fileName: string, e
   for (const name of zip.names) byLower.set(name.toLowerCase(), name);
   const read = async (path: string): Promise<Uint8Array> => {
     const actual = zip.names.includes(path) ? path : byLower.get(path.toLowerCase());
-    if (!actual) throw new Error(`EPUB 里缺少 ${path}`);
+    if (!actual) throw new Error(`Missing from EPUB: ${path}`);
     return zip.bytes(actual);
   };
   const has = (path: string): boolean => zip.names.includes(path) || byLower.has(path.toLowerCase());
@@ -77,10 +77,10 @@ export async function importEpub(zip: ZipSource, id: string, fileName: string, e
     let resource: ArchiveResource | null = null;
     try {
       const mime = imageMime(pkg.mediaTypes.get(path) ?? "");
-      if (!mime || !has(path)) throw new Error("认不出的图片");
-      if (stored.size >= MAX_BOOK_IMAGES || bytesStored >= MAX_BOOK_BYTES) throw new Error("这本书的图片太多");
+      if (!mime || !has(path)) throw new Error("Unrecognized image format");
+      if (stored.size >= MAX_BOOK_IMAGES || bytesStored >= MAX_BOOK_BYTES) throw new Error("This book contains too many images");
       const bytes = await read(path);
-      if (bytes.byteLength > MAX_RESOURCE_BYTES) throw new Error("单张图片过大");
+      if (bytes.byteLength > MAX_RESOURCE_BYTES) throw new Error("Image exceeds the size limit");
       const hash = await env.hash(bytes);
       await env.sink.resource(hash, bytes, mime);
       bytesStored += bytes.byteLength;
@@ -103,7 +103,7 @@ export async function importEpub(zip: ZipSource, id: string, fileName: string, e
     let words = 0;
     try {
       const bytes = await read(item.href);
-      if (bytes.byteLength > MAX_CHAPTER_BYTES) throw new Error("这一章太大");
+      if (bytes.byteLength > MAX_CHAPTER_BYTES) throw new Error("Chapter exceeds the size limit");
       // spine 里偶尔直接挂一张图（漫画、扫描件），当成只有一张图的一章
       const source = item.mediaType.startsWith("image/")
         ? `<img src="${item.href.replace(/"/g, "&quot;")}">`
@@ -129,9 +129,9 @@ export async function importEpub(zip: ZipSource, id: string, fileName: string, e
       words = countWords(normalizeText(doc.body?.textContent ?? ""));
       if (!title) title = chapterTitle(doc);
     } catch (err) {
-      html = `<p>这一章没能读出来：${err instanceof Error ? err.message : String(err)}</p>`;
+      html = `<p>Could not read this chapter: ${err instanceof Error ? err.message : String(err)}</p>`;
     }
-    if (!title) title = `第 ${index + 1} 节`;
+    if (!title) title = `Chapter ${index + 1}`;
     chapters.push({ index, title, words });
     const content: BookChapterContent = {
       url: chapterId(id, index),

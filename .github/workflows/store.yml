@@ -24,6 +24,15 @@ on:
         description: Release tag to upload, for example v0.3.19
         required: true
         type: string
+      replace_pending_version:
+        description: Exact pending version to cancel before uploading this release (leave blank to keep it)
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: chrome-web-store
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -34,6 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TAG: ${{ inputs.tag }}
+      REPLACE_PENDING_VERSION: ${{ inputs.replace_pending_version }}
       CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
       CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
     steps:
@@ -63,4 +73,9 @@ jobs:
 
       - name: Upload to store and submit for review
         if: steps.creds.outputs.ok == 'true'
-        run: node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/store-upload.ts "lectern-extension-$TAG.zip"
+        run: |
+          args=()
+          if [ -n "$REPLACE_PENDING_VERSION" ]; then
+            args+=("--replace-pending=$REPLACE_PENDING_VERSION")
+          fi
+          node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/store-upload.ts "lectern-extension-$TAG.zip" "${args[@]}"

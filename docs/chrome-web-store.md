@@ -106,7 +106,11 @@ One-time setup:
 
 5. Keep the key in protected credential storage and remove unnecessary downloaded copies. Never commit it.
 
-The workflow logs the upload and review-submission states. If a previous version is still in review and the store rejects a new upload, the GitHub Release/APK remains unaffected. After resolving the pending review, rerun **Actions → Chrome Web Store** with the same release tag.
+The workflow logs the upload and review-submission states. If a previous version is still in review and the store rejects a new upload, the GitHub Release/APK remains unaffected. By default the pending review is preserved; rerun **Actions → Chrome Web Store** with the same release tag after it completes.
+
+To replace a pending revision with a newer release, run that workflow manually with the target `tag` and the exact `replace_pending_version` (for example, `tag=v0.3.20` and `replace_pending_version=0.3.19`). The script checks that the submitted revision is still pending and that every release channel matches the named version before using the official [cancelSubmission API](https://developer.chrome.com/docs/webstore/api/reference/rest/v2/publishers.items/cancelSubmission). It waits for cancellation before uploading the replacement. A different or already approved revision stops the operation. This replaces the pending review; the new package must be reviewed again. The currently published version remains available.
+
+Automatic release uploads never cancel reviews. Store upload jobs are serialized to avoid overlapping submissions. Locally, the equivalent explicit option is `--replace-pending=0.3.19`; it cannot be combined with `--no-publish`.
 
 For a local upload, provide `CWS_SERVICE_ACCOUNT_JSON` and `CWS_PUBLISHER_ID` through your credential environment, then run:
 

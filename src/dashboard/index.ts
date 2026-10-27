@@ -24,6 +24,8 @@ import { BOOKS_KEY, parseChapterId, type Book } from "../books/types.ts";
 import { localStorage } from "../sync/storage.ts";
 import { createUiTracker, isUiEvent, type UiEvent } from "../lib/uiUsage.ts";
 import { onSyncUpdated } from "../lib/syncUpdated.ts";
+import { decorateIcons } from "../ui/icons.ts";
+import { renderReadingHome, renderStatistics } from "./overview.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const send = <T,>(msg: unknown): Promise<T> => chrome.runtime.sendMessage(msg) as Promise<T>;
@@ -90,26 +92,38 @@ const fmtDate = (ts: number): string =>
 
 /* ==================== 标签页切换 ==================== */
 
-const PANES = ["articles", "review", "words"] as const;
+const PANES = ["articles", "review", "words", "stats", "books"] as const;
 type Pane = (typeof PANES)[number];
 
 /** load=false 用于「队列已经装好了，只是切个面板」，见 openArticleReview。 */
 function show(pane: Pane, load = true): void {
   for (const p of PANES) {
-    $(`pane-${p}`).hidden = p !== pane;
+    const panel = $(`pane-${p}`);
+    if (!panel) continue;
+    panel.hidden = p !== pane;
     document.querySelector(`.tab[data-tab="${p}"]`)?.classList.toggle("active", p === pane);
+    document.querySelector(`.tab[data-tab="${p}"]`)?.setAttribute("aria-current", p === pane ? "page" : "false");
   }
-  location.hash = pane;
+  const titles = { articles: "我的阅读", words: "生词本", review: "间隔复习", stats: "阅读统计", books: "我的书架" };
+  if ($("workspace-title")) $("workspace-title").textContent = titles[pane];
+  if (location.hash !== `#${pane}`) window.history.pushState(null, "", `${location.href.split("#")[0]}#${pane}`);
+  document.documentElement.scrollTop = 0;
   if (!load) return;
   if (pane === "review") void loadReview();
   if (pane === "words") void loadWords();
   if (pane === "articles") void loadArticles();
+  if (pane === "stats") void guarded($("statistics"), () => renderStatistics($("statistics")));
+}
+
+function navigateHome(pane: "review" | "words" | "stats", queue?: "words" | "articles"): void {
+  if (queue) setQueue(queue, false);
+  show(pane);
 }
 
 // show() 改 hash 会留一条历史；不听 hashchange 的话按后退只有地址变、面板不动
 window.addEventListener("hashchange", () => {
   const name = location.hash.slice(1).split(":")[0] as Pane;
-  if (PANES.includes(name) && $(`pane-${name}`).hidden) show(name);
+  if (PANES.includes(name) && $(`pane-${name}`)?.hidden) show(name);
 });
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>(".tab")) {
@@ -289,6 +303,7 @@ async function fetchArticles(onlyIfChanged = false): Promise<void> {
   for (const id of materialDetails.keys()) if (!articles.some(a => a.id === id)) materialDetails.delete(id);
   speed = res.speed ?? null;
   renderArticles();
+  void renderReadingHome(articles, speed, navigateHome);
 }
 
 /*
@@ -345,6 +360,9 @@ function renderArticles(): void {
 
   for (const a of list) {
     const card = el("div", "card article-card");
+    const source = el("div", "article-source", (a.title || hostnameOf(a.url)).slice(0, 1).toUpperCase());
+    source.setAttribute("aria-hidden", "true");
+    card.append(source);
     const row = el("div", "row1");
 
     const title = el("div", "title");
@@ -370,6 +388,7 @@ function renderArticles(): void {
         // 按 id 找现在那一份：等应答的工夫列表可能被后台刷新换过一遍，手里这个 a 已经不在 articles 里了
         Object.assign(articles.find((x) => x.id === a.id) ?? a, r.article);
         renderArticles();
+        void renderReadingHome(articles, speed, navigateHome);
       } catch (err) {
         // 就写在按钮上：批量操作那行状态在列表最顶上，离这儿可能隔着几十张卡片
         toggle.disabled = false;
@@ -404,15 +423,19 @@ function renderArticles(): void {
       // 每次展开都重新取：同步处境和专注时段是会变的，留着的那份只为扛住列表重画
       void loadMaterialDetail(a.id);
     });
-    row.append(more);
+    const menu = el("details", "article-menu");
+    const menuToggle = tracked(el("summary", undefined, "•••"), "articles.menu");
+    menuToggle.setAttribute("aria-label", `文章操作：${a.title || a.url}`);
+    const menuBody = el("div", "article-menu-body");
+    menuBody.append(more); menu.append(menuToggle, menuBody); row.append(menu);
     // 读完了才有回顾卡；没读完的文章连正文都未必存下来了
     if (a.finished) {
       const rev = tracked(el("button", "mini", "回顾"), "articles.review");
       rev.addEventListener("click", () => void openArticleReview(a.id));
-      row.append(rev);
+      menuBody.append(rev);
     }
     toggle.classList.add("reading-action");
-    row.append(toggle);
+    menuBody.append(toggle);
 
     const sub = el("div", "sub");
     sub.append(
@@ -703,6 +726,7 @@ function renderWords(): void {
   });
 
   const queued = snippets.filter((s) => s.cardId).length;
+  if ($("nav-word-count")) $("nav-word-count").textContent = String(snippets.length);
   $("word-summary").textContent = `共 ${snippets.length} 条，其中 ${queued} 条在复习队列`;
 
   const box = $("words");
@@ -713,7 +737,7 @@ function renderWords(): void {
   }
 
   for (const s of list) {
-    const card = el("div", "card");
+    const card = el("div", "card word-card");
     const row = el("div", "row1");
     row.append(el("div", "title", s.text), el("span", "pill", KIND_LABEL[s.kind]));
 
@@ -765,8 +789,7 @@ function renderWords(): void {
     });
     row.append(del);
 
-    const tr = el("div", undefined, s.translation);
-    tr.style.margin = "5px 0 2px";
+    const tr = el("div", "word-translation", s.translation);
 
     const sub = el("div", "sub");
     const meta = el("span");
@@ -778,13 +801,20 @@ function renderWords(): void {
     from.style.color = "inherit";
     sub.append(from, el("span", undefined, fmtDate(s.createdTs)));
 
-    card.append(row, tr);
+    const controls = el("div", "word-controls");
+    while (row.children.length > 1) controls.append(row.children[1]!);
+    const summary = el("div", "word-summary-row");
+    summary.append(row, tr, sub, controls);
+    const detail = el("details", "word-detail");
+    detail.append(tracked(el("summary", undefined, "语境与讲解"), "words.detail"));
+    if (s.context) detail.append(el("blockquote", undefined, s.context));
+    card.append(summary, detail);
     if (s.contextNote) {
       const note = el("div", "sub", s.contextNote);
       note.style.display = "block";
-      card.append(note);
+      detail.append(note);
     }
-    if (s.usage) card.append(el("div", "usage", s.usage));
+    if (s.usage) detail.append(el("div", "usage", s.usage));
     if (s.vocab.length > 0) {
       const box = el("div", "vocab");
       for (const v of s.vocab) {
@@ -797,9 +827,8 @@ function renderWords(): void {
         if (v.note) one.append(el("div", "vn", v.note));
         box.append(one);
       }
-      card.append(box);
+      detail.append(box);
     }
-    card.append(sub);
     box.append(card);
   }
 }
@@ -832,6 +861,7 @@ function paintBadge(): void {
   const badge = $("due-badge");
   badge.textContent = String(total);
   badge.hidden = total === 0;
+  if ($("home-due-count")) $("home-due-count").textContent = String(total);
   $("seg-words-n").textContent = dueWords > 0 ? String(dueWords) : "";
   $("seg-articles-n").textContent = dueArticles > 0 ? String(dueArticles) : "";
 }
@@ -902,6 +932,11 @@ function renderReview(): void {
   }
 
   const wrap = el("div", "reviewer");
+  const progress = el("div", "review-progress");
+  progress.append(el("span", undefined, `本轮复习 ${cursor + 1} / ${queue.length}`));
+  const progressBar = el("div", "progress");
+  const progressFill = el("i"); progressFill.style.width = `${cursor / queue.length * 100}%`; progressBar.append(progressFill);
+  progress.append(progressBar); wrap.append(progress);
   const face = el("div", "face");
   const s = item.snippet;
 
@@ -1265,6 +1300,43 @@ function articleTools(item: ArticleReviewView, has: boolean): HTMLElement {
 }
 
 /* ==================== 启动 ==================== */
+decorateIcons();
+const addDialog = $<HTMLDialogElement>("article-dialog");
+$("add-article")?.addEventListener("click", () => { track("articles.add"); $("add-hint").hidden = true; addDialog.showModal(); });
+$("close-add")?.addEventListener("click", () => addDialog.close());
+addDialog?.addEventListener("click", event => {
+  if (event.target === addDialog) {
+    const bounds = addDialog.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) addDialog.close();
+  }
+});
+if (!document.body.classList.contains("app")) $("add")?.addEventListener("submit", event => {
+  event.preventDefault();
+  const input = $<HTMLInputElement>("add-url");
+  try {
+    const url = new URL(input.value.trim());
+    if (!/^https?:$/.test(url.protocol)) throw new Error("请填写 http(s):// 开头的文章地址");
+    const go = $<HTMLButtonElement>("add-go"); go.disabled = true;
+    void chrome.tabs.create({ url: url.href }).then(() => { addDialog.close(); input.value = ""; }).catch(error => {
+      $("add-hint").hidden = false; $("add-hint").textContent = reason(error);
+    }).finally(() => { go.disabled = false; });
+  } catch (error) { $("add-hint").hidden = false; $("add-hint").textContent = reason(error); }
+});
+window.addEventListener("load", () => { document.documentElement.scrollTop = 0; }, { once: true });
+document.querySelector(".app-sidebar .brand")?.addEventListener("click", e => { e.preventDefault(); show("articles"); });
+$("words-review")?.addEventListener("click", () => { track("nav.review"); setQueue("words", false); show("review"); });
+const openSearch = (): void => { show("articles"); setSearchOpen(true); searchInput.focus(); };
+$("workspace-search")?.addEventListener("click", openSearch);
+document.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }
+});
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-view]")) {
+  button.addEventListener("click", () => {
+    track(button.dataset.view === "grid" ? "articles.view.grid" : "articles.view.list");
+    $("articles").classList.toggle("grid-view", button.dataset.view === "grid");
+    for (const other of document.querySelectorAll("[data-view]")) other.setAttribute("aria-pressed", String(other === button));
+  });
+}
 
 /*
  * hash 形如 `#review` 或 `#review:<articleId>`——后者是 popup 的「去回顾」直达。
@@ -1279,7 +1351,7 @@ if (initial === "review" && target) {
   show("review", false);
   void openArticleReview(target);
 } else {
-  show(PANES.includes(initial) ? initial : "articles");
+  show(PANES.includes(initial) && $(`pane-${initial}`) ? initial : "articles");
 }
 // 无论进哪个标签页，先把两个队列的待办数取回来标在导航上
 void (async () => {

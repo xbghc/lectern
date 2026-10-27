@@ -42,26 +42,28 @@ export interface TranslationOptions {
 export interface TranslationFeature extends PageFeature {
   /** 「本页启用划词翻译」：只对本次加载有效。总开关关着时只记下这个选择，开关回来才挂。 */
   translateHere(): void;
+  setEnabled(enabled: boolean): void;
   screenshot(): void;
 }
 
 /** chrome.storage.onChanged 的回调类型。具名注册才摘得掉。 */
 type SettingsListener = Parameters<typeof chrome.storage.onChanged.addListener>[0];
 
-export function translationPlugin(opts: TranslationOptions = {}): PagePlugin<TranslationFeature, boolean> {
+export function translationPlugin(opts: TranslationOptions = {}): PagePlugin<TranslationFeature, boolean | "paused"> {
   return {
-    start: (ctx, carried) => startTranslation(ctx, opts, carried === true),
+    start: (ctx, carried) => startTranslation(ctx, opts, carried === true, carried === "paused"),
     // 带到 bfcache 回来的新一轮：用户在本页手动开过翻译
-    carry: (f) => f.state().translateHere === "on",
+    carry: (f) => f.state().translation?.paused === true ? "paused" : f.state().translateHere === "on",
   };
 }
 
-function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInitially: boolean): TranslationFeature {
+function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInitially: boolean, pausedInitially: boolean): TranslationFeature {
   const pageUrl = ctx.url;
   /** 设置还没读回来时是 null：那一小会儿什么都不挂，也不给入口。 */
   let settings: TranslationSettings | null = null;
   /** 用户点过「本页启用划词翻译」。 */
   let wanted = wantedInitially;
+  let paused = pausedInitially;
   let stopped = false;
   let translator: SelectionTranslator | null = null;
   let on = false;
@@ -74,7 +76,7 @@ function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInit
   const auto = (): boolean => opts.autoEnable === true || matchesUrlRules(pageUrl, settings?.translationAllowedUrls ?? []);
 
   const sync = (): void => {
-    const want = !stopped && settings !== null && settings.translateEnabled && (auto() || wanted);
+    const want = !stopped && !paused && settings !== null && settings.translateEnabled && (auto() || wanted);
     if (want === on) return;
     on = want;
     if (want) getTranslator().start();
@@ -102,6 +104,7 @@ function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInit
       const st: Partial<PageState> = {};
       if (stopped) return st;
       st.screenshot = "available";
+      if (settings) st.translation = { enabled: on, globallyEnabled: settings.translateEnabled, scope: auto() ? "site" : "page", paused };
       // 总开关关着：不给字段，popup 就不会画一个点不动的按钮。白名单里的本来就挂着，也不给
       if (settings?.translateEnabled && !auto()) st.translateHere = on ? "on" : "available";
       return st;
@@ -119,7 +122,15 @@ function startTranslation(ctx: PageContext, opts: TranslationOptions, wantedInit
     translateHere: () => {
       if (stopped) return;
       wanted = true;
+      paused = false;
       sync();
+    },
+    setEnabled: (enabled) => {
+      if (stopped) return;
+      paused = !enabled;
+      if (enabled) wanted = true;
+      sync();
+      ctx.changed();
     },
   };
 }

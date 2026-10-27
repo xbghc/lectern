@@ -15,3 +15,6 @@ export const ReaderError: Story = { name: '阅读器 · 抓取失败', args: { p
 export const Settings: Story = { name: '设置', args: { page: 'appOptions' } };
 
 export const Classification: Story = { name: 'LLM 文章筛选', args: { tab: 'classification' } };
+
+export const Books: Story = { name: "书架 · 本地 EPUB", args: { tab: "books" } };
+export const WordReview: Story = { name: "生词复习", args: { tab: "review" } };

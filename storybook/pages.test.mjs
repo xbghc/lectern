@@ -6,12 +6,14 @@ import { compilePages } from '../.storybook/pages-plugin.mjs';
 const pages = await compilePages();
 const scenarios = [
   ['popup', 'populated', 'current', '正在计时'],
-  ['popup', 'empty', 'history', '还没有'],
+  ['popup', 'empty', 'current', '还没有'],
   ['popup', 'error', 'current', '文章判断失败'],
-  ['popup', 'populated', 'overview', '专注'],
+  ['popup', 'populated', 'translation', '划词翻译'],
   ['dashboard', 'populated', 'articles', '共 3 篇'],
   ['dashboard', 'empty', 'articles', '还没有阅读记录'],
   ['dashboard', 'populated', 'words', 'consolidate'],
+  ['dashboard', 'populated', 'stats', '今日最长连续'],
+  ['app', 'populated', 'books', '深度阅读的技艺'],
   ['dashboard', 'populated', 'review', '显示答案'],
   ['dashboard', 'populated', 'articleReview', 'Understanding the browser event loop'],
   ['dashboard', 'populated', 'classification', 'LLM：非文章'],
@@ -300,4 +302,56 @@ test('an article card unfolds into its own focus sessions, looked-up words and s
       assert.deepEqual(Array.from(dom.window.__previewErrors), []);
     } finally { closeWindow(); }
   }
+});
+
+test('popup focus and translation controls stay independent, and tab changes preserve the rule draft', async () => {
+  const html = pages.popup.replace('<!--PREVIEW_CONFIG-->', '<script>window.__PREVIEW__={page:"popup",state:"populated",tab:"current"}</script>');
+  let close;
+  const dom = new JSDOM(html, {
+    url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
+    beforeParse(window) {
+      close = window.close.bind(window);
+      window.structuredClone = structuredClone;
+      window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder;
+      window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+    },
+  });
+  const settle = () => new Promise(resolve => setTimeout(resolve, 40));
+  try {
+    await settle();
+    const { document, chrome, KeyboardEvent } = dom.window;
+    const settings = await chrome.runtime.sendMessage({ type: 'settings:get' });
+    assert.equal(document.getElementById('tab-focus').getAttribute('aria-selected'), 'true');
+    document.getElementById('tab-focus').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    assert.equal(document.getElementById('tab-translation').getAttribute('aria-selected'), 'true');
+    document.querySelector('[role=switch]').click();
+    await settle();
+    assert.equal(document.querySelector('[role=switch]').getAttribute('aria-checked'), 'false');
+    const draft = document.querySelector('.rc-input');
+    draft.value = '这个站点以后不记录';
+    document.getElementById('tab-focus').click();
+    await settle();
+    assert.ok(document.querySelector('.focus-current').classList.contains('is-active'));
+    document.querySelector('.focus-control').click();
+    await settle();
+    assert.ok(document.querySelector('.current-state').textContent.includes('本页已暂停'));
+    document.getElementById('tab-translation').click();
+    await settle();
+    assert.equal(document.querySelector('[role=switch]').getAttribute('aria-checked'), 'false');
+    assert.equal(document.querySelector('.rc-input').value, '这个站点以后不记录');
+    assert.deepEqual(await chrome.runtime.sendMessage({ type: 'settings:get' }), settings);
+    document.querySelector('[role=switch]').click();
+    await settle();
+    const scope = document.getElementById('translation-scope');
+    scope.value = 'site'; scope.dispatchEvent(new dom.window.Event('change'));
+    await settle();
+    const changed = await chrome.runtime.sendMessage({ type: 'settings:get' });
+    assert.ok(changed.translationAllowedUrls.includes('example.com'));
+    assert.equal(changed.translateEnabled, settings.translateEnabled);
+    document.getElementById('tab-focus').click();
+    await settle();
+    assert.ok(document.querySelector('.current-state').textContent.includes('本页已暂停'));
+    assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+  } finally { close(); }
 });

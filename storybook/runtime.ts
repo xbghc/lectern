@@ -1,6 +1,8 @@
 import { handle } from '../src/background/handle.ts';
 import { installChromeShim, memoryBackend } from '../src/app/shim.ts';
 import { ARTICLE_URL, fixtures } from './fixtures.ts';
+import { matchesUrlRules } from "../src/lib/url.ts";
+import type { Settings } from "../src/types.ts";
 import type { AnyMessage, PageState } from '../src/types.ts';
 import type { SyncStatus } from '../src/sync/engine.ts';
 
@@ -110,10 +112,17 @@ let pageState: PageState = options.state === 'nonArticle' || options.state === '
   : { tracked: true, articleId: ARTICLE_URL, title: seed.articles[0]!.title,
       totalWords: 1500, trackedWords: 1400, wordsRead: 560, paragraphCount: 18, readParagraphCount: 7, activeSince: Date.now() - 125_000,
       screenshot: 'available' };
+let translationWanted = options.state === "populated";
+let translationPaused = false;
 Object.assign(chrome.tabs, {
   query: async () => [{ id: 1, windowId: 1, active: true, url: ARTICLE_URL, title: seed.articles[0]!.title }],
-  sendMessage: async (_id: number, msg: { type: string }) => {
-    if (msg.type === 'page:translate-here') pageState = { ...pageState, translateHere: 'on' };
+  sendMessage: async (_id: number, msg: { type: string; enabled?: boolean; paused?: boolean }) => {
+    const settings = (await storage.get('settings')).settings as Settings;
+    if (msg.type === 'page:translate-here') { translationWanted = true; translationPaused = false; }
+    if (msg.type === 'page:translation-toggle') { translationPaused = !msg.enabled; if (msg.enabled) translationWanted = true; }
+    if (msg.type === 'page:reading-pause') pageState = { ...pageState, readingPaused: msg.paused, activeSince: msg.paused ? null : Date.now() };
+    const site = matchesUrlRules(ARTICLE_URL, settings.translationAllowedUrls);
+    pageState.translation = { enabled: settings.translateEnabled && !translationPaused && (site || translationWanted), globallyEnabled: settings.translateEnabled, scope: site ? 'site' : 'page', paused: translationPaused };
     return pageState;
   },
 });

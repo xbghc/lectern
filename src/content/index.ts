@@ -22,11 +22,13 @@ let provideState: () => PageState = () => ({ tracked: false, reason: "初始化�
 let screenshot: () => void = () => undefined;
 /** popup 的「本页启用划词翻译」。插件还没挂上时点到就是空操作——那时 popup 也拿不到按钮。 */
 let translateHere: () => void = () => undefined;
+let setTranslation: (enabled: boolean) => void = () => undefined;
+let setReadingPaused: (paused: boolean) => void = () => undefined;
 /** 后台通知的同文档导航。不在跟踪的文档（iframe、非 HTML）上什么都不做。 */
 let urlChanged: (url: string) => void = () => undefined;
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  const m = msg as { type?: string; url?: string } | null;
+  const m = msg as { type?: string; url?: string; enabled?: boolean; paused?: boolean } | null;
   const type = m?.type;
   if (type === "page:archive") {
     void captureCurrentArticle().then(sendResponse, (err: unknown) => {
@@ -43,6 +45,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false; // 后台是发完就不管的，不必应答
   }
   if (type === "page:translate-here") translateHere();
+  else if (type === "page:translation-toggle" && typeof m?.enabled === "boolean") setTranslation(m.enabled);
+  else if (type === "page:reading-pause" && typeof m?.paused === "boolean") setReadingPaused(m.paused);
   else if (type !== "page:state") return false;
   // 两种询问都回一份现算的状态：开启之后 popup 要立刻把按钮换成「已开启」
   sendResponse(provideState());
@@ -61,6 +65,8 @@ function main(): void {
   });
   provideState = () => host.state();
   translateHere = () => host.get("translation")?.translateHere();
+  setTranslation = (enabled) => host.get("translation")?.setEnabled(enabled);
+  setReadingPaused = (paused) => host.get("reading")?.setPaused(paused);
   screenshot = () => host.get("translation")?.screenshot();
   urlChanged = (url) => host.urlChanged(url);
   host.start(location.href);

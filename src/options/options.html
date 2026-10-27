@@ -192,10 +192,29 @@
         /* 保存条吸在视口边上时占的是正文的地方：三个按钮挤一行，别叠成两行 */
         .savebar button { flex: 1 1 0; }
       }
+      /* Same paper surfaces and typography as the reading workspace. */
+      body { max-width:780px; padding-top:38px; }
+      h1 { font-size:32px; font-weight:400; margin:20px 0 16px; }
+      .settings-back { font-size:12px; text-decoration:none; color:var(--accent); }
+      fieldset { border:0; border-top:1px solid var(--line); border-radius:0; padding:22px 0; margin:26px 0; background:transparent; }
+      legend { padding:0 10px 0 0; font:21px var(--serif); }
+      .field { grid-template-columns:190px 110px 1fr; gap:12px; margin:16px 0; }
+      input[type="text"], input[type="password"], input[type="number"], textarea, .provider-picker input, .provider-picker select, #protocol { border-radius:5px; background:var(--card); padding:9px 11px; }
+      button { border-radius:5px; background:var(--card); }
+      .field.check input[type="checkbox"] { appearance:none; position:relative; width:35px; height:21px; border-radius:20px; background:var(--line); border:1px solid var(--line); cursor:pointer; }
+      .field.check input[type="checkbox"]::before { content:''; position:absolute; left:2px; top:2px; width:15px; height:15px; border-radius:50%; background:var(--card); }
+      .field.check input[type="checkbox"]:checked { background:var(--accent); border-color:var(--accent); }
+      .field.check input[type="checkbox"]:checked::before { transform:translateX(14px); }
+      .section-nav a { border-left:0; border-radius:5px; padding:9px 12px; }
+      .section-nav a[aria-current] { background:var(--wash); }
+      .status-panel { background:var(--card); border-radius:6px; }
+      @media(min-width:960px) { body.has-nav{ --nav-left:max(24px,calc(50% - 490px)); margin-left:calc(var(--nav-left) + 210px); } .section-nav{ top:48px; width:180px; } }
+      @media(max-width:560px) { body{padding-top:14px} .field{grid-template-columns:1fr} .field.check{grid-template-columns:1fr auto} h1{font-size:28px} fieldset{padding:18px 0;margin:20px 0} .field .wide{grid-column:auto} .field.check input[type="checkbox"]{width:39px;height:25px} .field.check input[type="checkbox"]::before{width:19px;height:19px} }
     </style>
   </head>
   <body>
-    <h1>Lectern 设置</h1>
+    <a class="settings-back" href="dashboard.html">‹ 返回读书台</a>
+    <h1>偏好设置</h1>
     <p class="muted small">
       阅读记录保存在本机；启用同步后，也会保存到你配置的服务器。<strong>打开的网页会自动发给模型判断是不是文章</strong>（文章记录黑名单里的除外）；<strong>划词翻译会把选中的文本及其所在段落发送给模型</strong>——只有下面翻译白名单里的站点自动开启，其余页面要从弹出面板手动开启。
     </p>

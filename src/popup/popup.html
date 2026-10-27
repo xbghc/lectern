@@ -1,31 +1,15 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <title>Lectern</title>
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
-    <nav class="tabs" role="tablist">
-      <button class="tab is-active" data-tab="current" role="tab">当前页</button>
-      <button class="tab" data-tab="history" role="tab">历史</button>
-      <button class="tab" data-tab="overview" role="tab">概览</button>
-    </nav>
-
-    <section id="panel-current" class="panel"></section>
-    <section id="panel-history" class="panel" hidden></section>
-    <section id="panel-overview" class="panel" hidden></section>
-
-    <details id="rule-chat" class="rulechat-wrap">
-      <summary>用一句话改黑名单、白名单</summary>
-    </details>
-
-    <footer class="foot">
-      <a id="open-dashboard" href="#">面板 / 复习</a>
-      <a id="open-panel" href="#">本页生词</a>
-      <a id="open-options" href="#">设置</a>
-    </footer>
-
-    <script src="popup.js"></script>
-  </body>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Lectern</title><link rel="stylesheet" href="popup.css" /></head>
+<body class="extension-popup">
+  <header class="popup-brand"><a id="open-home" class="brand" href="#"><span data-icon="book"></span><span class="brand-name">Lectern</span></a><button id="open-options" class="icon-btn" aria-label="打开设置" title="设置"><span data-icon="settings"></span></button></header>
+  <nav class="popup-tabs" role="tablist" aria-label="插件功能">
+    <button id="tab-focus" class="tab is-active" data-tab="current" role="tab" aria-selected="true" aria-controls="panel-current"><span data-icon="clock"></span>专注</button>
+    <button id="tab-translation" class="tab" data-tab="translation" role="tab" aria-selected="false" aria-controls="panel-translation" tabindex="-1"><span data-icon="words"></span>翻译</button>
+  </nav>
+  <section id="panel-current" class="popup-body" role="tabpanel" aria-labelledby="tab-focus"></section>
+  <section id="panel-translation" class="popup-body" role="tabpanel" aria-labelledby="tab-translation" hidden></section>
+  <footer class="popup-footer"><a id="open-dashboard" href="#"><span><span data-icon="chart"></span><span id="dashboard-label">查看完整统计</span></span><span data-icon="arrow"></span></a></footer>
+  <script src="popup.js"></script>
+</body>
 </html>

@@ -6,6 +6,7 @@ import { normalizeUrl } from "../../lib/url.ts";
 import type { Overview, ReadingPosition, Session } from "../../types.ts";
 import type { ReadingSettings } from "./settings.ts";
 import { buildOverview } from "../../lib/stats.ts";
+import { recentActivity } from "../../lib/activity.ts";
 import { samePosition } from "../../lib/position.ts";
 import {
   articleReviewState,
@@ -258,6 +259,7 @@ export const readingHandlers = {
     return { sessions, paragraphs: await getParagraphs(id) };
   },
   "stats:overview": () => overview(),
+  "stats:activity": async () => ({ sessions: recentActivity(await getSessions(), Date.now()) }),
   "article:finish": async (m) => {
     const article = await setFinished(m.articleId, m.finished);
     return { ok: article !== null, article };

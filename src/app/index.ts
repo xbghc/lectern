@@ -40,7 +40,7 @@ savedSummary.textContent = "插件保存的文章";
 const savedList = document.createElement("div");
 savedList.className = "list";
 savedSection.append(savedSummary, savedList);
-document.getElementById("book-section")?.after(savedSection);
+document.getElementById("continue-reading")?.after(savedSection);
 let archiveRender = 0;
 async function renderSavedArticles(): Promise<void> {
   const turn = ++archiveRender;
@@ -116,6 +116,7 @@ if (shared) {
   else {
     hint.hidden = false;
     hint.textContent = "分享过来的内容里没有网址。";
+    $<HTMLDialogElement>("article-dialog").showModal();
   }
 }
 
@@ -133,6 +134,7 @@ const bookList = $("book-list");
 /** 封面的临时地址，重画前逐个回收。 */
 let coverUrls: string[] = [];
 let openBookId = new URLSearchParams(location.search).get("book") ?? "";
+if (openBookId) document.querySelector<HTMLButtonElement>('[data-tab="books"]')?.click();
 let importing = false;
 let shelfDrawn = false;
 
@@ -251,6 +253,7 @@ async function renderBooks(): Promise<void> {
   for (const url of coverUrls) URL.revokeObjectURL(url);
   coverUrls = urls;
   bookSection.hidden = books.length === 0;
+  $("book-empty").hidden = books.length > 0;
   if (books.length > 0) {
     // 只在第一次画的时候展开：用户收起来之后，一次同步或一次导入不该把它又掀开
     if (!shelfDrawn) (bookSection as HTMLDetailsElement).open = true;
@@ -267,6 +270,7 @@ async function renderBooks(): Promise<void> {
  */
 async function importBook(uri?: string): Promise<void> {
   if (importing) return;
+  document.querySelector<HTMLButtonElement>('[data-tab="books"]')?.click();
   importing = true;
   $<HTMLButtonElement>("import-book").disabled = true;
   try {

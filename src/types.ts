@@ -145,6 +145,8 @@ export interface ArticleMeta {
 /** 供 popup 显示的当前页实时状态。 */
 export interface PageState {
   tracked: boolean;
+  readingPaused?: boolean;
+  translation?: { enabled: boolean; globallyEnabled: boolean; scope: "page" | "site"; paused?: boolean };
   /** 未追踪时说明原因（排除域名 / 非文章页）。 */
   reason?: string;
   /**
@@ -256,6 +258,7 @@ export type PopupToBg =
   | { type: "articles:list" }
   | { type: "article:sessions"; articleId: string }
   | { type: "stats:overview" }
+  | { type: "stats:activity" }
   | { type: "data:export" }
   /** 把另一台设备导出的文件合并进来。规则见 lib/merge.ts。 */
   | { type: "data:import"; bundle: unknown }
@@ -298,6 +301,8 @@ export type PopupToBg =
   | { type: "ui:track"; events: string[] };
 
 export type PopupToContent =
+  | { type: "page:reading-pause"; paused: boolean }
+  | { type: "page:translation-toggle"; enabled: boolean }
   | { type: "page:screenshot" }
   | { type: "page:state" }
   /** 「本页启用划词翻译」：只对本次加载有效。应答和 page:state 一样是更新后的 PageState。 */

@@ -2,28 +2,44 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lectern</title>
     <link rel="stylesheet" href="popup.css" />
     <link rel="stylesheet" href="dashboard.css" />
   </head>
   <body class="dash">
-    <header>
-      <h1>Lectern</h1>
-      <nav>
-        <button data-tab="articles" class="tab active">文章</button>
-        <button data-tab="review" class="tab">复习 <span id="due-badge" class="badge" hidden></span></button>
-        <button data-tab="words" class="tab">生词本</button>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="app-sidebar">
+      <a class="brand" href="#articles"><span data-icon="book"></span><span class="brand-name">Lectern</span></a>
+      <div class="brand-subtitle">读 书 台</div>
+      <p class="nav-label">你的阅读空间</p>
+      <nav aria-label="主导航">
+        <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>我的阅读</span></button>
+        <button data-tab="words" class="tab"><span data-icon="words"></span><span>生词本</span><span id="nav-word-count" class="nav-count"></span></button>
+        <button data-tab="review" class="tab"><span data-icon="review"></span><span>间隔复习</span><span id="due-badge" class="badge" hidden></span></button>
+        <button data-tab="stats" class="tab stats-nav"><span data-icon="chart"></span><span>阅读统计</span></button>
+
+        <a id="to-options" href="#" class="settings-link"><span data-icon="settings"></span><span>偏好设置</span></a>
       </nav>
-      <a id="to-options" href="#" class="muted small">设置</a>
+      <div class="sidebar-quote">读过的每一页，<br>都成为你的一部分。</div>
+      <div class="sidebar-local"><strong><i></i>本地优先，安心阅读</strong><span>数据由你保管，节奏由你决定。</span></div>
     </header>
+    <div class="workspace-bar"><div class="breadcrumb">读书台 <span data-icon="chevron"></span><span id="workspace-title">我的阅读</span></div><button id="workspace-search" class="icon-btn" aria-label="搜索文章" title="搜索文章（Ctrl / ⌘ K）"><span data-icon="search"></span></button></div>
+    <main id="main" class="dashboard-main">
+
 
     <!-- ---------------- 文章 ---------------- -->
     <section id="pane-articles" class="pane">
+      <div class="page-heading"><div><h1>把阅读，留在心里。</h1><p>继续昨日的好奇，也为新的想法留一点空间。</p></div><button id="add-article" class="primary add-trigger"><span data-icon="plus"></span><span>添加文章</span></button></div>
+      <div id="reading-metrics" class="reading-metrics" aria-label="阅读概览"></div>
+      <div class="reading-layout"><div class="reading-main">
+      <div id="continue-reading"></div>
+      <div class="section-heading"><h2>我的文章</h2><span>一点一滴，读过有迹</span></div>
       <div class="article-controls">
       <div id="article-search" class="toolbar article-search">
         <div id="finish-filter" class="filterbar" role="group" aria-label="按阅读状态筛选">
           <button type="button" data-filter="" aria-pressed="true">全部</button>
-          <button type="button" data-filter="reading" aria-pressed="false">未读完</button>
+          <button type="button" data-filter="reading" aria-pressed="false">阅读中</button>
           <button type="button" data-filter="done" aria-pressed="false">已读完</button>
         </div>
         <span id="article-summary" class="muted small"></span>
@@ -56,10 +72,13 @@
       </section>
       <details id="blacklist-section" class="blacklist-section" hidden><summary>网址黑名单建议</summary><div id="blacklist-suggestions"></div></details>
       <div id="articles" class="list"></div>
+      <div class="list-view-controls" role="group" aria-label="文章视图"><button data-view="list" class="icon-btn" aria-label="列表视图" aria-pressed="true"><span data-icon="list"></span></button><button data-view="grid" class="icon-btn" aria-label="网格视图" aria-pressed="false"><span data-icon="grid"></span></button></div>
+      </div><aside id="reading-rail" class="reading-rail" aria-label="阅读与复习"></aside></div>
     </section>
 
     <!-- ---------------- 复习 ---------------- -->
     <section id="pane-review" class="pane" hidden>
+      <div class="page-heading"><div><h1>让记忆，再深一点。</h1><p>读过的词，值得再见一面。</p></div></div>
       <!-- 两个队列不交错渲染：生词卡是一个词，文章卡是一整篇，节奏完全不同 -->
       <div class="segbar">
         <button class="seg active" data-queue="words">生词<span id="seg-words-n" class="n"></span></button>
@@ -71,6 +90,7 @@
 
     <!-- ---------------- 生词本 ---------------- -->
     <section id="pane-words" class="pane" hidden>
+      <div class="page-heading"><div><h1>在阅读中，慢慢积累。</h1><p>每个词，都有你遇见它的语境。</p></div><button id="words-review" class="primary">开始复习 <span data-icon="arrow"></span></button></div>
       <div class="toolbar">
         <input id="q-word" type="search" placeholder="搜索原文、译文或出处" />
         <select id="kind-filter">
@@ -83,6 +103,15 @@
       </div>
       <div id="words" class="list"></div>
     </section>
+
+    <section id="pane-stats" class="pane" hidden><div class="page-heading"><div><h1>一点一滴，读过有迹。</h1><p>看看最近的阅读节奏，找到适合自己的步调。</p></div></div><div id="statistics"></div></section>
+    </main>
+    <dialog id="article-dialog" class="article-dialog" aria-labelledby="add-title">
+      <div class="dialog-heading"><h2 id="add-title">添加一篇文章</h2><button id="close-add" class="icon-btn" type="button" aria-label="关闭添加文章">×</button></div>
+      <p class="muted">打开网页后，Lectern 会识别文章并记录阅读进度。</p>
+      <form id="add" class="addrow"><label class="visually-hidden" for="add-url">文章地址</label><input id="add-url" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required /><button id="add-go" type="submit" class="primary">阅读</button></form>
+      <p id="add-hint" class="muted small" role="status" hidden></p>
+    </dialog>
 
     <script src="dashboard.js"></script>
   </body>

@@ -14,11 +14,14 @@ export type ReadingOptions = Pick<TrackOptions, "focus" | "extract" | "approvedA
 export interface ReadingFeature extends PageFeature {
   /** 宿主通知可见性变化（App 切到后台再回来）。扩展里 visibilitychange 事件自己会驱动，不必调。 */
   setVisible(visible: boolean): void;
+  setPaused(paused: boolean): void;
 }
 
-export function readingPlugin(opts: ReadingOptions = {}): PagePlugin<ReadingFeature> {
+export function readingPlugin(opts: ReadingOptions = {}): PagePlugin<ReadingFeature, boolean> {
   return {
-    start: (ctx) => {
+    carry: (feature) => feature.state().readingPaused === true,
+    start: (ctx, carried) => {
+      let paused = carried === true;
       let ctl: TrackController | null = null;
       let reason = "初始化中";
       let stopped: EndReason | null = null;
@@ -35,7 +38,7 @@ export function readingPlugin(opts: ReadingOptions = {}): PagePlugin<ReadingFeat
         (next) => {
           // 起步期间就收摊了（页内又换了一篇、宿主整个停了）：这一轮不作数
           if (stopped !== null) next.stop(stopped);
-          else ctl = next;
+          else { ctl = next; if (paused) ctl.setPaused(true); }
           ctx.changed();
         },
         (err: unknown) => {
@@ -46,6 +49,7 @@ export function readingPlugin(opts: ReadingOptions = {}): PagePlugin<ReadingFeat
       return {
         state: (): Partial<PageState> => ctl?.state() ?? { tracked: false, reason },
         setVisible: (v) => ctl?.setVisible(v),
+        setPaused: (value) => { paused = value; ctl?.setPaused(value); ctx.changed(); },
         stop: (r = "unload") => {
           stopped ??= r;
           ctl?.stop(r);

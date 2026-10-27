@@ -361,3 +361,260 @@ body.mobile-settings .settings-savebar { position: fixed; z-index: 10; top: auto
   display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
   margin: 32px 0 12px; padding-top: 16px; border-top: 1px solid var(--line-soft);
 }
+
+/* Mobile reading workspace from the shared design. Preserve native safe areas. */
+body.app {
+  padding: 0 0 calc(80px + var(--sa-bottom));
+}
+body.app header.app-sidebar {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  padding: calc(18px + var(--sa-top)) max(20px, var(--sa-right)) 12px max(20px, var(--sa-left));
+  background: var(--bg);
+  border: 0;
+}
+body.app .brand-subtitle,
+body.app .nav-label,
+body.app .sidebar-quote,
+body.app .sidebar-local,
+body.app .stats-nav {
+  display: none;
+}
+body.app .app-sidebar .brand {
+  margin: 0;
+}
+body.app .app-sidebar .brand-name {
+  font-size: 28px;
+}
+body.app .app-sidebar nav {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  gap: 0;
+  padding: 7px max(8px, var(--sa-right)) max(7px, var(--sa-bottom)) max(8px, var(--sa-left));
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+body.app .app-sidebar nav .tab,
+body.app .app-sidebar nav .settings-link {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 2px;
+  min-height: 50px;
+  width: auto;
+  border: 0;
+  font-size: 11px;
+  background: none;
+}
+body.app .app-sidebar nav .stats-nav {
+  display: none;
+}
+body.app .app-sidebar .tab.active > [data-icon] {
+  border-radius: 16px;
+  background: var(--wash);
+  padding: 2px 14px;
+  margin-block: -2px;
+}
+body.app .nav-count {
+  display: none;
+}
+body.app .app-sidebar .badge {
+  position: absolute;
+  right: 20%;
+  top: 2px;
+  font-size: 9px;
+  color: var(--accent);
+}
+body.app .workspace-bar {
+  position: absolute;
+  top: calc(20px + var(--sa-top));
+  right: max(20px, var(--sa-right));
+  padding: 0;
+  height: auto;
+  border: 0;
+}
+body.app .breadcrumb {
+  display: none;
+}
+body.app .dashboard-main {
+  max-width: 1000px;
+  padding: 12px max(20px, var(--sa-right)) 30px max(20px, var(--sa-left));
+}
+body.app .reading-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+body.app .reading-rail {
+  display: none;
+}
+body.app .reading-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 18px 0;
+  margin-bottom: 24px;
+}
+body.app .metric-rhythm,
+body.app .metric-note {
+  display: none;
+}
+body.app .reading-metric {
+  padding-inline: 10px;
+}
+body.app .reading-metric:first-child {
+  padding-left: 0;
+}
+body.app .reading-metric:nth-child(3) {
+  border: 0;
+}
+body.app .metric-value {
+  font-size: 22px;
+}
+body.app .metric-label {
+  font-size: 10px;
+}
+body.app .metric-label svg {
+  display: none;
+}
+body.app .page-heading h1 {
+  font-size: 27px;
+}
+body.app #add {
+  margin-top: 0;
+}
+body.app #add-url {
+  font: 14px var(--sans);
+  padding: 11px 12px;
+}
+body.app .addrow button {
+  font-size: 13px;
+  border-radius: 5px;
+  padding: 10px 15px;
+}
+body.app .article-card {
+  padding: 18px 0 16px 44px;
+}
+body.app .article-card .row1 > .title {
+  flex: 1 1 calc(100% - 35px);
+  order: 0;
+}
+body.app .article-card .row1 > .pill {
+  order: 2;
+}
+body.app .article-card .row1 > .article-menu {
+  order: 1;
+}
+body.app .managing-articles .article-card .row1 > .title {
+  flex: 1 1 0;
+}
+body.app .filterbar button {
+  padding: 10px 0;
+  font-size: 12px;
+}
+body.app #search-toggle {
+  padding: 10px;
+}
+body.app #manage-articles {
+  padding: 9px;
+}
+body.app .article-menu > summary {
+  padding: 8px;
+}
+body.app .article-menu-body button {
+  min-height: 42px;
+}
+body.app .book-card {
+  padding: 18px;
+  border-radius: 6px;
+  background: var(--card);
+}
+body.app img.book-cover {
+  position: static;
+  width: 60px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 3px;
+  box-shadow: 3px 3px 0 var(--line);
+}
+body.app #book-section {
+  padding: 0;
+  border: 0;
+}
+body.app #book-section > summary {
+  font-size: 13px;
+}
+body.app #book-list {
+  gap: 18px;
+}
+body.app .book-card .title {
+  font: 20px/1.5 var(--serif);
+}
+body.app .chapter-row {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  padding: 12px 0;
+}
+body.reader {
+  background: var(--bg);
+}
+body.reader .rbar {
+  background: var(--bg);
+  padding-bottom: 10px;
+}
+body.reader .article {
+  max-width: 760px;
+  padding: 32px 24px 80px;
+}
+body.reader .article h1 {
+  font: 32px/1.4 var(--serif);
+  letter-spacing: -.5px;
+}
+body.reader .article .body {
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.95;
+}
+body.reader .sheet {
+  border-radius: 14px 14px 0 0;
+}
+@media (min-width: 721px) {
+  body.app .reading-rail {
+    display: grid;
+  }
+  body.app .reading-layout {
+    grid-template-columns: minmax(0, 1fr) 230px;
+  }
+  body.app .article-card .row1 > .title {
+    flex: 1;
+  }
+}
+body.app .workspace-bar {
+  z-index: 16;
+}
+body.app .page-heading .add-trigger {
+  position: fixed;
+  right: max(22px, var(--sa-right));
+  bottom: calc(90px + var(--sa-bottom));
+  z-index: 18;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  padding: 0;
+  box-shadow: 0 4px 16px #302c2720;
+}
+body.app .add-trigger > span:last-child {
+  display: none;
+}
+body.app .add-trigger .ui-icon {
+  width: 22px;
+  height: 22px;
+}

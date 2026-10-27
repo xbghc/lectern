@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/html-vite';
 import { controls, renderPage, type PageArgs } from './render.ts';
 export default {
   title: '扩展/页面', render: renderPage, argTypes: controls,
-  args: { page: 'dashboard', state: 'populated', tab: 'articles', width: 1040, height: 860 },
+  args: { page: 'dashboard', state: 'populated', tab: 'articles', width: 1380, height: 1000 },
 } satisfies Meta<PageArgs>;
 type Story = StoryObj<PageArgs>;
 export const Articles: Story = { name: '文章 · 筛选与批量操作' };
@@ -19,3 +19,5 @@ export const EmptySidebar: Story = { name: '侧边栏 · 空状态', args: { pag
 export const Classification: Story = { name: 'LLM 文章筛选 · 混合结果', args: { tab: 'classification' } };
 export const ClassificationLoading: Story = { name: 'LLM 文章筛选 · 处理中', args: { tab: 'classification', state: 'loading' } };
 export const ClassificationFailed: Story = { name: 'LLM 文章筛选 · 失败重试', args: { tab: 'classification', state: 'error' } };
+
+export const Statistics: Story = { name: "阅读统计 · 真实片段", args: { tab: "stats" } };

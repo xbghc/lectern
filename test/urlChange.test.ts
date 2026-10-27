@@ -379,3 +379,33 @@ test("插件说「状态变了」时宿主转给界面；被顶掉的那几轮�
   said[1]!();
   assert.deepEqual(changes, ["changed"]);
 });
+
+test('本页暂停结算当前片段，滚动和宿主可见通知不会重新开始，继续后另开一段', async () => {
+  sent = [];
+  mock.timers.enable({ apis: ['setInterval', 'Date'], now: 1_700_000_000_000 });
+  let ctl: Awaited<ReturnType<typeof startTracking>> | undefined;
+  try {
+    ctl = await startTracking({ url: FIRST, focus: 'assume', extract: () => extractFromContainer(doc.getElementById('art')!, '渡口') });
+    ctl.setVisible(true);
+    ioCb(paras.map(target => ({ target, isIntersecting: true })));
+    await run(4_000);
+    ctl.setPaused(true);
+    const words = ctl.state().wordsRead;
+    assert.equal(ctl.state().activeSince, null);
+    assert.equal(ctl.state().readingPaused, true);
+    assert.equal(sent.filter(m => m.type === 'session:end').length, 1);
+    const starts = sent.filter(m => m.type === 'session:start').length;
+    ctl.setVisible(false); ctl.setVisible(true);
+    doc.dispatchEvent(new dom.window.Event('scroll'));
+    doc.dispatchEvent(new dom.window.Event('keydown'));
+    await run(10_000);
+    assert.equal(ctl.state().wordsRead, words);
+    assert.equal(sent.filter(m => m.type === 'session:start').length, starts);
+    ctl.setPaused(false);
+    doc.dispatchEvent(new dom.window.Event('scroll'));
+    await run(1_000);
+    assert.equal(ctl.state().readingPaused, false);
+    assert.ok(ctl.state().activeSince);
+    assert.equal(sent.filter(m => m.type === 'session:start').length, starts + 1);
+  } finally { ctl?.stop(); await run(0); mock.timers.reset(); }
+});

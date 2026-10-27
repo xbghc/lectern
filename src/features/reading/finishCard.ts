@@ -25,10 +25,10 @@ const CSS = `
   gap: 10px;
   padding: 10px 10px 10px 14px;
   border-radius: 3px;
-  border: 1px solid #d3cbbd;
-  border-left: 3px solid #9c4d14;
-  background: #f6f0e7;
-  color: #3a342e;
+  border: 1px solid #e6dfd5;
+  border-left: 3px solid #a45531;
+  background: #fffdfa;
+  color: #302c27;
   box-shadow: 0 1px 2px rgba(31, 27, 22, 0.06), 0 10px 28px rgba(31, 27, 22, 0.14);
   font: 13px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   animation: rise 240ms cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -42,31 +42,31 @@ const CSS = `
 }
 .label { display: flex; flex-direction: column; gap: 1px; }
 .title { font-weight: 600; letter-spacing: -0.01em; }
-.sub { color: #6c6254; font-size: 11.5px; }
+.sub { color: #766d62; font-size: 11.5px; }
 button {
   font: inherit;
   cursor: pointer;
   border-radius: 2px;
-  border: 1px solid #d3cbbd;
+  border: 1px solid #e6dfd5;
   background: #ebe5db;
-  color: #574e44;
+  color: #554e45;
   padding: 5px 11px;
   transition: color 120ms, border-color 120ms;
 }
 /* 触屏上点过之后 :hover 会一直挂着，所以只给真有悬停的设备；手指用 :active */
-@media (hover: hover) { button:hover { color: #9c4d14; border-color: #9c4d14; } }
-button:active { color: #9c4d14; border-color: #9c4d14; }
+@media (hover: hover) { button:hover { color: #a45531; border-color: #a45531; } }
+button:active { color: #a45531; border-color: #a45531; }
 @media (pointer: coarse) { button { padding: 11px 14px; } }
 .close {
   padding: 5px 8px;
   border-color: transparent;
   background: transparent;
-  color: #6c6254;
+  color: #766d62;
   font-size: 15px;
   line-height: 1;
 }
-@media (hover: hover) { .close:hover { color: #574e44; border-color: transparent; background: transparent; } }
-.close:active { color: #574e44; border-color: transparent; background: transparent; }
+@media (hover: hover) { .close:hover { color: #554e45; border-color: transparent; background: transparent; } }
+.close:active { color: #554e45; border-color: transparent; background: transparent; }
 @media (pointer: coarse) { .close { padding: 11px 13px; } }
 @media (prefers-color-scheme: dark) {
   .card { background: #342f2c; color: #d6cec3; border-color: #423e38; border-left-color: #e18d5a; }

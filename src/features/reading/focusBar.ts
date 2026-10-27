@@ -32,7 +32,7 @@ const CSS = `
   height: 3px;
   z-index: 2147483644; /* 压在读完角标、位置提示之下 */
   pointer-events: none;
-  --read: #9c4d14;
+  --read: #a45531;
   --earlier: #7d8896;
   --glanced: rgba(156, 77, 20, 0.32);
   --unseen: rgba(128, 128, 128, 0.2);

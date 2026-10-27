@@ -77,6 +77,7 @@ export interface TrackController {
   state(): PageState;
   /** 宿主通知可见性变化（App 切到后台再回来）。扩展里 visibilitychange 事件自己会驱动，不必调。 */
   setVisible(visible: boolean): void;
+  setPaused(paused: boolean): void;
   /** 结束追踪：结算最后一段、判一次读完、拆掉所有监听。重复调用无害。 */
   stop(reason?: EndReason): void;
 }
@@ -87,6 +88,7 @@ type SettingsListener = Parameters<typeof chrome.storage.onChanged.addListener>[
 const idle = (reason: string): TrackController => ({
   state: () => ({ tracked: false, reason }),
   setVisible: () => undefined,
+  setPaused: () => undefined,
   stop: () => undefined,
 });
 
@@ -536,7 +538,10 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   );
   for (const type of ["wheel", "keydown", "touchmove"]) on(document, type, signal, opts_);
 
-  on(document, "visibilitychange", () => machine.setVisible(document.visibilityState === "visible"));
+  let paused = false;
+  let hostVisible = document.visibilityState === "visible";
+  const updateVisibility = (): void => { if (!torn) machine.setVisible(hostVisible && !paused); };
+  on(document, "visibilitychange", () => { hostVisible = document.visibilityState === "visible"; updateVisibility(); });
   // 视口高了矮了，屏幕上那一截跟着变
   on(window, "resize", scheduleBar, { passive: true });
   if (!assumeFocus) {
@@ -607,11 +612,13 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   machine.bootstrap();
 
   return {
-    state: () => excludedNow ? { tracked: false, reason: excludedNow } : state(),
+    state: () => excludedNow ? { tracked: false, reason: excludedNow } : { ...state(), readingPaused: paused },
     setVisible: (v) => {
       // 宿主直接调的，不在 finish 摘掉的那组监听里：收摊之后再通知可见也不该重新计时
-      if (!torn) machine.setVisible(v);
+      hostVisible = v;
+      updateVisibility();
     },
+    setPaused: (value) => { paused = value; updateVisibility(); scheduleBar(); },
     stop: (reason = "unload") => finish(reason)(),
   };
 

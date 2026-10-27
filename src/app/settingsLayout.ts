@@ -3,6 +3,7 @@ import { sectionName } from "../options/nav.ts";
 /** Keep the shared settings controls and handlers, but give the app a compact section index. */
 export function setupSettingsLayout(): void {
   document.body.classList.add("mobile-settings");
+  document.querySelector(".settings-back")?.remove();
   const title = document.querySelector("h1");
   if (title) title.textContent = "设置";
   const intro = title?.nextElementSibling;

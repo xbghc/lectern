@@ -1,564 +1,206 @@
-import type {
-  Article,
-  ArticleReviewState,
-  EndReason,
-  Overview,
-  PageState,
-  ParagraphRecord,
-  PopupToContent,
-  Session,
-  SpeedSummary,
-} from "../types.ts";
-import { formatDuration, overviewInsights, wordsPerMinute } from "../lib/stats.ts";
-import { describeBasis, estimateArticle, formatEstimate } from "../lib/readingTime.ts";
-import { hostnameOf } from "../lib/url.ts";
-import { clear, el, empty } from "./dom.ts";
-import { ruleChatBox } from "./ruleChat.ts";
-import { onSyncUpdated } from "../lib/syncUpdated.ts";
-import { reasonOf } from "../lib/reason.ts";
+import type { ArticleReviewState, PageState, PopupToContent } from '../types.ts';
+import { readingActivity, type ActivitySession } from '../lib/activity.ts';
+import { hostnameOf } from '../lib/url.ts';
+import { reasonOf } from '../lib/reason.ts';
+import { onSyncUpdated } from '../lib/syncUpdated.ts';
+import { icon, decorateIcons } from '../ui/icons.ts';
+import { minutes, sessionTimeline, weekChart, duration as formatDuration } from '../ui/activity.ts';
+import { el } from './dom.ts';
+import { ruleChatBox } from './ruleChat.ts';
 
-const REASON_LABEL: Record<EndReason, string> = {
-  idle: "走神",
-  stall: "发呆",
-  hidden: "切走",
-  blur: "失焦",
-  unload: "离开",
-  recovered: "补记",
-};
-
-function ask<T>(msg: unknown): Promise<T> {
-  return chrome.runtime.sendMessage(msg) as Promise<T>;
-}
-
-const panels = {
-  current: document.getElementById("panel-current")!,
-  history: document.getElementById("panel-history")!,
-  overview: document.getElementById("panel-overview")!,
-};
-
-function kv(rows: Array<[string, string]>): HTMLElement {
-  return el(
-    "dl",
-    { class: "kv" },
-    rows.flatMap(([k, v]) => [el("dt", {}, [k]), el("dd", {}, [v])]),
-  );
-}
-
-/* ---------- 当前页 ---------- */
-
-let liveTimer: ReturnType<typeof setInterval> | null = null;
-let archiveSaving = false;
-let archiveResult = "";
-
-function archiveNode(): HTMLElement {
-  const row = el("div", { class: "actions" });
-  const btn = el("button", { type: "button", class: "btn" }, [archiveSaving ? "正在保存正文和图片…" : "保存文章到同步库"]);
-  btn.disabled = archiveSaving;
-  const note = el("div", { class: "muted small", role: "status" }, [archiveResult || "保存在本机，连接同步服务器后可在手机阅读"]);
-  btn.addEventListener("click", () => {
-    archiveSaving = true;
-    archiveResult = "";
-    btn.disabled = true;
-    btn.textContent = "正在保存正文和图片…";
-    void askPage<{ ok?: boolean; missing?: number; error?: string }>({ type: "page:archive" }).then(result => {
-      archiveResult = result?.ok
-        ? result.missing ? `已保存，${result.missing} 项图片未能获取；可在页面加载完成后重新保存` : "文章和图片已保存在本机，将随同步上传"
-        : result?.error || "保存未完成，请保持原网页打开后重试";
-    }, (err: unknown) => {
-      archiveResult = err instanceof Error ? err.message : String(err);
-    }).finally(() => {
-      archiveSaving = false;
-      void refreshCurrent();
-    });
-  });
-  row.append(btn, note);
-  return row;
-}
-
-/** 问当前标签页的 content script 一句。chrome:// 页、PDF、扩展商店等注入不了脚本，回 null。 */
-async function askPage<T>(msg: PopupToContent | { type: "page:archive" }): Promise<T | null> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return null;
-  try {
-    return (await chrome.tabs.sendMessage(tab.id, msg)) as T;
-  } catch {
-    return null;
-  }
-}
-
-const fetchPageState = (): Promise<PageState | null> => askPage<PageState>({ type: "page:state" });
-
-function renderCurrent(st: PageState | null): void {
-  const root = panels.current;
-  clear(root);
-  if (liveTimer !== null) {
-    clearInterval(liveTimer);
-    liveTimer = null;
-  }
-
-  if (!st) {
-    root.append(empty("此页面无法追踪（浏览器内部页面或未注入脚本）"));
-    return;
-  }
-  if (!st.tracked) {
-    const box = el("div", { class: "empty" }, [el("div", {}, [st.reason ?? "未追踪"])]);
-    if (st.translateHere) box.append(...translateHereNodes(st));
-    if (st.screenshot === "available") box.append(screenshotNode());
-    box.append(archiveNode());
-    root.append(box);
-    return;
-  }
-
-  root.append(el("h2", {}, [st.title || "（无标题）"]));
-  root.append(archiveNode());
-
-  const durationNode = el("div", { class: "big" }, ["—"]);
-  const label = el("div", { class: "muted small" }, ["当前 session"]);
-  root.append(durationNode, label);
-
-  const paint = (): void => {
-    if (st.activeSince) {
-      durationNode.textContent = formatDuration(Date.now() - st.activeSince);
-      durationNode.classList.add("live");
-      label.textContent = "正在计时";
-    } else {
-      durationNode.textContent = "未在计时";
-      durationNode.classList.remove("live");
-      label.textContent = "切回页面或滚动即可开始新的 session";
-    }
-  };
-  paint();
-  if (st.activeSince) liveTimer = setInterval(paint, 1000);
-
-  const tracked = st.trackedWords ?? 0;
-  const read = st.wordsRead ?? 0;
-  const pct = tracked > 0 ? Math.min(100, Math.round((read / tracked) * 100)) : 0;
-
-  root.append(el("div", { class: "progress" }, [el("span", { style: "width:" + pct + "%" })]));
-
-  const done = st.sessionsThisLoad ?? [];
-  const liveMs = st.activeSince ? Date.now() - st.activeSince : 0;
-  const totalMs = done.reduce((n, s) => n + (s.endTs - s.startTs), 0) + liveMs;
-
-  const rows: Array<[string, string]> = [
-    ["已读", pct + "%（" + read + " / " + tracked + " 字）"],
-    ["段落", (st.readParagraphCount ?? 0) + " / " + (st.paragraphCount ?? 0)],
-    ["本次加载专注", formatDuration(totalMs)],
-    ["session 数", String(done.length + (st.activeSince ? 1 : 0))],
-    ["正文全文", (st.totalWords ?? 0) + " 字"],
-  ];
-  // 走神阈值随视口文字量自适应，把此刻的数字亮出来，"为什么还没算走神"就不用猜
-  if (st.visibleExpectedMs !== undefined && st.idleLimitMs !== undefined) {
-    rows.push(
-      ["这一屏读完约需", formatDuration(st.visibleExpectedMs)],
-      ["静默多久算走神", formatDuration(st.idleLimitMs)],
-    );
-  }
-  // 还要读多久。都读过了就没这一行——那时该说话的是下面的回顾提示
-  const est = st.estimate;
-  if (est && est.words > 0) rows.push(["预计还需", formatEstimate(est.ms)]);
-  root.append(kv(rows));
-  // 依据那句靠负外边距贴着「预计还需」的数字（popup.css 的 .basis），它和 kv 表之间不能插东西——插了就叠在一起
-  if (est && est.words > 0) root.append(el("div", { class: "muted small basis" }, [describeBasis(est)]));
-  // 不在翻译白名单里的文章页：翻译器没挂，这里给「本页开启」的入口。记不记专注和翻不翻译各判各的
-  const actions = [...(st.translateHere ? translateHereNodes(st, true) : []), ...(st.screenshot === "available" ? [screenshotNode()] : [])];
-  if (actions.length > 0) root.append(el("div", { class: "actions" }, actions));
-
-  if (st.articleId) void appendReviewLine(root, st.articleId);
-
-  root.append(el("div", { class: "muted small" }, ["本页 session 时间条"]));
-  root.append(timeline(done, st.activeSince ?? null));
-  if (done.length > 0) {
-    const legend = done
-      .map((s) => formatDuration(s.endTs - s.startTs) + "·" + REASON_LABEL[s.endReason])
-      .join("　");
-    root.append(el("div", { class: "muted small" }, [legend]));
-  }
-}
-
-function screenshotNode(): HTMLElement {
-  const btn = el("button", { type: "button", class: "btn", title: "截图翻译（也可按 Alt+Shift+S 或使用右键菜单）" }, ["截图翻译"]);
-  btn.addEventListener("click", () => {
-    // 等消息真的递出去再关：askPage 里先要查一次当前标签页，紧跟着就 close 的话，
-    // 弹窗常常在消息发出之前就没了，点了等于没点
-    btn.disabled = true;
-    void askPage({ type: "page:screenshot" }).finally(() => window.close());
-  });
-  return btn;
-}
-
-/**
- * 划词翻译的手动入口。
- *
- * 只在不在翻译白名单里的页面上出现：那些页面默认不挂选区监听（在网页应用里选中文本不该悄悄联网）。
- * 「本页启用」只对当前这次加载生效，刷新就回到默认；「本站始终开启」把站点加进白名单，顺手把本页也开了。
- * 文章页的布局里没有那行「为什么没追踪」，没自动开这件事得在这里自己说（explain）。
- */
-function translateHereNodes(st: PageState, explain = false): HTMLElement[] {
-  const nodes: HTMLElement[] = [];
-  if (st.translateHere === "on") {
-    nodes.push(el("div", { class: "small translate-on" }, ["划词翻译已在本页开启，刷新后失效"]));
-  } else {
-    if (explain) nodes.push(el("div", { class: "muted small" }, ["本站不在翻译白名单里，划词翻译没有自动开启"]));
-    const btn = el("button", { type: "button", class: "btn" }, ["本页启用划词翻译"]);
-    btn.addEventListener("click", () => {
-      btn.disabled = true;
-      // 应答就是更新后的状态；拿不到（页面刚好跳走了）就再问一遍
-      void askPage<PageState>({ type: "page:translate-here" })
-        .then(async (next) => renderCurrent(next ?? (await fetchPageState())));
-    });
-    nodes.push(btn);
-  }
-  nodes.push(allowSiteNode());
-  return nodes;
-}
-
-/**
- * 「本站始终开启」：加进翻译白名单。
- *
- * 不等页面那边的设置热更新再重画——storage.onChanged 送到页面要一小会儿，紧跟着问状态多半还是旧的。
- * 直接把本页也开上，按钮换成一句结果。
- */
-function allowSiteNode(): HTMLElement {
-  const btn = el("button", { type: "button", class: "btn" }, ["本站始终开启"]);
-  btn.addEventListener("click", () => {
-    btn.disabled = true;
-    void (async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const url = tab?.url ?? "";
-      const host = hostnameOf(url);
-      if (!host) {
-        btn.replaceWith(el("div", { class: "muted small" }, ["这个页面没有站点可加"]));
-        return;
-      }
-      try {
-        await chrome.runtime.sendMessage({ type: "translation:allow-site", url });
-      } catch (err) {
-        btn.disabled = false;
-        btn.after(el("div", { class: "muted small" }, [`没加上：${reasonOf(err)}`]));
-        return;
-      }
-      await askPage({ type: "page:translate-here" });
-      btn.replaceWith(el("div", { class: "small translate-on" }, [`已把 ${host} 加进翻译白名单，以后自动开启`]));
-    })();
-  });
-  return btn;
-}
-
-/**
- * 「回顾材料备好了没」这一行。
- *
- * 走的是只读查询，**不会触发生成**——打开一次 popup 就烧一次 token 说不过去。
- * 异步追加而不是阻塞整个面板：这一行没了不影响别的信息。
- */
-async function appendReviewLine(root: HTMLElement, articleId: string): Promise<void> {
-  let st: ArticleReviewState;
-  try {
-    st = (await chrome.runtime.sendMessage({ type: "article:review-state", articleId })) as ArticleReviewState;
-  } catch {
-    return; // 后台正在重启，这一行可有可无
-  }
-  if (!st?.hasText) return; // 还没读到阈值，没什么可说的
-
-  const row = el("div", { class: "review-line" });
-  row.append(el("span", {}, [st.hasReview ? "回顾材料已备好" : "正在准备回顾材料…"]));
-
-  // 回顾卡是读完那一刻才建的。没读完就给链接会跳到一个空白面板。
-  if (st.carded) {
-    const go = el("a", { href: "#" }, ["去回顾"]);
-    go.addEventListener("click", (e) => {
-      e.preventDefault();
-      void chrome.tabs.create({
-        url: chrome.runtime.getURL("dashboard.html") + "#review:" + encodeURIComponent(articleId),
-      });
-    });
-    row.append(go);
-  } else if (st.hasReview) {
-    row.append(el("span", { class: "hint-right" }, ["读完后进入回顾队列"]));
-  }
-  root.append(row);
-}
-
-/** 每段宽度正比于时长，段与段之间留一个正比于间隔的空隙。 */
-function timeline(done: NonNullable<PageState["sessionsThisLoad"]>, activeSince: number | null): HTMLElement {
-  const row = el("div", { class: "timeline" });
-  const segs = [
-    ...done.map((s) => ({ start: s.startTs, ms: s.endTs - s.startTs, live: false })),
-    ...(activeSince ? [{ start: activeSince, ms: Date.now() - activeSince, live: true }] : []),
-  ];
-  if (segs.length === 0) {
-    row.append(el("span", { class: "muted small" }, ["本次加载还没有 session"]));
-    return row;
-  }
-  const last = segs[segs.length - 1]!;
-  const first = segs[0]!;
-  const span = Math.max(1, last.start + last.ms - first.start);
-  let prevEnd = first.start;
-  for (const s of segs) {
-    const gapPct = ((s.start - prevEnd) / span) * 100;
-    if (gapPct > 0.5) row.append(el("span", { class: "gap", style: "flex:" + gapPct }));
-    row.append(
-      el("span", {
-        class: s.live ? "seg is-live" : "seg",
-        style: "flex:" + Math.max(1, (s.ms / span) * 100),
-        title: new Date(s.start).toLocaleTimeString() + " · " + formatDuration(s.ms),
-      }),
-    );
-    prevEnd = s.start + s.ms;
-  }
-  return row;
-}
-
-/* ---------- 历史 ---------- */
-
-const expanded = new Set<string>();
-
-/** 画着的那份历史长什么样；后台刷新拿它比，没变就不重画。 */
-let paintedHistory = "";
-
-/**
- * onlyIfChanged：同步拉到新东西之后的那次刷新用（见文件末尾）。先取、再清、一口气画完——
- * 清在前面的话，两次调用叠在一起会各画一遍，列表翻倍。
- */
-async function renderHistory(onlyIfChanged = false): Promise<void> {
-  const root = panels.history;
-  const res = await ask<{ articles: Article[]; speed: SpeedSummary | null }>({ type: "articles:list" });
-  const withData = res.articles.filter((a) => a.sessionCount > 0);
-  // 速度摘要的 updatedTs 每次落库都是「现在」，不参与比较
-  const face = JSON.stringify([withData, res.speed && { ...res.speed, updatedTs: 0 }]);
-  if (onlyIfChanged && face === paintedHistory) return;
-  paintedHistory = face;
-  const top = root.scrollTop;
-  clear(root);
-  if (withData.length === 0) {
-    root.append(empty("还没有记录。打开一篇文章读一会儿就会出现。"));
-    return;
-  }
-  for (const a of withData) root.append(articleItem(a, res.speed ?? null));
-  root.scrollTop = top;
-}
-
-function articleItem(a: Article, speed: SpeedSummary | null): HTMLElement {
-  const pct = a.trackedWords > 0 ? Math.round((a.wordsRead / a.trackedWords) * 100) : 0;
-  const wpm = Math.round(wordsPerMinute(a.wordsRead, a.totalMs));
-  const item = el("div", { class: "item" });
-  // 回合数比片段数更接近"来读了几次"；老记录没有回合字段时只显示片段
-  const meta =
-    a.episodeCount !== undefined && a.episodeCount > 0
-      ? formatDuration(a.totalMs) + " · " + a.episodeCount + " 回合 / " + a.sessionCount + " 段"
-      : formatDuration(a.totalMs) + " · " + a.sessionCount + " 段";
-  const head = el("div", { class: "item-head" }, [
-    el("span", { class: "item-title", title: a.title }, [a.title || a.url]),
-    el("span", { class: "item-meta" }, [meta]),
-  ]);
-  const body = el("div");
-  head.addEventListener("click", () => {
-    if (expanded.has(a.id)) {
-      expanded.delete(a.id);
-      clear(body);
-    } else {
-      expanded.add(a.id);
-      void renderSessions(a, body);
-    }
-  });
-  const hostNode = el("div", { class: "item-host" }, [hostnameOf(a.url) + " · 已读 " + pct + "% · " + wpm + " 字/分"]);
-  // 没读完的才说还需多久；依据放在 title 里，窄栏放不下一整句
-  const left = a.finished ? null : estimateArticle(a, speed);
-  if (left && left.words > 0) {
-    hostNode.append(" · 还需" + formatEstimate(left.ms));
-    hostNode.title = describeBasis(left);
-  }
-  item.append(head, hostNode, body);
-  if (expanded.has(a.id)) void renderSessions(a, body);
-  return item;
-}
-
-async function renderSessions(a: Article, host: HTMLElement): Promise<void> {
-  clear(host);
-  const res = await ask<{ sessions: Session[]; paragraphs: ParagraphRecord[] }>({
-    type: "article:sessions",
-    articleId: a.id,
-  });
-  if (res.sessions.length === 0) {
-    host.append(el("div", { class: "muted small" }, ["没有 session 明细"]));
-    return;
-  }
-  const fmt = new Intl.DateTimeFormat("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const rows = res.sessions.map((s) => {
-    const ms = s.endTs - s.startTs;
-    return el("tr", {}, [
-      el("td", {}, [fmt.format(new Date(s.startTs))]),
-      el("td", {}, [formatDuration(ms)]),
-      el("td", {}, [String(s.wordsRead)]),
-      el("td", {}, [String(Math.round(wordsPerMinute(s.wordsRead, ms)))]),
-      el("td", {}, [el("span", { class: "reason" }, [REASON_LABEL[s.endReason]])]),
-    ]);
-  });
-  host.append(
-    el("table", { class: "sessions" }, [
-      el("thead", {}, [
-        el("tr", {}, [
-          el("th", {}, ["开始"]),
-          el("th", {}, ["时长"]),
-          el("th", {}, ["字数"]),
-          el("th", {}, ["字/分"]),
-          el("th", {}, ["结束"]),
-        ]),
-      ]),
-      el("tbody", {}, rows),
-    ]),
-  );
-}
-
-/* ---------- 概览 ---------- */
-
-async function renderOverview(): Promise<void> {
-  const root = panels.overview;
-  clear(root);
-  const o = await ask<Overview>({ type: "stats:overview" });
-  root.append(el("h2", {}, ["近 7 天"]));
-  if (o.sessionCount === 0) {
-    root.append(empty("近 7 天没有记录"));
-    return;
-  }
-  const readingPct = o.totalMs > 0 ? Math.round((o.readingMs / o.totalMs) * 100) : 0;
-  // 解读放最前面、用正文字号：它是这一栏唯一的结论，以前却缀在十三个数字后面、用最小最淡的字
-  // 只在数据支持时才说话——一句在任何数据下都显示的解读等于没有解读
-  for (const line of overviewInsights(o)) root.append(el("p", { class: "insight" }, [line]));
-  root.append(
-    kv([
-      ["总专注时长", formatDuration(o.totalMs)],
-      ["其中读到新内容", formatDuration(o.readingMs) + "（" + readingPct + "%）"],
-      ["文章数", String(o.articleCount)],
-      ["已读字数", String(o.wordsRead)],
-      // 速度只按读到新内容的时间算：回看和停留会把它稀释成一个没有含义的数
-      ["阅读速度", Math.round(wordsPerMinute(o.wordsRead, o.readingMs)) + " 字/分"],
-    ]),
-  );
-
-  // 回合是主指标：session 的边界是"输入信号中断"，量的是两次输入之间的间隔，不是注意力长度
-  root.append(
-    kv([
-      ["回合数", String(o.episodeCount)],
-      ["回合中位数", formatDuration(o.episodeMedianMs)],
-    ]),
-  );
-
-  // 分布的细目和供对照的原始片段收起来：380px 的弹窗里十三个数字一字排开，没有一个看得进去
-  const more = el("details", { class: "more" }, [el("summary", {}, ["回合与片段的明细"])]);
-  more.append(
-    el("div", { class: "muted small" }, [
-      "回合：同一篇文章内间隔不超过 " + formatDuration(o.episodeGapMs) + " 的片段合成一个",
-    ]),
-    kv([
-      ["回合 P90", formatDuration(o.episodeP90Ms)],
-      ["最长回合", formatDuration(o.longestEpisodeMs)],
-    ]),
-    el("div", { class: "muted small" }, ["原始片段 · 供对照"]),
-    kv([
-      ["片段数", String(o.sessionCount)],
-      ["片段中位数", formatDuration(o.medianMs)],
-      ["片段 P90", formatDuration(o.p90Ms)],
-      ["切换频率", Math.round(o.switchesPerHour) + " 次/时"],
-    ]),
-  );
-
-  // 结束原因的构成：idle 是"没输入"、blur/hidden 是"切走了"，混在一个分布里没法读
-  const reasons = (Object.keys(REASON_LABEL) as EndReason[])
-    .filter((r) => o.byReason[r].count > 0)
-    .sort((a, b) => o.byReason[b].count - o.byReason[a].count)
-    .map((r) => REASON_LABEL[r] + " " + o.byReason[r].count);
-  more.append(el("div", { class: "muted small" }, ["结束原因　" + reasons.join("　")]));
-  root.append(more);
-}
-
-/* ---------- 标签页切换 ---------- */
-
-for (const btn of document.querySelectorAll<HTMLButtonElement>(".tab")) {
-  btn.addEventListener("click", () => {
-    for (const b of document.querySelectorAll(".tab")) b.classList.toggle("is-active", b === btn);
-    const name = btn.dataset["tab"] as keyof typeof panels;
-    for (const [k, p] of Object.entries(panels)) p.toggleAttribute("hidden", k !== name);
-    if (name === "history") void renderHistory();
-    if (name === "overview") void renderOverview();
-  });
-}
-
-document.getElementById("open-options")!.addEventListener("click", (e) => {
-  e.preventDefault();
-  chrome.runtime.openOptionsPage();
-});
-
-document.getElementById("open-dashboard")!.addEventListener("click", (e) => {
-  e.preventDefault();
-  void chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
-});
-
-/**
- * sidePanel.open() 只在**用户手势的同步调用栈**里有效，await 之后再调会被拒。
- * 所以窗口 id 在 popup 打开时就预取好，点击时直接同步用。
- */
+const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+const ask = <T,>(message: unknown): Promise<T> => chrome.runtime.sendMessage(message) as Promise<T>;
+const panels = { current: $('panel-current'), translation: $('panel-translation') };
+let tab: keyof typeof panels = 'current';
+let state: PageState | null = null;
+let activeTab: chrome.tabs.Tab | undefined;
+let sessions: ActivitySession[] = [];
+let refreshId = 0;
+let controlBusy = false;
 let currentWindowId: number | null = null;
-void chrome.windows.getCurrent().then((w) => {
-  currentWindowId = w.id ?? null;
-});
+let paintLive: (() => void) | null = null;
+let rules: HTMLDetailsElement | null = null;
+decorateIcons();
+void chrome.windows.getCurrent().then(w => { currentWindowId = w.id ?? null; });
 
-document.getElementById("open-panel")!.addEventListener("click", (e) => {
-  e.preventDefault();
-  if (currentWindowId === null) return;
-  // 同步发起（手势要求），失败只记日志——popup 马上就关了，没地方显示错误
-  chrome.sidePanel.open({ windowId: currentWindowId }).catch((err: unknown) => {
-    console.warn("[lectern] 打开侧边栏失败", err);
-  });
-  window.close();
-});
-
-// 打开历史会催后台同步一轮（background/handle.ts 的 articles:list）；手机上刚读的那篇拉到之后，开着的历史跟着补上
-onSyncUpdated(() => {
-  if (!panels.history.hasAttribute("hidden")) void renderHistory(true).catch(() => undefined);
-});
-
-async function refreshCurrent(): Promise<void> {
-  renderCurrent(await fetchPageState());
+async function askPage(message: PopupToContent): Promise<PageState | null> {
+  const [current] = await chrome.tabs.query({ active: true, currentWindow: true });
+  activeTab = current;
+  if (!current?.id) return null;
+  try { return await chrome.tabs.sendMessage(current.id, message) as PageState; }
+  catch { return null; }
 }
-
-void refreshCurrent();
-
-/*
- * 底部那个「用一句话改黑名单、白名单」。「这个站」「这一页」指当前标签页。
- * 写完之后隔一会儿再问页面状态：页面那边的设置热更新要一小会儿才到（同 allowSiteNode 的说明），
- * 紧跟着问多半还是旧的——比如刚把这站拉黑，追踪要等热更新到了才收摊。
- */
-const ruleChat = document.getElementById("rule-chat") as HTMLDetailsElement;
-const chatBox = ruleChatBox({
-  pageUrl: async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.url,
-  onApplied: () => {
-    setTimeout(() => void refreshCurrent(), 400);
-  },
-});
-ruleChat.append(chatBox);
-ruleChat.addEventListener("toggle", () => {
-  if (ruleChat.open) chatBox.querySelector("input")?.focus();
-});
-/*
- * 本地每秒只是插值，session 可能在 popup 打开期间结束，定期回源校正。
- *
- * 校正是整块重画，不能打断人：这一栏内容常常超过 460px 要滚着看，每三秒弹回顶上没法读；
- * 键盘焦点在里面（正要按「保存」）时重画会把焦点所在的节点整个换掉。所以焦点在栏里就跳过这一轮，
- * 重画之后把滚动位置放回去。
- */
-setInterval(() => {
+function openDashboard(pane: string): void {
+  void chrome.tabs.create({ url: `${chrome.runtime.getURL('dashboard.html')}#${pane}` });
+}
+function button(label: string, action: () => void, className = 'secondary'): HTMLButtonElement {
+  const b = el('button', { type: 'button', class: className }, [label]);
+  b.addEventListener('click', action);
+  return b;
+}
+async function changePage(message: PopupToContent): Promise<void> {
+  if (controlBusy) return;
+  controlBusy = true;
+  try {
+    const next = await askPage(message);
+    if (!next) throw new Error('页面已关闭或不支持此操作，请回到网页重试');
+    state = next;
+    await refresh();
+  } catch (error) { panels[tab].append(el('p', { class: 'error', role: 'alert' }, [reasonOf(error)])); }
+  finally { controlBusy = false; }
+}
+function renderFocus(): void {
   const root = panels.current;
-  if (root.hasAttribute("hidden") || root.contains(document.activeElement)) return;
-  void (async () => {
-    const st = await fetchPageState();
-    const top = root.scrollTop;
-    renderCurrent(st);
-    root.scrollTop = top;
-  })();
-}, 3000);
+  const selected = root.querySelector<HTMLElement>('.focus-segment[aria-pressed="true"]')?.dataset.session;
+  const detailOpen = root.querySelector<HTMLDetailsElement>('.page-detail')?.open ?? false;
+  const activity = readingActivity(sessions, Date.now(), state);
+  const total = el('b', {}, [minutes(activity.today.totalMs)]);
+  const delta = el('strong');
+  const longest = el('strong', {}, [formatDuration(activity.longestMs)]);
+  const clock = el('strong', { id: 'current-clock' });
+  const heading = el('div', { class: 'focus-hero' }, [
+    el('div', {}, [el('h3', {}, ['今日专注']), el('div', { class: 'focus-total' }, [total, el('span', {}, ['分钟'])])]),
+    el('div', { class: 'focus-comparison' }, [delta, el('span', {}, ['较昨日'])]),
+  ]);
+  const facts = el('div', { class: 'focus-facts' }, [el('div', {}, [el('span', {}, ['专注片段']), el('strong', {}, [String(activity.today.count), el('small', {}, [' 段'])])]), el('div', {}, [el('span', {}, ['最长连续']), longest])]);
+  const live = !!state?.activeSince;
+  const current = el('div', { class: `focus-current${live ? ' is-active' : ''}` }, [
+    el('div', {}, [el('span', { class: 'current-label' }, ['本次连续']), clock]),
+    el('div', { class: 'current-state' }, [el('span', {}, [el('i'), state?.readingPaused ? '本页已暂停' : live ? '正在计时' : state?.tracked ? '等待继续阅读' : '未在计时']),
+      el('small', {}, [state?.tracked ? hostnameOf(activeTab?.url ?? state.articleId ?? '') : state?.reason ?? '此页面无法追踪'])])]);
+  if (state?.tracked) {
+    const paused = state.readingPaused === true;
+    const label = paused ? '继续本页专注统计' : '暂停本页专注统计';
+    const control = button('', () => void changePage({ type: 'page:reading-pause', paused: !paused }), 'icon-btn focus-control');
+    control.setAttribute('aria-label', label); control.title = label; control.append(icon(paused ? 'play' : 'pause'));
+    current.append(control);
+  }
+  const weekTotal = el('span', {}, [`共 ${formatDuration(activity.totalMs)}`]);
+  const trend = el('section', { class: 'focus-trend' }, [el('div', { class: 'focus-section-heading' }, [el('h3', {}, ['近 7 天']), weekTotal]), weekChart(activity)]);
+  const overview = el('div', { class: 'focus-overview' }, [heading, facts, current, sessionTimeline(activity, selected), trend]);
+  if (state?.tracked) {
+    const detail = el('details', { class: 'page-detail' }, [el('summary', {}, ['当前文章与阅读进度'])]);
+    detail.open = detailOpen;
+    const pct = state.trackedWords ? Math.min(100, Math.round((state.wordsRead ?? 0) / state.trackedWords * 100)) : 0;
+    detail.append(el('h2', {}, [state.title || '当前文章']), el('p', { class: 'muted small' }, [`已读 ${pct}% · ${state.wordsRead ?? 0} / ${state.trackedWords ?? 0} 字`]), archiveControl());
+    const articleId = state.articleId;
+    if (articleId) void ask<ArticleReviewState>({ type: 'article:review-state', articleId }).then(info => {
+      if (info?.carded) detail.append(button('回顾这篇文章', () => openDashboard(`review:${encodeURIComponent(articleId)}`), 'text-btn'));
+    }).catch(() => undefined);
+    overview.append(detail);
+  }
+  root.replaceChildren(overview);
+  paintLive = () => {
+    const fresh = readingActivity(sessions, Date.now(), state);
+    total.textContent = minutes(fresh.today.totalMs);
+    const difference = fresh.today.totalMs - fresh.yesterday.totalMs;
+    delta.replaceChildren(`${difference >= 0 ? '+' : '−'}${minutes(Math.abs(difference))}`, el('span', {}, [' 分钟']));
+    longest.textContent = formatDuration(fresh.longestMs);
+    const seconds = state?.activeSince ? Math.max(0, Math.floor((Date.now() - state.activeSince) / 1000)) : 0;
+    clock.textContent = state?.activeSince ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : '—';
+    weekTotal.textContent = `共 ${formatDuration(fresh.totalMs)}`;
+  };
+  paintLive();
+}
+function archiveControl(): HTMLElement {
+  const status = el('p', { class: 'muted small', role: 'status' });
+  const save = button('保存文章到同步库', () => {
+    save.disabled = true; status.textContent = '正在保存正文和图片…';
+    void (async () => {
+      const [current] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!current?.id) throw new Error('当前页面不可用');
+      const result = await chrome.tabs.sendMessage(current.id, { type: 'page:archive' }) as { ok?: boolean; missing?: number; error?: string } | undefined;
+      if (!result?.ok) throw new Error(result?.error ?? '保存未完成，请保持原网页打开后重试');
+      status.textContent = result.missing ? `已保存；${result.missing} 项图片未能获取，可稍后重试。` : '已保存在本机，连接同步服务器后可在手机阅读。';
+    })().catch(error => { status.textContent = reasonOf(error); }).finally(() => { save.disabled = false; });
+  });
+  return el('div', { class: 'archive-control' }, [save, status]);
+}
+function renderTranslation(): void {
+  paintLive = null;
+  const root = panels.translation;
+  const translation = state?.translation;
+  const enabled = translation?.enabled ?? state?.translateHere === 'on';
+  const globallyEnabled = translation?.globallyEnabled ?? !!state?.translateHere;
+  const site = translation?.scope === 'site';
+  const host = hostnameOf(activeTab?.url ?? '');
+  const toggle = button('', () => void changePage({ type: 'page:translation-toggle', enabled: !enabled }), `toggle${enabled ? ' on' : ''}`);
+  toggle.setAttribute('role', 'switch'); toggle.setAttribute('aria-checked', String(enabled)); toggle.setAttribute('aria-label', '本页划词翻译');
+  toggle.disabled = !state || !globallyEnabled;
+  const scope = el('select', { id: 'translation-scope' }, [el('option', { value: 'page' }, ['仅此页面']), el('option', { value: 'site' }, ['本站始终开启'])]);
+  scope.value = site ? 'site' : 'page'; scope.disabled = !globallyEnabled || !host || !enabled;
+  // Broader whitelist rules must not be silently removed by a page-specific control.
+  scope.options[0]!.disabled = site;
+  scope.addEventListener('change', () => {
+    if (scope.value !== 'site' || !activeTab?.url) return;
+    scope.disabled = true;
+    void ask({ type: 'translation:allow-site', url: activeTab.url }).then(() => changePage({ type: 'page:translation-toggle', enabled: true }))
+      .catch(error => { scope.disabled = false; root.append(el('p', { role: 'alert' }, [reasonOf(error)])); });
+  });
+  const feature = el('div', { class: 'popup-feature' }, [
+    el('div', { class: 'translation-page-context' }, [icon('book'), host || '当前页面']),
+    el('div', { class: 'feature-heading' }, [el('span', { class: 'feature-icon' }, [icon('words')]), el('div', { class: 'feature-title' }, [
+      el('h3', {}, ['划词翻译']), el('span', { class: `feature-state${enabled ? ' is-on' : ''}` }, [el('i'), !state ? '此页面不支持翻译' : !globallyEnabled ? '全局已关闭' : enabled ? '选中文字即可翻译' : '本页未开启'])]), toggle]),
+    el('div', { class: 'translation-scope' }, [el('label', { for: 'translation-scope' }, ['启用范围']), scope]),
+    el('p', { class: 'scope-explanation' }, [!globallyEnabled ? '可在设置中开启划词翻译。' : site ? '本站按白名单自动开启；本页暂停不改变站点规则。范围可在设置中管理。' : '仅对此次页面加载有效，刷新后恢复本站默认设置。']),
+  ]);
+  const shortcuts = el('div', { class: 'translation-shortcuts' });
+  if (state?.screenshot === 'available') shortcuts.append(button('截图翻译', () => { void askPage({ type: 'page:screenshot' }).finally(() => window.close()); }));
+  shortcuts.append(button(globallyEnabled ? '打开生词本' : '翻译设置', () => globallyEnabled ? openDashboard('words') : void chrome.runtime.openOptionsPage(), 'text-btn'));
+  feature.append(shortcuts);
+  const panel = button('本页生词', () => {
+    if (currentWindowId === null) return;
+    // sidePanel.open must stay in the synchronous user gesture.
+    void chrome.sidePanel.open({ windowId: currentWindowId }).then(() => window.close()).catch(error => {
+      feature.append(el('p', { role: 'alert' }, [reasonOf(error)]));
+    });
+  }, 'text-btn');
+  panel.id = 'open-panel'; feature.append(panel);
+  if (state && !state.tracked) feature.append(archiveControl());
+  if (!rules) {
+    rules = el('details', { class: 'rulechat-wrap', id: 'rule-chat' }, [el('summary', {}, ['用一句话改黑名单、白名单'])]);
+    rules.append(ruleChatBox({ pageUrl: async () => activeTab?.url, onApplied: () => { setTimeout(() => void refresh(), 400); } }));
+  }
+  root.replaceChildren(feature, rules);
+}
+async function refresh(): Promise<void> {
+  const id = ++refreshId;
+  try {
+    const [page, activity] = await Promise.all([askPage({ type: 'page:state' }), ask<{ sessions: ActivitySession[] }>({ type: 'stats:activity' })]);
+    if (id !== refreshId) return;
+    state = page; sessions = activity.sessions;
+    if (tab === 'current') renderFocus(); else renderTranslation();
+  } catch (error) {
+    if (id !== refreshId) return;
+    panels[tab].replaceChildren(el('p', { role: 'alert' }, [`读取失败：${reasonOf(error)}`]), button('重试', () => void refresh()));
+  }
+}
+function selectTab(next: keyof typeof panels): void {
+  tab = next;
+  for (const [key, root] of Object.entries(panels)) root.hidden = key !== tab;
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    const active = b.dataset.tab === tab;
+    b.classList.toggle('is-active', active); b.setAttribute('aria-selected', String(active)); b.tabIndex = active ? 0 : -1;
+  }
+  $('dashboard-label').textContent = tab === 'current' ? '查看完整统计' : '打开读书台';
+  void refresh();
+}
+const tabs = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+tabs.forEach((b, i) => {
+  b.addEventListener('click', () => selectTab(b.dataset.tab as keyof typeof panels));
+  b.addEventListener('keydown', e => {
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i + tabs.length - 1) % tabs.length : -1;
+    if (next < 0) return; e.preventDefault(); tabs[next]!.focus(); tabs[next]!.click();
+  });
+});
+$('open-home').addEventListener('click', e => { e.preventDefault(); openDashboard('articles'); });
+$('open-dashboard').addEventListener('click', e => { e.preventDefault(); openDashboard(tab === 'current' ? 'stats' : 'articles'); });
+$('open-options').addEventListener('click', () => void chrome.runtime.openOptionsPage());
+onSyncUpdated(() => { if (!panels[tab].contains(document.activeElement)) void refresh(); });
+void refresh();
+let tick = 0;
+const timer = setInterval(() => {
+  paintLive?.();
+  if (++tick % 3 === 0 && !controlBusy && !panels[tab].contains(document.activeElement)) void refresh();
+}, 1000);
+window.addEventListener('pagehide', () => { clearInterval(timer); refreshId++; });

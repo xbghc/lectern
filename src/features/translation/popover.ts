@@ -74,12 +74,12 @@ const CSS = `
   max-height: min(70vh, 520px);
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 12px 14px;
-  border-radius: 3px;
-  border: 1px solid #d3cbbd;
-  border-top: 3px solid #9c4d14;
-  background: #f6f0e7;
-  color: #3a342e;
+  padding: 18px 20px;
+  border-radius: 8px;
+  border: 1px solid #e6dfd5;
+
+  background: #fffdfa;
+  color: #302c27;
   box-shadow: 0 1px 2px rgba(31, 27, 22, 0.06), 0 10px 28px rgba(31, 27, 22, 0.12);
   font: 14px/1.7 "Source Serif 4", Georgia, "Songti SC", "Noto Serif CJK SC", "SimSun", serif;
   overflow-wrap: break-word;
@@ -96,38 +96,38 @@ const CSS = `
  */
 .box.scrolls { overscroll-behavior: contain; }
 .head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 5px; }
-.term { font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
+.term { font-weight: 600; font-size: 23px; letter-spacing: -0.01em; }
 /*
  * 截断过的原文可以点：点一下展开全文，再点收起（见 fillTerm）。没截断的不挂 aria-expanded，不可点也不变色。
  * 不学音标描虚线：一整段粗体原文底下拖一道线太吵，结尾那个「…」本身就在说后面还有。
  */
 .term[aria-expanded] { cursor: pointer; }
-@media (hover: hover) { .term[aria-expanded]:hover { color: #9c4d14; } }
-.term[aria-expanded]:active { color: #9c4d14; }
+@media (hover: hover) { .term[aria-expanded]:hover { color: #a45531; } }
+.term[aria-expanded]:active { color: #a45531; }
 /* 注脚一律无衬线，和 popup / dashboard 同一套分工 */
 .meta {
-  color: #6c6254; font-size: 11.5px;
+  color: #766d62; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 .tr { font-size: 16px; margin: 3px 0 6px; }
-.note { color: #574e44; font-size: 13px; line-height: 1.85; }
-.ctx { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e3dbcf; display: flex; gap: 7px; flex-wrap: wrap; }
+.note { color: #554e45; font-size: 13px; line-height: 1.85; }
+.ctx { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1ebe2; display: flex; gap: 7px; flex-wrap: wrap; }
 
 /* ---- 讲解：用法一行，生词逐条 ---- */
-.usage { margin-top: 7px; color: #574e44; font-size: 13px; line-height: 1.8; }
+.usage { margin-top: 7px; color: #554e45; font-size: 13px; line-height: 1.8; }
 .usage::before {
   content: "用法 · ";
   color: #8f8475; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
-.vocab { margin-top: 9px; padding-top: 8px; border-top: 1px solid #e3dbcf; }
+.vocab { margin-top: 9px; padding-top: 8px; border-top: 1px solid #f1ebe2; }
 /* 还没生成到的时候整块藏起来，免得先亮出一条空的分隔线和一个"用法 ·" */
 .usage:empty, .vocab:empty { display: none; }
 .v + .v { margin-top: 8px; }
 .vh { display: flex; align-items: baseline; gap: 7px; }
 .vw { font-weight: 600; }
 .vm {
-  color: #6c6254; font-size: 11.5px;
+  color: #766d62; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 /*
@@ -136,24 +136,24 @@ const CSS = `
  */
 .ph { cursor: pointer; border-bottom: 1px dotted #aea392; }
 /* :hover 一律关进 (hover: hover)，理由见 popup.css——这一份浮层在手机上也用 */
-@media (hover: hover) { .ph:hover { color: #9c4d14; border-bottom-color: #9c4d14; } }
-.ph:active { color: #9c4d14; border-bottom-color: #9c4d14; }
-.vd { font-size: 13px; line-height: 1.75; color: #574e44; }
+@media (hover: hover) { .ph:hover { color: #a45531; border-bottom-color: #a45531; } }
+.ph:active { color: #a45531; border-bottom-color: #a45531; }
+.vd { font-size: 13px; line-height: 1.75; color: #554e45; }
 .vn {
-  font-size: 12px; line-height: 1.7; color: #6c6254;
+  font-size: 12px; line-height: 1.7; color: #766d62;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 button {
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   font-size: 12px; cursor: pointer;
   padding: 4px 11px; border-radius: 3px;
-  border: 1px solid #d0c8ba; background: #efe9de; color: #574e44;
+  border: 1px solid #d0c8ba; background: #faf8f4; color: #554e45;
   /* 拖选浮层里的字时，别把按钮上的字也圈进去 */
   -webkit-user-select: none;
   user-select: none;
 }
-@media (hover: hover) { button:hover { border-color: #9c4d14; color: #9c4d14; } }
-button:active { background: #e3dbcf; border-color: #9c4d14; color: #9c4d14; }
+@media (hover: hover) { button:hover { border-color: #a45531; color: #a45531; } }
+button:active { background: #f1ebe2; border-color: #a45531; color: #a45531; }
 /*
  * 「还在写」的尾灯。译文约 800ms 就到，讲解还要两三秒——中间没有任何动静的话，
  * 浮层看起来就是已经完事了，人转头就走，正要出来的讲解白生成。
@@ -162,17 +162,17 @@ button:active { background: #e3dbcf; border-color: #9c4d14; color: #9c4d14; }
 .more { display: none; margin-top: 9px; }
 .more.on { display: block; }
 /* ---- 追问：译文出来之后，就着这一段再问一句 ---- */
-.ask { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e3dbcf; }
+.ask { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1ebe2; }
 /* 骨架里先空着。译文还没到就先亮一道分隔线，看着像下面还有东西没加载出来 */
 .ask:empty { display: none; }
 .qa + .qa { margin-top: 10px; }
 .qq {
-  color: #6c6254; font-size: 11.5px;
+  color: #766d62; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 .qq::before { content: "问 · "; }
 /* 答案里的换行是模型自己分的段，留着 */
-.aa { margin-top: 3px; font-size: 13px; line-height: 1.8; color: #574e44; white-space: pre-wrap; }
+.aa { margin-top: 3px; font-size: 13px; line-height: 1.8; color: #554e45; white-space: pre-wrap; }
 .askbar { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
 /*
  * 图标按钮：拿一个字符当图标，不写文字标签。同 App 阅读器顶栏的 .iconbtn（那里是 ‹ 和 词）
@@ -186,22 +186,22 @@ button:active { background: #e3dbcf; border-color: #9c4d14; color: #9c4d14; }
   color: #8f8475; font-size: 15px; line-height: 1.3;
   font-family: "Source Serif 4", Georgia, "Songti SC", "Noto Serif CJK SC", "SimSun", serif;
 }
-@media (hover: hover) { .iconbtn:hover { color: #9c4d14; border-color: transparent; background: transparent; } }
-.iconbtn:active { color: #9c4d14; }
+@media (hover: hover) { .iconbtn:hover { color: #a45531; border-color: transparent; background: transparent; } }
+.iconbtn:active { color: #a45531; }
 .qin {
   flex: 1; min-width: 0; box-sizing: border-box;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   font-size: 12px; padding: 4px 8px;
   border: 1px solid #d0c8ba; border-radius: 3px;
-  background: #f6f0e7; color: #3a342e;
+  background: #fffdfa; color: #302c27;
 }
-.qin:focus { outline: none; border-color: #9c4d14; }
+.qin:focus { outline: none; border-color: #a45531; }
 /* 上一问还没答完时禁用。pointer-events 一并关掉，否则 :hover 还会把它描成可点的样子 */
 .qin:disabled, button:disabled { opacity: 0.5; pointer-events: none; }
 .err { color: #845424; }
 .spin {
   display: inline-block; width: 11px; height: 11px;
-  border: 2px solid #d7d0c3; border-top-color: #9c4d14;
+  border: 2px solid #e6dfd5; border-top-color: #a45531;
   border-radius: 50%; animation: r 0.7s linear infinite; vertical-align: -1px;
 }
 @keyframes r { to { transform: rotate(360deg); } }
@@ -223,7 +223,7 @@ button:active { background: #e3dbcf; border-color: #9c4d14; color: #9c4d14; }
 /*
  * 深色的一套覆盖必须排在最后。这些选择器和上面浅色那套**同名同权重**（button、.note、
  * .qin…），@media 不加权重，靠的纯粹是后来居上：排在前面的话，浅色那份会在深色下把它压回去，
- * 卡片是深的、字却还是 #574e44，正文直接看不清。
+ * 卡片是深的、字却还是 #554e45，正文直接看不清。
  */
 @media (prefers-color-scheme: dark) {
   .box { background: #342f2c; color: #d6cec3; border-color: #423e38; border-top-color: #e18d5a; }

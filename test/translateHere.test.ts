@@ -65,7 +65,7 @@ g["chrome"] = {
 const { translationPlugin } = await import("../src/features/translation/page.ts");
 const tick = () => new Promise((r) => setImmediate(r));
 
-async function start(settings: Partial<Settings>, opts: Parameters<typeof translationPlugin>[0] = {}, carried?: boolean) {
+async function start(settings: Partial<Settings>, opts: Parameters<typeof translationPlugin>[0] = {}, carried?: boolean | "paused") {
   stored = { ...DEFAULT_SETTINGS, ...settings };
   const f = translationPlugin(opts).start({
     url: URL_,
@@ -79,10 +79,10 @@ async function start(settings: Partial<Settings>, opts: Parameters<typeof transl
 
 test("不在白名单：只是「可用」，点了才挂监听，停了就摘掉", async () => {
   const f = await start({});
-  assert.deepEqual(f.state(), { screenshot: "available", translateHere: "available" });
+  assert.deepEqual(f.state(), { screenshot: "available", translateHere: "available", translation: { enabled: false, globallyEnabled: true, scope: "page", paused: false } });
   assert.equal(mouseups, 0);
   f.translateHere();
-  assert.deepEqual(f.state(), { screenshot: "available", translateHere: "on" });
+  assert.deepEqual(f.state(), { screenshot: "available", translateHere: "on", translation: { enabled: true, globallyEnabled: true, scope: "page", paused: false } });
   assert.equal(mouseups, 1);
   f.translateHere(); // 再点一次不叠加
   assert.equal(mouseups, 1);
@@ -96,7 +96,7 @@ test("不在白名单：只是「可用」，点了才挂监听，停了就摘�
 
 test("命中白名单：自动挂、不给入口；运行中拿掉就回到手动，加回来又自动挂", async () => {
   const f = await start({ translationAllowedUrls: ["example.com"] });
-  assert.deepEqual(f.state(), { screenshot: "available" });
+  assert.deepEqual(f.state(), { screenshot: "available", translation: { enabled: true, globallyEnabled: true, scope: "site", paused: false } });
   assert.equal(mouseups, 1);
 
   push({ ...DEFAULT_SETTINGS });
@@ -125,7 +125,7 @@ test("总开关关掉即摘监听且不再给按钮；开关回来时用户的�
   assert.equal(mouseups, 1);
   push({ ...DEFAULT_SETTINGS, translateEnabled: false });
   assert.equal(mouseups, 0);
-  assert.deepEqual(f.state(), { screenshot: "available" });
+  assert.deepEqual(f.state(), { screenshot: "available", translation: { enabled: false, globallyEnabled: false, scope: "page", paused: false } });
   push({ ...DEFAULT_SETTINGS });
   assert.equal(mouseups, 1);
   assert.equal(f.state().translateHere, "on");
@@ -134,7 +134,7 @@ test("总开关关掉即摘监听且不再给按钮；开关回来时用户的�
 
 test("总开关本来就关着：白名单里也不挂，不给按钮，点了也不挂", async () => {
   const f = await start({ translateEnabled: false, translationAllowedUrls: ["example.com"] });
-  assert.deepEqual(f.state(), { screenshot: "available" });
+  assert.deepEqual(f.state(), { screenshot: "available", translation: { enabled: false, globallyEnabled: false, scope: "site", paused: false } });
   f.translateHere();
   assert.equal(mouseups, 0);
   f.stop();
@@ -148,7 +148,7 @@ test("和专注记录各判各的：文章记录黑名单不影响翻译", async
 
 test("App 阅读器（autoEnable）：不看白名单，总开关开着就挂", async () => {
   const f = await start({}, { autoEnable: true });
-  assert.deepEqual(f.state(), { screenshot: "available" });
+  assert.deepEqual(f.state(), { screenshot: "available", translation: { enabled: true, globallyEnabled: true, scope: "site", paused: false } });
   assert.equal(mouseups, 1);
   push({ ...DEFAULT_SETTINGS, translateEnabled: false });
   assert.equal(mouseups, 0);
@@ -174,4 +174,31 @@ test("设置还没读回来就收摊：读回来也不挂", async () => {
   } finally {
     hold = false;
   }
+});
+
+
+test("本页暂停独立于白名单和全局开关，bfcache 保留暂停，重新开启不写设置", async () => {
+  const f = await start({ translationAllowedUrls: ["example.com"] });
+  f.setEnabled(false);
+  assert.equal(mouseups, 0);
+  assert.equal(f.state().translation?.paused, true);
+  assert.equal(f.state().translation?.scope, "site");
+  push({ ...DEFAULT_SETTINGS, translationAllowedUrls: ["example.com"], translateEnabled: false });
+  push({ ...DEFAULT_SETTINGS, translationAllowedUrls: ["example.com"] });
+  assert.equal(mouseups, 0, "全局开关变化不能覆盖本页暂停");
+  const carried = translationPlugin().carry!(f);
+  f.stop();
+  const restored = await start({ translationAllowedUrls: ["example.com"] }, {}, carried);
+  assert.equal(mouseups, 0);
+  restored.setEnabled(true);
+  assert.equal(mouseups, 1);
+  assert.equal(restored.state().translation?.enabled, true);
+  assert.deepEqual(stored.translationAllowedUrls, ["example.com"]);
+  restored.stop();
+});
+
+test("未手动暂停的默认关闭状态不能被当作暂停带到下一轮", async () => {
+  const f = await start({});
+  assert.equal(translationPlugin().carry!(f), false);
+  f.stop();
 });

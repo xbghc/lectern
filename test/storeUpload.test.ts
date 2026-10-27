@@ -97,3 +97,80 @@ test("处理失败的包不提交；只上传不提交时也不碰 publish", asy
   assert.equal(result.state, "Uploaded only; not submitted for review");
   assert.equal(draft.calls.length, 2);
 });
+
+const statusUrl = `https://chromewebstore.googleapis.com/v2/${ITEM}:fetchStatus`;
+const cancelUrl = `https://chromewebstore.googleapis.com/v2/${ITEM}:cancelSubmission`;
+const uploadUrl = `https://chromewebstore.googleapis.com/upload/v2/${ITEM}:upload`;
+const publishUrl = `https://chromewebstore.googleapis.com/v2/${ITEM}:publish`;
+const pending = (version = "0.3.19", state = "PENDING_REVIEW") => ({
+  submittedItemRevisionStatus: { state, distributionChannels: [{ crxVersion: version }] },
+});
+const replacement = { sa: SA, publisherId: "pub-1", zip: new Uint8Array([80, 75]), replacePendingVersion: "0.3.19" };
+
+test("explicit replacement cancels only the named pending version and waits before uploading", async () => {
+  const { deps, calls, waits } = fake({
+    "https://token.test/token": [{ body: { access_token: "tok" } }],
+    [statusUrl]: [{ body: pending() }, { body: pending() }, { body: pending("0.3.19", "CANCELLED") }],
+    [cancelUrl]: [{ body: "" }],
+    [uploadUrl]: [{ body: { crxVersion: "0.3.20", uploadState: "SUCCEEDED" } }],
+    [publishUrl]: [{ body: { state: "PENDING_REVIEW" } }],
+  });
+  assert.deepEqual(await uploadToStore(replacement, deps), { crxVersion: "0.3.20", state: "PENDING_REVIEW" });
+  assert.deepEqual(calls.slice(1).map(c => c.url), [statusUrl, cancelUrl, statusUrl, statusUrl, uploadUrl, publishUrl]);
+  assert.deepEqual(waits, [1_000]);
+  assert.equal(calls[2]!.method, "POST");
+  assert.equal(calls[2]!.auth, "Bearer tok");
+  assert.equal(calls[2]!.body, undefined, "cancelSubmission requires an empty body");
+});
+
+test("replacement refuses a different, unknown or already approved revision", async () => {
+  for (const body of [pending("0.3.20"), pending("0.3.19", "STAGED"),
+    { submittedItemRevisionStatus: { state: "PENDING_REVIEW" } },
+    { submittedItemRevisionStatus: { state: "PENDING_REVIEW", distributionChannels: [{ crxVersion: "0.3.19" }, { crxVersion: "0.3.20" }] } }]) {
+    const { deps, calls } = fake({
+      "https://token.test/token": [{ body: { access_token: "tok" } }], [statusUrl]: [{ body }],
+    });
+    await assert.rejects(uploadToStore(replacement, deps), /Refusing to cancel/);
+    assert.deepEqual(calls.map(c => c.url), ["https://token.test/token", statusUrl]);
+  }
+});
+
+test("failed cancellation never uploads or submits a replacement", async () => {
+  const { deps, calls } = fake({
+    "https://token.test/token": [{ body: { access_token: "tok" } }], [statusUrl]: [{ body: pending() }],
+    [cancelUrl]: [{ status: 403, body: { error: { message: "not permitted" } } }],
+  });
+  await assert.rejects(uploadToStore(replacement, deps), /Cancel pending review failed \(HTTP 403\)/);
+  assert.equal(calls.at(-1)!.url, cancelUrl);
+});
+
+test("a changing or uncleared submission stops without canceling twice or uploading", async () => {
+  for (const statuses of [[pending("0.3.20")], Array.from({ length: 30 }, () => pending())]) {
+    const { deps, calls } = fake({
+      "https://token.test/token": [{ body: { access_token: "tok" } }],
+      [statusUrl]: [{ body: pending() }, ...statuses.map(body => ({ body }))], [cancelUrl]: [{ body: {} }],
+    });
+    await assert.rejects(uploadToStore(replacement, deps), /No replacement was uploaded/);
+    assert.equal(calls.filter(c => c.url === cancelUrl).length, 1);
+    assert.equal(calls.some(c => c.url === uploadUrl || c.url === publishUrl), false);
+  }
+});
+
+test("no active submission uploads normally without canceling the published revision", async () => {
+  const { deps, calls } = fake({
+    "https://token.test/token": [{ body: { access_token: "tok" } }],
+    [statusUrl]: [{ body: { publishedItemRevisionStatus: { state: "PUBLISHED", distributionChannels: [{ crxVersion: "0.3.19" }] } } }],
+    [uploadUrl]: [{ body: { crxVersion: "0.3.20", uploadState: "SUCCEEDED" } }],
+    [publishUrl]: [{ body: { state: "PENDING_REVIEW" } }],
+  });
+  assert.equal((await uploadToStore(replacement, deps)).state, "PENDING_REVIEW");
+  assert.equal(calls.some(c => c.url === cancelUrl), false);
+});
+
+test("replacement requires an explicit numeric version and cannot accompany a draft-only upload", async () => {
+  const { deps, calls } = fake({});
+  for (const opts of [{ ...replacement, publish: false }, { ...replacement, replacePendingVersion: "" }, { ...replacement, replacePendingVersion: "latest" }]) {
+    await assert.rejects(uploadToStore(opts, deps), /exact numeric version/);
+  }
+  assert.equal(calls.length, 0);
+});

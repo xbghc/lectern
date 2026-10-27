@@ -12,8 +12,8 @@ import { pathToFileURL } from "node:url";
  * 用的是商店 API 的 V2（chromewebstore.googleapis.com/v2）和服务账号：服务账号的密钥不会过期，
  * 不像 OAuth 的 refresh token 那样在「测试中」的同意屏幕下七天就失效。凭据怎么建见 docs/chrome-web-store.md。
  *
- * 审核跳不过：这里做的只是「上传 + 点提交」。商店里上一版还在审的时候传不上去，那种情况这里照实报错退出，
- * 等上一版出了结果，在 Actions 页面对同一个标签手动重跑 store.yml 就行。
+ * Review is always required. By default, a pending review blocks another upload.
+ * An explicit --replace-pending=VERSION may replace that exact pending revision.
  */
 
 /** 商店里这个扩展的 ID。公开的（就是商店网址里那一串），不算机密。 */
@@ -87,12 +87,56 @@ export interface UploadOptions {
   /** false 时只上传成草稿，不提交审核。 */
   publish?: boolean;
   extensionId?: string;
+  /** Cancel only this exact pending version before submitting its replacement. Never enabled by default. */
+  replacePendingVersion?: string;
+}
+
+interface RevisionStatus { state?: string; distributionChannels?: { crxVersion?: string }[] }
+
+async function replacePendingReview(item: string, auth: Record<string, string>, version: string, deps: UploadDeps): Promise<void> {
+  const status = async (): Promise<RevisionStatus | undefined> => {
+    const result = await json(await deps.fetch(`${API}/v2/${item}:fetchStatus`, { headers: auth }), "Check submission status");
+    return result.submittedItemRevisionStatus as RevisionStatus | undefined;
+  };
+  const matches = (revision: RevisionStatus): boolean => {
+    const channels = revision.distributionChannels;
+    return Array.isArray(channels) && channels.length > 0 && channels.every(channel => channel?.crxVersion === version);
+  };
+  const pending = await status();
+  if (!pending || pending.state === "CANCELLED") {
+    deps.log("No pending submission to replace.");
+    return;
+  }
+  if (pending.state !== "PENDING_REVIEW" || !matches(pending)) {
+    throw new Error(`Refusing to cancel: the active submission is not pending version ${version}. Check the developer dashboard.`);
+  }
+  // Official V2 API: empty request and response bodies. Published revisions are not changed.
+  const canceled = await deps.fetch(`${API}/v2/${item}:cancelSubmission`, { method: "POST", headers: auth });
+  if (!canceled.ok) await json(canceled, "Cancel pending review");
+  else await canceled.text();
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const current = await status();
+    if (!current || current.state === "CANCELLED") {
+      deps.log(`Canceled pending review for ${version}. Uploading the replacement.`);
+      return;
+    }
+    if (current.state !== "PENDING_REVIEW" || !matches(current)) {
+      throw new Error("Submission changed while canceling. No replacement was uploaded; check the developer dashboard.");
+    }
+    if (attempt < 29) await deps.wait(1_000);
+  }
+  throw new Error("The previous submission is still pending after cancellation. No replacement was uploaded.");
 }
 
 /** 上传、等商店处理完、提交审核。返回提交后商店给的状态。 */
 export async function uploadToStore(opts: UploadOptions, deps: UploadDeps = DEFAULT_DEPS): Promise<{ crxVersion: string; state: string }> {
+  if (opts.replacePendingVersion !== undefined &&
+      (opts.publish === false || !/^\d+(?:\.\d+){0,3}$/.test(opts.replacePendingVersion))) {
+    throw new Error("Replacing a pending review requires its exact numeric version and a review submission (not --no-publish).");
+  }
   const item = `publishers/${opts.publisherId}/items/${opts.extensionId ?? EXTENSION_ID}`;
   const auth = { authorization: `Bearer ${await accessToken(opts.sa, deps)}` };
+  if (opts.replacePendingVersion !== undefined) await replacePendingReview(item, auth, opts.replacePendingVersion, deps);
 
   const uploaded = await json(
     await deps.fetch(`${API}/upload/v2/${item}:upload`, { method: "POST", headers: { ...auth, "content-type": "application/zip" }, body: opts.zip as BodyInit }),
@@ -126,7 +170,7 @@ async function main(): Promise<void> {
   const raw = process.env.CWS_SERVICE_ACCOUNT_JSON;
   const publisherId = process.env.CWS_PUBLISHER_ID;
   if (!file || !raw || !publisherId) {
-    console.error("Usage: CWS_SERVICE_ACCOUNT_JSON=<key-file-contents> CWS_PUBLISHER_ID=<publisher-id> store-upload.ts <zip> [--no-publish]");
+    console.error("Usage: CWS_SERVICE_ACCOUNT_JSON=<key-file-contents> CWS_PUBLISHER_ID=<publisher-id> store-upload.ts <zip> [--no-publish] [--replace-pending=VERSION]");
     process.exit(2);
   }
   let sa: ServiceAccount;
@@ -141,6 +185,8 @@ async function main(): Promise<void> {
     publisherId: publisherId.trim(),
     zip: readFileSync(file),
     publish: !args.includes("--no-publish"),
+    ...(args.some(a => a.startsWith("--replace-pending="))
+      ? { replacePendingVersion: args.find(a => a.startsWith("--replace-pending="))!.slice("--replace-pending=".length) } : {}),
     ...(process.env.CWS_EXTENSION_ID ? { extensionId: process.env.CWS_EXTENSION_ID } : {}),
   });
   console.log(`Version ${result.crxVersion || "?"}: ${result.state}`);

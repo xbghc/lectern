@@ -41,10 +41,10 @@ test("no consent, deleted words and cancelled requests never contact the model",
   assert.ok(!consent.ok && consent.needsConfig);
   (data.llm as Record<string, unknown>).consentAt = 1;
   const missing = await streamVocabularyChat({ ...req, snippetIds: ["missing"] }, () => {}).done;
-  assert.ok(!missing.ok && /不存在/.test(missing.error));
+  assert.ok(!missing.ok && /no longer exists/.test(missing.error));
   const handle = streamVocabularyChat(req, () => {}); handle.cancel();
   const cancelled = await handle.done;
-  assert.ok(!cancelled.ok && /取消/.test(cancelled.error));
+  assert.ok(!cancelled.ok && /Canceled/.test(cancelled.error));
   assert.equal(calls, 0);
 });
 test("conversation streams real model text with stored word context and records usage without changing vocabulary", async () => {

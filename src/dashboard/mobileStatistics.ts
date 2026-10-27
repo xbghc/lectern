@@ -5,7 +5,7 @@ import { el } from "../popup/dom.ts";
 import { icon } from "../ui/icons.ts";
 import { minutes } from "../ui/activity.ts";
 
-const date = (ts: number): string => new Date(ts).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+const date = (ts: number): string => new Date(ts).toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
 let range: ReportRange = 7;
 let selected = 6;
 let request = 0;
@@ -23,40 +23,40 @@ export async function renderMobileStatistics(root: HTMLElement): Promise<void> {
     selected = Math.min(selected, report.groups.length - 1);
     const group = report.groups[selected]!;
     const interval = (start: number, end: number): string => date(start) + (end - start > 26 * 3600_000 ? ` — ${date(end - 1)}` : "");
-    const ranges = el("div", { class: "phone-stat-ranges", role: "group", "aria-label": "统计时间范围" });
-    for (const [value, label] of [[1, "今天"], [7, "近 7 天"], [30, "近 30 天"]] as const) {
+    const ranges = el("div", { class: "phone-stat-ranges", role: "group", "aria-label": "Statistics date range" });
+    for (const [value, label] of [[1, "Today"], [7, "Last 7 days"], [30, "Last 30 days"]] as const) {
       const button = el("button", { type: "button", "aria-pressed": String(range === value), class: range === value ? "active" : "", "data-track": "stats.range" }, [label]);
       button.onclick = () => { range = value; selected = value === 30 ? 5 : value - 1; paint(); root.querySelector<HTMLButtonElement>(`.phone-stat-ranges [aria-pressed=true]`)?.focus(); };
       ranges.append(button);
     }
     const total = Math.floor(report.totalMs / 60_000);
     const hero = el("section", { class: "phone-stat-hero" }, [
-      el("div", { class: "row between" }, [el("span", {}, ["专注阅读"]), el("small", {}, [interval(report.groups[0]!.startTs, report.groups.at(-1)!.endTs)])]),
-      el("div", { class: "phone-stat-total" }, [...(total >= 60 ? [String(Math.floor(total / 60)), el("small", {}, ["小时"])] : []), String(total % 60), el("small", {}, ["分钟"])]),
-      el("div", { class: "phone-stat-summary" }, [[report.readingDays, "天", "有阅读"], [report.completed, "篇", "读完文章"], [report.words, "个", "收藏生词"]].map(([n, unit, label]) => el("span", {}, [el("strong", {}, [String(n), el("small", {}, [String(unit)])]), String(label)]))),
+      el("div", { class: "row between" }, [el("span", {}, ["Focused reading"]), el("small", {}, [interval(report.groups[0]!.startTs, report.groups.at(-1)!.endTs)])]),
+      el("div", { class: "phone-stat-total" }, [...(total >= 60 ? [String(Math.floor(total / 60)), el("small", {}, [" h "])] : []), String(total % 60), el("small", {}, [" min"])]),
+      el("div", { class: "phone-stat-summary" }, [[report.readingDays, report.readingDays === 1 ? "day" : "days", "Reading days"], [report.completed, report.completed === 1 ? "article" : "articles", "Articles finished"], [report.words, report.words === 1 ? "word" : "words", "Words saved"]].map(([n, unit, label]) => el("span", {}, [el("strong", {}, [String(n), el("small", {}, [" " + String(unit)])]), String(label)]))),
     ]);
     const heading = (title: string, note: string): HTMLElement => el("div", { class: "row between" }, [el("h2", {}, [title]), el("span", {}, [note])]);
-    const bars = el("div", { class: "phone-stat-bars", role: "group", "aria-label": "选择时间查看阅读时长" });
+    const bars = el("div", { class: "phone-stat-bars", role: "group", "aria-label": "Select a period to view reading time" });
     const max = Math.max(1, ...report.groups.map(g => g.totalMs));
     report.groups.forEach((g, i) => {
-      const label = range === 1 || (range === 7 && i === 6) ? "今天" : date(g.startTs) + (range === 30 ? "起" : "");
-      const button = el("button", { type: "button", class: i === selected ? "active" : "", "aria-pressed": String(i === selected), "aria-label": `${interval(g.startTs, g.endTs)}，${minutes(g.totalMs)} 分钟`, "data-track": "stats.period" }, [
+      const label = range === 1 || (range === 7 && i === 6) ? "Today" : date(g.startTs) + (range === 30 ? " onward" : "");
+      const button = el("button", { type: "button", class: i === selected ? "active" : "", "aria-pressed": String(i === selected), "aria-label": `${interval(g.startTs, g.endTs)}, ${minutes(g.totalMs)} min`, "data-track": "stats.period" }, [
         el("span", { class: "stat-bar-value" }, [String(minutes(g.totalMs))]),
         el("span", { class: "stat-bar-track" }, [el("i", { style: `height:${g.totalMs ? Math.max(3, g.totalMs / max * 100) : 0}%` })]), el("small", {}, [label]),
       ]);
       button.onclick = () => { selected = i; paint(); root.querySelector<HTMLButtonElement>(".phone-stat-bars [aria-pressed=true]")?.focus(); };
       bars.append(button);
     });
-    const chart = el("section", { class: "phone-stat-section" }, [heading("阅读时长", range === 30 ? "每 5 天合计" : "分钟"), bars,
-      el("div", { class: "phone-stat-selection", "aria-live": "polite" }, [el("span", {}, [interval(group.startTs, group.endTs)]), el("strong", {}, [`${minutes(group.totalMs)} 分钟`])])]);
-    const content = el("section", { class: "phone-stat-section" }, [heading("阅读内容", "所选时段")]);
-    for (const [name, ms, titles, glyph] of [["文章阅读", group.articleMs, group.titles.articles, "book"], ["书籍阅读", group.bookMs, group.titles.books, "shelf"]] as const) {
-      content.append(el("div", { class: "phone-stat-source" }, [icon(glyph), el("div", {}, [el("strong", {}, [name]), el("small", { title: titles.join("、") }, [titles.join("、") || "暂无阅读记录"])]), el("b", {}, [String(minutes(ms)), el("small", {}, [" 分"])])]));
+    const chart = el("section", { class: "phone-stat-section" }, [heading("Reading time", range === 30 ? "5-day totals" : "minutes"), bars,
+      el("div", { class: "phone-stat-selection", "aria-live": "polite" }, [el("span", {}, [interval(group.startTs, group.endTs)]), el("strong", {}, [`${minutes(group.totalMs)} min`])])]);
+    const content = el("section", { class: "phone-stat-section" }, [heading("Reading activity", "Selected period")]);
+    for (const [name, ms, titles, glyph] of [["Articles", group.articleMs, group.titles.articles, "book"], ["Books", group.bookMs, group.titles.books, "shelf"]] as const) {
+      content.append(el("div", { class: "phone-stat-source" }, [icon(glyph), el("div", {}, [el("strong", {}, [name]), el("small", { title: titles.join(", ") }, [titles.join(", ") || "No reading records"])]), el("b", {}, [String(minutes(ms)), el("small", {}, [" min"])])]));
     }
-    const distribution = el("section", { class: "phone-stat-section" }, [heading("内容分布", range === 1 ? "今天" : `近 ${range} 天`),
-      el("div", { class: `phone-stat-distribution${report.totalMs ? "" : " is-empty"}`, role: "img", "aria-label": `文章 ${minutes(report.articleMs)} 分钟，书籍 ${minutes(report.bookMs)} 分钟` }, [el("i", { style: `width:${report.articleMs / Math.max(1, report.totalMs) * 100}%` })]),
-      el("div", { class: "phone-stat-legend" }, [el("span", {}, [el("i"), `文章 ${minutes(report.articleMs)} 分`]), el("span", {}, [el("i"), `书籍 ${minutes(report.bookMs)} 分`])])]);
-    root.replaceChildren(ranges, hero, chart, content, distribution, el("p", { class: "phone-data-note" }, ["按本地日期统计已保存的阅读记录；生词按词条去重。"]));
+    const distribution = el("section", { class: "phone-stat-section" }, [heading("Reading breakdown", range === 1 ? "Today" : `Last ${range} days`),
+      el("div", { class: `phone-stat-distribution${report.totalMs ? "" : " is-empty"}`, role: "img", "aria-label": `Articles ${minutes(report.articleMs)} min; books ${minutes(report.bookMs)} min` }, [el("i", { style: `width:${report.articleMs / Math.max(1, report.totalMs) * 100}%` })]),
+      el("div", { class: "phone-stat-legend" }, [el("span", {}, [el("i"), `Articles ${minutes(report.articleMs)} min`]), el("span", {}, [el("i"), `Books ${minutes(report.bookMs)} min`])])]);
+    root.replaceChildren(ranges, hero, chart, content, distribution, el("p", { class: "phone-data-note" }, ["Based on saved sessions in your local time zone. Duplicate words are counted once."]));
   };
   paint();
 }

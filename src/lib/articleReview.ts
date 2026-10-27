@@ -87,7 +87,7 @@ export function normalizeArticleReview(raw: unknown): Pick<ArticleReview, "outli
   const o = (raw ?? {}) as Record<string, unknown>;
   const outline = toList(o["outline"], 8);
   // 大纲是这份材料的本体，没有它就没有回顾可言；问题少几条还能用
-  if (outline.length === 0) throw new LlmError("模型没有返回可用的 outline", "parse");
+  if (outline.length === 0) throw new LlmError("The model did not return a usable outline", "parse");
   return { outline, questions: toList(o["questions"], 5) };
 }
 
@@ -119,7 +119,7 @@ export async function generateArticleReview(
       ? { ...res.timing, totalMs: (deps?.now ?? (() => performance.now()))() - t0, attempts: res.timing.attempts + (first.timing?.attempts ?? 1) }
       : res.timing;
     try {
-      if (res.truncated) throw new LlmError(`回顾材料被 max_tokens(${cfg.maxTokens}) 截断`, "parse");
+      if (res.truncated) throw new LlmError(`Review output was truncated by max_tokens(${cfg.maxTokens})`, "parse");
       const { outline, questions } = normalizeArticleReview(extractJson(res.text));
       return { review: { outline, questions, generatedTs: now, model: cfg.model }, usage, timing, ...(first ? { recovered: { by: "retry" as const, error: first } } : {}) };
     } catch (err) {

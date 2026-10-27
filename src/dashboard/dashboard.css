@@ -77,7 +77,7 @@ header .tab.active { color: var(--accent); border-color: var(--line); font-weigh
 
 /* ---- 讲解：用法一行，生词逐条 ---- */
 .card .usage { font-size: 12.5px; line-height: 1.8; color: var(--fg-soft); margin-top: 4px; }
-.card .usage::before { content: "用法 · "; color: var(--muted); font-size: 11.5px; font-family: var(--sans); }
+.card .usage::before { content: "Usage · "; color: var(--muted); font-size: 11.5px; font-family: var(--sans); }
 .card .vocab { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line-soft); }
 .card .v + .v { margin-top: 7px; }
 .card .vw { font-weight: 600; }

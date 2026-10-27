@@ -22,7 +22,7 @@ function ensureOffscreen(): Promise<void> {
   offscreen ??= chrome.offscreen.createDocument({
     url: "ocr.html",
     reasons: [chrome.offscreen.Reason.WORKERS],
-    justification: "在 Worker 里跑 Tesseract 做截图文字识别",
+    justification: "Recognize screenshot text with Tesseract in a worker",
   }).catch((err: unknown) => {
     // SW 重启会丢掉 promise，文档却仍在；Chrome 114 还没有 getContexts 可查。
     if (/already exists|only a single offscreen document/i.test(String(err))) return;
@@ -40,7 +40,7 @@ setOcrBackend({
   async warm() {
     await ensureOffscreen();
     const reply = await chrome.runtime.sendMessage({ target: "offscreen", type: "ocr:warm" });
-    if (!reply?.ok) throw new Error(reply?.error ?? "识别器尚未就绪");
+    if (!reply?.ok) throw new Error(reply?.error ?? "The text recognizer is not ready");
   },
 });
 
@@ -56,11 +56,11 @@ chrome.alarms.onAlarm.addListener(alarm => {if(alarm.name === "sync")scheduleSyn
 chrome.runtime.onMessage.addListener((msg: AnyMessage & { target?: string }, sender, sendResponse) => {
   if (msg?.target === "offscreen") return false;
   // options_page 总是开成标签页，它的 sender.tab 同样有值；要挡的是网页里的 content script，得看来源 URL。
-  if (msg.type?.startsWith("sync:") && !sender.url?.startsWith(chrome.runtime.getURL(""))) { sendResponse({ok:false,error:"同步设置只能从扩展设置页访问"}); return false; }
+  if (msg.type?.startsWith("sync:") && !sender.url?.startsWith(chrome.runtime.getURL(""))) { sendResponse({ok:false,error:"Sync settings can only be accessed from extension settings"}); return false; }
   // 必须显式 return true 保持通道打开；Chrome 不认返回 Promise 的写法。
   handle(msg, sender).then(sendResponse, (err: unknown) => {
     // 写入失败（多数是超出存储配额）不能无声无息
-    console.warn("[lectern] 消息处理失败", msg.type, err instanceof Error ? err.message : "未知错误");
+    console.warn("[lectern] Message handler failed", msg.type, err instanceof Error ? err.message : "Unknown error");
     sendResponse({ ok: false, error: String(err) });
   });
   return true;
@@ -87,7 +87,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
     id: "screenshot-translate",
-    title: "截图翻译",
+    title: "Screenshot translation",
     contexts: ["page", "image", "selection"],
   });
   // 设置页顶部有一段「会发什么给模型服务」的确认，同意之前一个请求都不发。

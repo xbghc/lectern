@@ -153,7 +153,7 @@ test("到期队列带上文章信息和已生成的材料", async () => {
   await seedArticle(1_000);
   await store.setFinished(ID, true);
   await area.set({
-    [ar.reviewKey(ID)]: { articleId: ID, outline: ["一"], questions: ["问"], generatedTs: 1, model: "m" },
+    [ar.reviewKey(ID)]: { articleId: ID, outline: ["一"], questions: ["Ask"], generatedTs: 1, model: "m" },
   });
 
   const due = await ar.articleReviewViews(Date.now());
@@ -226,7 +226,7 @@ test("导出带上回顾材料和卡片，但不含正文——正文可再抓�
 test("清空数据把正文、材料、卡片一并带走", async () => {
   await seedArticle(1_000);
   await store.setFinished(ID, true);
-  await ar.saveArticleText(ID, "正文", 2);
+  await ar.saveArticleText(ID, "Article text", 2);
   await store.clearData();
   assert.equal(await ar.getArticleText(ID), null);
   assert.deepEqual(await cards(), []);
@@ -255,7 +255,7 @@ test("已读完、正文也在，却没有卡的老文章会被补上", async ()
   // 模拟功能上线前的状态：finished 早就是 true，但没有卡
   await store.setFinished(ID, true);
   await area.set({ articleCards: [] });
-  await ar.saveArticleText(ID, "正文", 2);
+  await ar.saveArticleText(ID, "Article text", 2);
 
   assert.deepEqual(await cards(), []);
   await ar.ensureArticleCard(ID, 1_000);
@@ -265,7 +265,7 @@ test("已读完、正文也在，却没有卡的老文章会被补上", async ()
 test("补卡是幂等的，不会每次点开都加一张", async () => {
   await seedArticle(1_000);
   await store.setFinished(ID, true);
-  await ar.saveArticleText(ID, "正文", 2);
+  await ar.saveArticleText(ID, "Article text", 2);
   await ar.ensureArticleCard(ID, 1_000);
   await ar.ensureArticleCard(ID, 2_000);
   assert.equal((await cards()).length, 1);
@@ -281,7 +281,7 @@ test("没有正文就不补卡——否则队列里全是看不了的东西", as
 
 test("没读完的文章不补卡", async () => {
   await seedArticle(1_000);
-  await ar.saveArticleText(ID, "正文", 2);
+  await ar.saveArticleText(ID, "Article text", 2);
   await ar.ensureArticleCard(ID, 1_000);
   assert.deepEqual(await cards(), []);
 });
@@ -290,7 +290,7 @@ test("状态查询顺手补卡，并如实报告读完与否", async () => {
   await seedArticle(1_000);
   await store.setFinished(ID, true);
   await area.set({ articleCards: [] });
-  await ar.saveArticleText(ID, "正文", 2);
+  await ar.saveArticleText(ID, "Article text", 2);
 
   const st = await ar.articleReviewState(ID);
   assert.equal(st.finished, true);

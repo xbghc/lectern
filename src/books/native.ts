@@ -59,7 +59,7 @@ const callbacks: EpubCallbacks = {
     if (!request) return;
     try {
       const names: unknown = JSON.parse(namesJson);
-      if (!Array.isArray(names) || names.some(name => typeof name !== "string")) throw new Error("宿主返回的条目清单无效");
+      if (!Array.isArray(names) || names.some(name => typeof name !== "string")) throw new Error("The app returned an invalid EPUB entry list");
       request.opened?.(hash, (names as string[]).slice(0, MAX_EPUB_ENTRIES));
     } catch (err) {
       request.error(err instanceof Error ? err.message : String(err));
@@ -76,7 +76,7 @@ const callbacks: EpubCallbacks = {
   error(id, message) {
     const request = pending.get(id);
     pending.delete(id);
-    request?.error(message || "读取 EPUB 失败");
+    request?.error(message || "Could not read EPUB");
   },
 };
 
@@ -104,7 +104,7 @@ export interface PickedEpub { uri: string; name: string }
 /** 让用户选一个文件。用户按了取消时 resolve 一个 null，不是错误。 */
 export function pickEpub(): Promise<PickedEpub | null> {
   const host = bridge();
-  if (!host?.epubPick) return Promise.reject(new Error("这个版本的宿主不支持导入电子书"));
+  if (!host?.epubPick) return Promise.reject(new Error("Update the app to import books"));
   const pick = host.epubPick.bind(host);
   return request<PickedEpub | null>((id, resolve, reject) => {
     pending.set(id, { picked: (uri, name) => resolve(uri ? { uri, name } : null), error: message => reject(new Error(message)) });
@@ -122,7 +122,7 @@ export interface OpenEpub {
 
 export function openEpub(uri: string): Promise<OpenEpub> {
   const host = bridge();
-  if (!host?.epubOpen || !host.epubEntry || !host.epubClose) return Promise.reject(new Error("这个版本的宿主不支持导入电子书"));
+  if (!host?.epubOpen || !host.epubEntry || !host.epubClose) return Promise.reject(new Error("Update the app to import books"));
   const open = host.epubOpen.bind(host);
   const entry = host.epubEntry.bind(host);
   const close = host.epubClose.bind(host);

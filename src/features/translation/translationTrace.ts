@@ -146,10 +146,10 @@ export class TranslationTraceRecorder {
     this.finalStatus = status;
     this.stable = 0;
     if (this.log.popup.measurement === "unavailable") {
-      this.finish("unobserved", "当前环境不支持动画帧采样");
+      this.finish("unobserved", "Animation frame sampling is unavailable in this environment");
       return;
     }
-    this.timeout = setTimeout(() => this.finish("render-timeout", "最终内容更新后 2000ms 内未观测到字体就绪且连续两帧稳定"), SETTLE_TIMEOUT_MS);
+    this.timeout = setTimeout(() => this.finish("render-timeout", "Fonts and layout did not stabilize for two consecutive frames within 2000 ms of the final update"), SETTLE_TIMEOUT_MS);
     this.queueFrame();
   }
 

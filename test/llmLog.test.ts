@@ -112,9 +112,9 @@ test("超长原文截尾并留标记，请求里的长字段同样截，数字�
   await recordLlmFailure(entry({ raw: "x".repeat(MAX_RAW_CHARS + 5), request: { context: "y".repeat(MAX_FIELD_CHARS + 10), n: 5 } }));
   const [e] = await getLlmLog();
   assert.ok(e!.raw!.startsWith("x".repeat(MAX_RAW_CHARS)));
-  assert.match(e!.raw!, /已截断，原长 \d+/);
+  assert.match(e!.raw!, /truncated; original length: \d+/);
   assert.ok(e!.raw!.length < MAX_RAW_CHARS + 40);
-  assert.match(String(e!.request["context"]), /已截断/);
+  assert.match(String(e!.request["context"]), /truncated/);
   assert.equal(e!.request["n"], 5);
   // 短的原样
   await recordLlmFailure(entry({ raw: "short" }));
@@ -140,7 +140,7 @@ test("recordFailure 从 LlmError 里抽出 kind / status / 原文 / stop_reason"
 });
 
 test("主动取消和缺配置不记；不是 LlmError 的也记，kind 为 unknown", async () => {
-  await recordFailure(new LlmError("已取消", "abort"), CFG, { source: "translate", request: {} });
+  await recordFailure(new LlmError("Canceled", "abort"), CFG, { source: "translate", request: {} });
   await recordFailure(new LlmError("没 key", "config"), CFG, { source: "translate", request: {} });
   assert.deepEqual(await getLlmLog(), []);
   await recordFailure(new TypeError("boom"), CFG, { source: "test", request: {} });
@@ -205,7 +205,7 @@ test("失败也占一格，带上是怎么失败的——只记成功会把分�
 });
 
 test("主动取消、缺配置、以及压根没耗时的失败都不记", async () => {
-  const abort = new LlmError("已取消", "abort");
+  const abort = new LlmError("Canceled", "abort");
   abort.timing = { ...TIMING };
   await recordFailure(abort, CFG, { source: "translate", request: {} });
   await recordFailure(new LlmError("没 key", "config"), CFG, { source: "translate", request: {} });

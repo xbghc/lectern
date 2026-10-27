@@ -1,3 +1,4 @@
+import { quantity } from "../ui/text.ts";
 import type { HistoryArticleDecision } from "../lib/articleFilter.ts";
 import type { BlacklistSuggestion } from "../lib/articleFilter.ts";
 import { matchesUrlRule } from "../lib/url.ts";
@@ -77,11 +78,11 @@ function el<K extends keyof HTMLElementTagNameMap>(
  * 已经有内容时不插「正在读取」——刷新不该闪一下。
  */
 async function guarded(box: HTMLElement, load: () => Promise<void>): Promise<void> {
-  if (!box.hasChildNodes()) box.append(el("div", "empty", "正在读取…"));
+  if (!box.hasChildNodes()) box.append(el("div", "empty", "Loading…"));
   try { await load(); }
   catch (err) {
-    const note = el("div", "empty", `读取失败：${reason(err)}`);
-    const retry = el("button", "mini", "重试");
+    const note = el("div", "empty", `Could not load: ${reason(err)}`);
+    const retry = el("button", "mini", "Retry");
     retry.addEventListener("click", () => void guarded(box, load));
     note.append(document.createElement("br"), retry);
     box.replaceChildren(note);
@@ -89,7 +90,7 @@ async function guarded(box: HTMLElement, load: () => Promise<void>): Promise<voi
 }
 
 const fmtDate = (ts: number): string =>
-  new Date(ts).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+  new Date(ts).toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
 
 /* ==================== 标签页切换 ==================== */
 
@@ -106,9 +107,9 @@ function show(pane: Pane, load = true): void {
     document.querySelector(`.tab[data-tab="${p}"]`)?.classList.toggle("active", active);
     document.querySelector(`.tab[data-tab="${p}"]`)?.setAttribute("aria-current", active ? "page" : "false");
   }
-  const titles = { articles: "我的阅读", words: "生词本", review: "间隔复习", stats: "阅读统计", books: "我的书架" };
+  const titles = { articles: "My reading", words: "Vocabulary", review: "Spaced review", stats: "Reading statistics", books: "My bookshelf" };
   if ($("workspace-title")) $("workspace-title").textContent = titles[pane];
-  if ($("app-page-title")) $("app-page-title").textContent = { articles: "阅读", books: "书架", words: "生词", review: "复习", stats: "阅读统计" }[pane];
+  if ($("app-page-title")) $("app-page-title").textContent = { articles: "Reading", books: "Bookshelf", words: "Vocabulary", review: "Review", stats: "Reading statistics" }[pane];
   if ($("reading-back")) $("reading-back").hidden = !["books", "stats"].includes(pane);
   if ($("reading-statistics")) {
     $("reading-statistics").hidden = pane !== "articles";
@@ -227,17 +228,17 @@ async function loadMaterialDetail(id: string): Promise<void> {
   renderArticles();
 }
 
-const clock = (ts: number): string => new Date(ts).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
-const spellCounts = (counts: [string, number][]): string => counts.map(([label, n]) => `${n} 个${label}`).join("、");
+const clock = (ts: number): string => new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+const spellCounts = (counts: [string, number][]): string => counts.map(([label, n]) => `${label}: ${n}`).join(", ");
 
 function renderMaterialDetail(a: Article): HTMLElement {
   const box = el("div", "material-detail");
   const detail = materialDetails.get(a.id);
-  if (!detail || detail === "loading") { box.append(el("p", "muted", "正在读取…")); return box; }
+  if (!detail || detail === "loading") { box.append(el("p", "muted", "Loading…")); return box; }
   if ("error" in detail) {
-    const retry = el("button", "mini", "重试");
+    const retry = el("button", "mini", "Retry");
     retry.addEventListener("click", () => void loadMaterialDetail(a.id));
-    box.append(el("p", "muted", `读取失败：${detail.error}`), retry);
+    box.append(el("p", "muted", `Could not load: ${detail.error}`), retry);
     return box;
   }
 
@@ -251,7 +252,7 @@ function renderMaterialDetail(a: Article): HTMLElement {
     for (const item of all ? items : items.slice(0, DETAIL_PREVIEW)) list.append(row(item));
     part.append(list);
     if (!all && items.length > DETAIL_PREVIEW) {
-      const more = tracked(el("button", "mini", `显示全部 ${items.length} 条`), "articles.detail.more");
+      const more = tracked(el("button", "mini", `Show all ${quantity(items.length, "record")}`), "articles.detail.more");
       more.addEventListener("click", () => { showAll.add(`${a.id}:${key}`); renderArticles(); });
       part.append(more);
     }
@@ -259,34 +260,34 @@ function renderMaterialDetail(a: Article): HTMLElement {
   };
 
   const total = detail.sessions.reduce((n, s) => n + s.endTs - s.startTs, 0);
-  section("sessions", `专注时段 · ${detail.sessions.length} 段${detail.sessions.length ? ` · 共 ${formatDuration(total)}` : ""}`,
-    detail.sessions, "还没有记下专注时段。", (s) => {
+  section("sessions", `Focus sessions · ${detail.sessions.length}${detail.sessions.length ? ` · Total: ${formatDuration(total)}` : ""}`,
+    detail.sessions, "No focus sessions recorded yet.", (s) => {
       const li = el("li");
       li.append(el("span", "when", `${fmtDate(s.startTs)} ${clock(s.startTs)}–${clock(s.endTs)}`),
-        el("span", "meta", `${formatDuration(s.endTs - s.startTs)}${s.wordsRead > 0 ? ` · 新读 ${s.wordsRead} 字` : " · 没有读到新内容"}`));
+        el("span", "meta", `${formatDuration(s.endTs - s.startTs)}${s.wordsRead > 0 ? ` · Newly read: ${quantity(s.wordsRead, "word")}` : " · No new content read"}`));
       return li;
     });
-  section("snippets", `划词 · ${detail.snippets.length} 条`, detail.snippets, "这篇里还没有划过词。", (w) => {
+  section("snippets", `Translations · ${quantity(detail.snippets.length, "record")}`, detail.snippets, "No saved translations for this article yet.", (w) => {
     const li = el("li");
     li.append(el("span", "word", w.text), el("span", "gloss", w.translation));
     return li;
   });
 
   const sync = el("section");
-  sync.append(el("h4", undefined, "同步"));
+  sync.append(el("h4", undefined, "Sync"));
   const line = el("p", "sync-line");
   const state = detail.sync?.state ?? "unknown";
   const dot = el("span", "dot");
   dot.dataset.tone = state === "synced" ? "ok" : state === "pending" ? "busy" : state === "blocked" ? "warn" : "";
   const waiting = detail.sync?.waiting.length ? spellCounts(detail.sync.waiting) : "";
   line.append(dot, el("span", undefined,
-    state === "synced" ? "已同步到服务器，名下的专注时段、段落和划词都在上面"
-      : state === "pending" ? `有改动等下一轮同步上传：${waiting}`
-      : state === "blocked" ? `无法上传，留在本机：${waiting}`
-      : state === "local" ? "只存在这台设备上（没有启用同步，或这类材料不上传）"
-      : "同步处境暂时查不到"));
+    state === "synced" ? "Synced to the server, including focus sessions, paragraphs and translations"
+      : state === "pending" ? `Changes waiting for the next sync: ${waiting}`
+      : state === "blocked" ? `Could not upload; kept on this device: ${waiting}`
+      : state === "local" ? "Only on this device: sync is disabled or this content is kept local"
+      : "Sync status is temporarily unavailable"));
   if (state === "unknown") {
-    const retry = el("button", "mini", "重试");
+    const retry = el("button", "mini", "Retry");
     retry.addEventListener("click", () => void loadMaterialDetail(a.id));
     line.append(retry);
   }
@@ -361,15 +362,15 @@ function renderArticles(): void {
   updateArticleSelection();
   const done = loose.filter((a) => a.finished).length;
   const chapters = articles.length - loose.length;
-  $("article-summary").textContent = `共 ${loose.length} 篇，读完 ${done} 篇`
+  $("article-summary").textContent = `Articles: ${loose.length} · Finished: ${done}`
     // 筛过之后说一声剩几篇：三个键和搜索框叠着用的时候，光看列表分不清是筛没了还是本来就没有
-    + (list.length !== loose.length ? ` · 显示 ${list.length} 篇` : "")
-    + (chapters > 0 ? ` · 另有 ${chapters} 节在书架上` : "");
+    + (list.length !== loose.length ? ` · Showing ${list.length}` : "")
+    + (chapters > 0 ? ` · Also ${quantity(chapters, "chapter")} on your bookshelf` : "");
 
   const box = $("articles");
   box.textContent = "";
   if (list.length === 0) {
-    box.append(el("div", "empty", loose.length ? "没有匹配的文章" : "还没有阅读记录。打开一篇文章读一会儿，它就会出现在这里。"));
+    box.append(el("div", "empty", loose.length ? "No matching articles" : "No reading history yet. Read an article for a while and it will appear here."));
     return;
   }
 
@@ -388,9 +389,9 @@ function renderArticles(): void {
     title.append(link);
 
     const ratio = a.trackedWords > 0 ? Math.min(1, a.wordsRead / a.trackedWords) : 0;
-    const pill = el("span", `pill${a.finished ? " done" : ""}`, a.finished ? "读完" : `${Math.round(ratio * 100)}%`);
+    const pill = el("span", `pill${a.finished ? " done" : ""}`, a.finished ? "Finished" : `${Math.round(ratio * 100)}%`);
 
-    const toggle = tracked(el("button", "mini", a.finished ? "标记未读完" : "标记读完"), a.finished ? "articles.unfinish" : "articles.finish");
+    const toggle = tracked(el("button", "mini", a.finished ? "Mark unfinished" : "Mark finished"), a.finished ? "articles.unfinish" : "articles.finish");
     toggle.addEventListener("click", async () => {
       toggle.disabled = true;
       try {
@@ -399,7 +400,7 @@ function renderArticles(): void {
           articleId: a.id,
           finished: !a.finished,
         });
-        if (!r.article) throw new Error("这篇文章的记录已经不在了");
+        if (!r.article) throw new Error("This article record no longer exists");
         // 按 id 找现在那一份：等应答的工夫列表可能被后台刷新换过一遍，手里这个 a 已经不在 articles 里了
         Object.assign(articles.find((x) => x.id === a.id) ?? a, r.article);
         renderArticles();
@@ -407,7 +408,7 @@ function renderArticles(): void {
       } catch (err) {
         // 就写在按钮上：批量操作那行状态在列表最顶上，离这儿可能隔着几十张卡片
         toggle.disabled = false;
-        toggle.textContent = "没改成，再点一次";
+        toggle.textContent = "Update failed. Try again.";
         toggle.title = reason(err);
       }
     });
@@ -418,7 +419,7 @@ function renderArticles(): void {
     select.inert = !managingArticles;
     select.checked = selectedArticles.has(a.id);
     select.disabled = articleActionBusy;
-    select.setAttribute("aria-label", "选择 " + (a.title || a.url));
+    select.setAttribute("aria-label", "Select " + (a.title || a.url));
     select.addEventListener("change", () => {
       if (select.checked) selectedArticles.add(a.id); else selectedArticles.delete(a.id);
       card.classList.toggle("selected", select.checked);
@@ -427,7 +428,7 @@ function renderArticles(): void {
     row.append(select, title, pill);
     // 正在逐篇判别的卡片被压成了两行摘要，不在这时候展开详情
     const open = expandedArticles.has(a.id) && !classifications.has(a.id);
-    const more = el("button", "mini detail-toggle", open ? "收起" : "详情");
+    const more = el("button", "mini detail-toggle", open ? "Collapse" : "Details");
     more.hidden = classifications.has(a.id);
     // 只记展开：收起是同一个键
     if (!open) tracked(more, "articles.detail");
@@ -440,12 +441,12 @@ function renderArticles(): void {
     });
     const menu = el("details", "article-menu");
     const menuToggle = tracked(el("summary", undefined, "•••"), "articles.menu");
-    menuToggle.setAttribute("aria-label", `文章操作：${a.title || a.url}`);
+    menuToggle.setAttribute("aria-label", `Article actions: ${a.title || a.url}`);
     const menuBody = el("div", "article-menu-body");
     menuBody.append(more); menu.append(menuToggle, menuBody); row.append(menu);
     // 读完了才有回顾卡；没读完的文章连正文都未必存下来了
     if (a.finished) {
-      const rev = tracked(el("button", "mini", "回顾"), "articles.review");
+      const rev = tracked(el("button", "mini", "Review"), "articles.review");
       rev.addEventListener("click", () => void openArticleReview(a.id));
       menuBody.append(rev);
     }
@@ -455,17 +456,17 @@ function renderArticles(): void {
     const sub = el("div", "sub");
     sub.append(
       el("span", undefined, hostnameOf(a.url)),
-      el("span", undefined, `${a.wordsRead} / ${a.trackedWords} 字`),
+      el("span", undefined, `${a.wordsRead} / ${quantity(a.trackedWords, "word")}`),
       el("span", undefined, formatDuration(a.totalMs)),
-      el("span", undefined, `${a.sessionCount} 段专注`),
-      el("span", undefined, `最近 ${fmtDate(a.lastSeenTs)}`),
+      el("span", undefined, `${quantity(a.sessionCount, "focus session")}`),
+      el("span", undefined, `Last read: ${fmtDate(a.lastSeenTs)}`),
     );
-    if (!a.reachedBottom && !a.finished) sub.append(el("span", undefined, "未读到末尾"));
+    if (!a.reachedBottom && !a.finished) sub.append(el("span", undefined, "End not reached"));
     // 没读完的说一句还需多久；依据挂在 title 上，悬停可见
     if (!a.finished) {
       const left = estimateArticle(a, speed);
       if (left && left.words > 0) {
-        const span = el("span", undefined, "还需" + formatEstimate(left.ms));
+        const span = el("span", undefined, "Remaining: " + formatEstimate(left.ms));
         span.title = describeBasis(left);
         sub.append(span);
       }
@@ -481,12 +482,12 @@ function renderArticles(): void {
     if (classification) {
       const result = el("div", "classification-result");
       card.classList.add("has-classification");
-      if ("status" in classification) result.textContent = classification.status === "pending" ? "LLM：等待判别" : classification.status === "running" ? "LLM：正在判别…" : "LLM：已停止，尚未判别";
+      if ("status" in classification) result.textContent = classification.status === "pending" ? "AI: waiting to classify" : classification.status === "running" ? "AI: classifying…" : "AI: stopped before classification";
       else {
         result.classList.add(classification.ok ? classification.isArticle ? "is-article" : "not-article" : "failed");
-        result.append(el("strong", undefined, classification.ok ? classification.isArticle ? "LLM：是文章" : "LLM：非文章" : "LLM：判别失败"),
+        result.append(el("strong", undefined, classification.ok ? classification.isArticle ? "AI: article" : "AI: not an article" : "AI: classification failed"),
           el("p", undefined, classification.reason));
-        if (classification.ok) result.append(el("span", "muted small", classification.source === "saved" ? "依据：已存正文" : "依据：重新抓取的网页"));
+        if (classification.ok) result.append(el("span", "muted small", classification.source === "saved" ? "Source: saved article text" : "Source: fetched page"));
       }
       card.append(result);
     }
@@ -517,7 +518,7 @@ function setSearchOpen(open: boolean): void {
   searchBox.classList.toggle("open", open);
   searchInput.toggleAttribute("inert", !open);
   searchToggle.setAttribute("aria-expanded", String(open));
-  const label = open ? "收起搜索" : "搜索文章";
+  const label = open ? "Close search" : "Search articles";
   searchToggle.setAttribute("aria-label", label);
   searchToggle.title = label;
 }
@@ -560,9 +561,9 @@ function updateArticleSelection(): void {
   $("article-actions").hidden = !managingArticles;
   $("article-actions").inert = !managingArticles;
   $("pane-articles").classList.toggle("managing-articles", managingArticles);
-  $("manage-articles").textContent = managingArticles ? "完成" : "批量管理";
+  $("manage-articles").textContent = managingArticles ? "Done" : "Manage articles";
   $("manage-articles").setAttribute("aria-pressed", String(managingArticles));
-  $("selection-count").textContent = `已选 ${selectedArticles.size} 篇`;
+  $("selection-count").textContent = `Selected: ${selectedArticles.size}`;
   const all = $<HTMLInputElement>("select-articles");
   const n = visibleArticles.filter(a => selectedArticles.has(a.id)).length;
   all.checked = n > 0 && n === visibleArticles.length;
@@ -581,7 +582,7 @@ function renderClassificationProgress(): void {
   const nonarticles = done.filter(v => "ok" in v && v.ok && !v.isArticle).length;
   const failed = done.filter(v => "ok" in v && !v.ok).length;
   const stopped = values.filter(v => "status" in v && v.status === "stopped").length;
-  $("classification-progress").textContent = `${classificationRunning ? "筛选中" : "筛选结束"}：已处理 ${done.length} / ${values.length} 篇，其中非文章 ${nonarticles} 篇，失败 ${failed} 篇${stopped ? `，未处理 ${stopped} 篇` : ""}。`;
+  $("classification-progress").textContent = `${classificationRunning ? "Classifying" : "Classification complete"}: processed ${done.length} / ${quantity(values.length, "article")}; non-articles: ${nonarticles}; failed: ${failed}${stopped ? `; pending: ${stopped}` : ""}.`;
   $<HTMLButtonElement>("select-nonarticles").disabled = articleActionBusy || !visibleArticles.some(a => {
     const result = classifications.get(a.id); return result && "ok" in result && result.ok && !result.isArticle;
   });
@@ -603,7 +604,7 @@ async function classifySelected(ids: string[]): Promise<void> {
         classifications.set(id, { status: "running" }); renderArticles();
         try {
           const result = await send<HistoryArticleDecision>({ type: "article:classify-history", articleId: id });
-          if (!result || typeof result.ok !== "boolean" || (result.ok && typeof result.isArticle !== "boolean")) throw new Error("判别响应无效，请重试");
+          if (!result || typeof result.ok !== "boolean" || (result.ok && typeof result.isArticle !== "boolean")) throw new Error("Invalid classification response. Try again.");
           classifications.set(id, result);
         } catch (err) { classifications.set(id, { ok: false, reason: err instanceof Error ? err.message : String(err) }); }
         renderArticles();
@@ -655,18 +656,18 @@ async function articleAction(work: () => Promise<void>): Promise<void> {
   $("article-action-status").textContent = "";
   renderArticles();
   try { await work(); }
-  catch (err) { $("article-action-status").textContent = "操作失败：" + reason(err); }
+  catch (err) { $("article-action-status").textContent = "Action failed: " + reason(err); }
   finally { articleActionBusy = false; renderArticles(); }
 }
 
 $("delete-articles").addEventListener("click", () => {
   const ids = [...selectedArticles];
-  if (!ids.length || !confirm(`删除所选 ${ids.length} 篇文章及其阅读记录、正文、回顾卡？划词记录和生词卡会保留。此操作不可撤销。`)) return;
+  if (!ids.length || !confirm(`Delete the selected ${quantity(ids.length, "article")} with their reading history, saved text and review cards? Translations and vocabulary cards will be kept. This cannot be undone.`)) return;
   void articleAction(async () => {
     const res = await send<{ ok: boolean; deleted: number }>({ type: "articles:delete", articleIds: ids });
-    if (!res.ok) throw new Error((res as { error?: string }).error || "删除失败");
+    if (!res.ok) throw new Error((res as { error?: string }).error || "Could not delete");
     for (const id of ids) selectedArticles.delete(id);
-    $("article-action-status").textContent = `已删除 ${res.deleted} 篇文章`;
+    $("article-action-status").textContent = `Deleted ${quantity(res.deleted, "article")}`;
     await loadArticles();
   });
 });
@@ -674,9 +675,9 @@ $("delete-articles").addEventListener("click", () => {
 $("suggest-blacklist").addEventListener("click", () => {
   const ids = [...selectedArticles];
   void articleAction(async () => {
-    $("article-action-status").textContent = "LLM 正在根据所选记录的网址和标题提出建议…";
+    $("article-action-status").textContent = "AI is suggesting rules based on the selected URLs and titles…";
     const res = await send<{ ok: boolean; suggestions?: BlacklistSuggestion[]; error?: string }>({ type: "articles:blacklist-suggest", articleIds: ids });
-    if (!res.ok) throw new Error(res.error || "生成失败");
+    if (!res.ok) throw new Error(res.error || "Generation failed");
     const box = $("blacklist-suggestions");
     const section = $<HTMLDetailsElement>("blacklist-section");
     section.hidden = false; section.open = true;
@@ -687,13 +688,13 @@ $("suggest-blacklist").addEventListener("click", () => {
       const input = el("input"); input.type = "checkbox";
       const matches = articles.filter(a => matchesUrlRule(a.url, suggestion.pattern)).length;
       row.append(input, el("strong", undefined, suggestion.pattern), el("p", undefined, suggestion.reason),
-        el("p", "muted small", `匹配现有 ${matches} 条记录；采用后阻止后续记录，不删除已有文章，不影响翻译。`));
+        el("p", "muted small", `Matches ${matches} existing records. Applying this rule stops future tracking without deleting articles or disabling translation.`));
       choices.push({ input, pattern: suggestion.pattern });
       box.append(row);
     }
-    $("article-action-status").textContent = choices.length ? "请勾选要采用的建议。" : "没有足够依据提出黑名单建议。";
+    $("article-action-status").textContent = choices.length ? "Select the suggestions you want to apply." : "Not enough evidence to suggest blocklist rules.";
     if (!choices.length) return;
-    const apply = el("button", undefined, "采用勾选建议");
+    const apply = el("button", undefined, "Apply selected suggestions");
     apply.addEventListener("click", () => {
       const rules = choices.filter(c => c.input.checked).map(c => c.pattern);
       if (!rules.length) return;
@@ -705,7 +706,7 @@ $("suggest-blacklist").addEventListener("click", () => {
         await send({ type: "settings:set", settings: { articleExcludedUrls: [...new Set([...settings.articleExcludedUrls, ...rules])] } });
         box.textContent = "";
         section.hidden = true;
-        $("article-action-status").textContent = `已采用 ${rules.length} 条文章记录黑名单建议`;
+        $("article-action-status").textContent = `Applied ${rules.length} reading blocklist suggestions`;
       }).finally(() => { apply.disabled = false; });
     });
     box.append(apply);
@@ -725,7 +726,7 @@ async function loadWords(): Promise<void> {
   });
 }
 
-const KIND_LABEL: Record<Snippet["kind"], string> = { word: "单词", phrase: "短语", sentence: "句子" };
+const KIND_LABEL: Record<Snippet["kind"], string> = { word: "Word", phrase: "Phrase", sentence: "Sentence" };
 
 function renderWords(): void {
   const q = $<HTMLInputElement>("q-word").value.trim().toLowerCase();
@@ -742,12 +743,12 @@ function renderWords(): void {
 
   const queued = snippets.filter((s) => s.cardId).length;
   if ($("nav-word-count")) $("nav-word-count").textContent = String(snippets.length);
-  $("word-summary").textContent = `共 ${snippets.length} 条，其中 ${queued} 条在复习队列`;
+  $("word-summary").textContent = `Total: ${quantity(snippets.length, "record")}; ${queued} in the review queue`;
 
   const box = $("words");
   box.textContent = "";
   if (list.length === 0) {
-    box.append(el("div", "empty", snippets.length ? "没有匹配的记录" : "还没有划词记录。在文章里选中一个词或一句话，它和译文就会记在这里。"));
+    box.append(el("div", "empty", snippets.length ? "No matching records" : "No saved translations yet. Select a word or sentence in an article to save it here with its explanation."));
     return;
   }
 
@@ -757,19 +758,19 @@ function renderWords(): void {
     row.append(el("div", "title", s.text), el("span", "pill", KIND_LABEL[s.kind]));
 
     if (s.cardId) {
-      row.append(el("span", "pill done", "在复习"));
+      row.append(el("span", "pill done", "In review"));
     } else {
       // 整句默认不排期，但用户可以手动捞进来
-      const add = tracked(el("button", "mini", "加入复习"), "words.enqueue");
+      const add = tracked(el("button", "mini", "Add to review"), "words.enqueue");
       add.addEventListener("click", async () => {
         add.disabled = true;
         try {
           const res = await send<{ ok: boolean }>({ type: "snippet:enqueue", id: s.id });
-          if (!res?.ok) throw new Error("这条划词已经不在了");
+          if (!res?.ok) throw new Error("This vocabulary record no longer exists");
           await loadWords();
         } catch (err) {
           add.disabled = false;
-          add.textContent = "没加上，再点一次";
+          add.textContent = "Could not add. Try again.";
           add.title = reason(err);
         }
       });
@@ -780,12 +781,12 @@ function renderWords(): void {
      * 删除要点两下。这一条没了，它名下那张复习卡（连同排期和复习进度）可能跟着没，后台没有撤销；
      * 弹 confirm 又太重——一屏几十条，逐条清理时每条都弹窗会逼人不看就点确定。
      */
-    const del = el("button", "mini danger", "删除");
+    const del = el("button", "mini danger", "Delete");
     let armed: ReturnType<typeof setTimeout> | null = null;
     del.addEventListener("click", async () => {
       if (armed === null) {
-        del.textContent = s.cardId ? "确认删除（连同复习进度）" : "确认删除";
-        armed = setTimeout(() => { armed = null; del.textContent = "删除"; }, 4000);
+        del.textContent = s.cardId ? "Delete with review progress?" : "Confirm deletion";
+        armed = setTimeout(() => { armed = null; del.textContent = "Delete"; }, 4000);
         return;
       }
       clearTimeout(armed);
@@ -798,7 +799,7 @@ function renderWords(): void {
         await loadWords();
       } catch (err) {
         del.disabled = false;
-        del.textContent = "没删掉，再点一次";
+        del.textContent = "Could not delete. Try again.";
         del.title = reason(err);
       }
     });
@@ -823,11 +824,11 @@ function renderWords(): void {
     if (document.body.classList.contains("app") && s.kind !== "sentence") {
       const chat = tracked(el("a", "icon-btn word-chat-entry"), "chat.word");
       chat.href = `chat.html?word=${encodeURIComponent(s.id)}`;
-      chat.setAttribute("aria-label", `与 AI 练习 ${s.text}`); chat.append(icon("chat"));
+      chat.setAttribute("aria-label", `Practice with AI: ${s.text}`); chat.append(icon("chat"));
       row.append(chat);
     }
     const detail = el("details", "word-detail");
-    detail.append(tracked(el("summary", undefined, "语境与讲解"), "words.detail"));
+    detail.append(tracked(el("summary", undefined, "Context and explanation"), "words.detail"));
     if (s.context) detail.append(el("blockquote", undefined, s.context));
     card.append(summary, detail);
     if (s.contextNote) {
@@ -924,12 +925,12 @@ function renderStats(s: ReviewStats, kind: Queue): void {
     stat.append(el("b", undefined, String(n)), el("span", undefined, label));
     box.append(stat);
   };
-  add(s.dueNow, kind === "words" ? "待复习" : "待回顾");
-  add(s.total, kind === "words" ? "卡片总数" : "文章总数");
-  add(s.newCount, "新的");
-  add(s.learningCount, "学习中");
-  add(s.reviewCount, "已进入复习");
-  add(s.forecast.slice(1).reduce((a, b) => a + b, 0), "未来 6 天到期");
+  add(s.dueNow, kind === "words" ? "Due words" : "Due articles");
+  add(s.total, kind === "words" ? "Total cards" : "Total articles");
+  add(s.newCount, "New");
+  add(s.learningCount, "Learning");
+  add(s.reviewCount, "Reviewing");
+  add(s.forecast.slice(1).reduce((a, b) => a + b, 0), "Due in the next 6 days");
 
   if (kind === "words") dueWords = s.dueNow;
   else dueArticles = s.dueNow;
@@ -947,14 +948,14 @@ function renderReview(): void {
   const item = queue[cursor];
   if (!item) {
     area.append(
-      el("div", "empty", queue.length === 0 ? "现在没有到期的卡片。去读点文章、划几个生词吧。" : "这一轮复习完了 🎉"),
+      el("div", "empty", queue.length === 0 ? "No cards due now. Read an article and discover some new words." : "Review complete 🎉"),
     );
     return;
   }
 
   const wrap = el("div", "reviewer");
   const progress = el("div", "review-progress");
-  progress.append(el("span", undefined, `本轮复习 ${cursor + 1} / ${queue.length}`));
+  progress.append(el("span", undefined, `Reviewed this session: ${cursor + 1} / ${queue.length}`));
   const progressBar = el("div", "progress");
   const progressFill = el("i"); progressFill.style.width = `${cursor / queue.length * 100}%`; progressBar.append(progressFill);
   progress.append(progressBar); wrap.append(progress);
@@ -970,14 +971,14 @@ function renderReview(): void {
   }
 
   if (!revealed) {
-    face.append(el("div", "note", `出现在 ${item.articleCount} 篇文章 · 复习 ${item.card.reps} 次`));
+    face.append(el("div", "note", `Appears in ${quantity(item.articleCount, "article")} · Reviews: ${item.card.reps}`));
     wrap.append(face);
-    const showBtn = el("button", "mini reveal", coarsePointer() ? "显示答案" : "显示答案（空格）");
+    const showBtn = el("button", "mini reveal", coarsePointer() ? "Show answer" : "Show answer (Space)");
     showBtn.style.marginTop = "14px";
     showBtn.addEventListener("click", () => reveal());
     wrap.append(showBtn);
   } else {
-    face.append(el("div", "answer", s?.translation ?? "（这条记录已被删除）"));
+    face.append(el("div", "answer", s?.translation ?? "(This record was deleted.)"));
     if (s?.contextNote) face.append(el("div", "note", s.contextNote));
     if (s) {
       const src = el("div", "src");
@@ -1007,10 +1008,10 @@ function highlight(context: string, term: string): Node[] {
 }
 
 const GRADES: Array<{ g: 1 | 2 | 3 | 4; label: string; key: string }> = [
-  { g: 1, label: "忘了", key: "1" },
-  { g: 2, label: "有点难", key: "2" },
-  { g: 3, label: "记得", key: "3" },
-  { g: 4, label: "太简单", key: "4" },
+  { g: 1, label: "Again", key: "1" },
+  { g: 2, label: "Hard", key: "2" },
+  { g: 3, label: "Good", key: "3" },
+  { g: 4, label: "Easy", key: "4" },
 ];
 
 function gradeBar(item: ReviewCardView): HTMLElement {
@@ -1042,7 +1043,7 @@ async function graded(event: UiEvent, byKey: boolean, work: () => Promise<void>)
   catch (err) {
     // 没记上就留在这张卡上，让人再评一次；评分条重画之前先把按钮放开
     for (const b of buttons) b.disabled = false;
-    $("review-area").append(el("p", "muted small", `评分没记上：${reason(err)}`));
+    $("review-area").append(el("p", "muted small", `Could not save your rating: ${reason(err)}`));
   } finally { grading = false; }
 }
 
@@ -1067,15 +1068,15 @@ function assistBar(item: ReviewCardView): HTMLElement {
   out.hidden = true;
 
   const modes: Array<{ mode: "example" | "explain" | "quiz"; label: string }> = [
-    { mode: "example", label: "再给个例句" },
-    { mode: "explain", label: "换个说法讲" },
-    { mode: "quiz", label: "考我一下" },
+    { mode: "example", label: "Another example" },
+    { mode: "explain", label: "Explain differently" },
+    { mode: "quiz", label: "Quiz me" },
   ];
   for (const { mode, label } of modes) {
     const btn = tracked(el("button", "mini", label), `review.assist.${mode}`);
     btn.addEventListener("click", async () => {
       out.hidden = false;
-      out.textContent = "正在问模型…";
+      out.textContent = "Asking the model…";
       for (const b of bar.querySelectorAll("button")) b.disabled = true;
       // 后台拒掉请求（刚重启、还没醒）时也得把按钮放开，不然「正在问…」和一排死按钮要挂到刷新为止
       try {
@@ -1087,10 +1088,10 @@ function assistBar(item: ReviewCardView): HTMLElement {
         out.textContent = res.ok
           ? (res.text ?? "")
           : res.needsConfig
-            ? (res.error ?? "模型服务还没配置好，去「设置」里处理。")
-            : `失败：${res.error ?? "未知错误"}`;
+            ? (res.error ?? "Configure your model connection in Settings first.")
+            : `Failed: ${res.error ?? "Unknown error"}`;
       } catch (err) {
-        out.textContent = `失败：${reason(err)}。再点一次重试。`;
+        out.textContent = `Failed: ${reason(err)}. Select again to retry.`;
       } finally {
         for (const b of bar.querySelectorAll("button")) b.disabled = false;
       }
@@ -1182,10 +1183,10 @@ function renderNoCard(st: ArticleReviewState): void {
   area.textContent = "";
   aQueue = [];
   const msg = !st.finished
-    ? "这篇还没读完。读完之后它会自动进入回顾队列。"
+    ? "Finish this article to add it to the review queue automatically."
     : st.hasText
-      ? "这篇的回顾材料还在准备中，过一会儿再来。"
-      : "这篇是在「文章回顾」上线之前读完的，当时没有保存正文，没法生成回顾材料。重新读一遍（读到已读比例阈值就行）会自动备好。";
+      ? "Review materials are still being prepared. Try again shortly."
+      : "This article was finished before article reviews were available, so its text was not saved. Read it again to the completion threshold to prepare review materials.";
   area.append(el("div", "empty", msg));
 }
 
@@ -1196,7 +1197,7 @@ function renderArticleReview(): void {
   const item = aQueue[aCursor];
   if (!item) {
     const msg =
-      aQueue.length === 0 ? "现在没有到期的文章。读完一篇，过几天它会出现在这里。" : "这一轮回顾完了 🎉";
+      aQueue.length === 0 ? "No articles due now. Finish an article and it will appear here for review in a few days." : "Article review complete 🎉";
     area.append(el("div", "empty", msg));
     return;
   }
@@ -1207,32 +1208,32 @@ function renderArticleReview(): void {
 
   face.append(el("div", "atitle", a.title || a.url));
   const bits = [hostnameOf(a.url)];
-  if (a.finishedTs) bits.push(`读完于 ${fmtDate(a.finishedTs)}`);
-  bits.push(`${a.sessionCount} 段专注`, formatDuration(a.totalMs));
-  if (item.card.reps > 0) bits.push(`回顾 ${item.card.reps} 次`);
+  if (a.finishedTs) bits.push(`Finished on ${fmtDate(a.finishedTs)}`);
+  bits.push(`${quantity(a.sessionCount, "focus session")}`, formatDuration(a.totalMs));
+  if (item.card.reps > 0) bits.push(`Reviews: ${item.card.reps}`);
   face.append(el("div", "ameta", bits.join(" · ")));
 
   const r = item.review;
   if (!r) {
-    face.append(el("div", "note", "还没有这篇的回顾材料。"));
+    face.append(el("div", "note", "No review materials for this article yet."));
     wrap.append(face, articleTools(item, false));
   } else if (!aRevealed) {
     // 先自己想，再翻开对答案——比直接读摘要记得牢
     if (r.questions.length > 0) {
-      face.append(el("div", "lead", "先自己想一想"));
+      face.append(el("div", "lead", "Try recalling it first"));
       const ol = el("ol", "qs");
       for (const q of r.questions) ol.append(el("li", undefined, q));
       face.append(ol);
     } else {
-      face.append(el("div", "note", "这篇没生成回想问题，直接看大纲吧。"));
+      face.append(el("div", "note", "No recall questions were generated. You can view the outline."));
     }
     wrap.append(face);
-    const btn = el("button", "mini reveal", coarsePointer() ? "翻开看大纲" : "翻开看大纲（空格）");
+    const btn = el("button", "mini reveal", coarsePointer() ? "Show outline" : "Show outline (Space)");
     btn.style.marginTop = "14px";
     btn.addEventListener("click", () => revealArticle());
     wrap.append(btn);
   } else {
-    face.append(el("div", "lead", "这篇讲了什么"));
+    face.append(el("div", "lead", "What was this article about?"));
     const ol = el("ol", "ol");
     for (const line of r.outline) ol.append(el("li", undefined, line));
     face.append(ol);
@@ -1281,13 +1282,13 @@ function articleTools(item: ArticleReviewView, has: boolean): HTMLElement {
   const out = el("div", "out");
   out.hidden = true;
 
-  const open = tracked(el("button", "mini", "打开原文"), "review.articles.source");
+  const open = tracked(el("button", "mini", "Open original"), "review.articles.source");
   open.addEventListener("click", () => window.open(item.article.url, "_blank", "noreferrer"));
 
-  const gen = tracked(el("button", "mini", has ? "重新生成" : "生成回顾材料"), "review.articles.generate");
+  const gen = tracked(el("button", "mini", has ? "Regenerate" : "Generate review"), "review.articles.generate");
   gen.addEventListener("click", async () => {
     out.hidden = false;
-    out.textContent = "正在通读原文并整理…这一步要十几秒。";
+    out.textContent = "Reading the article and preparing your review… This may take a moment.";
     for (const b of bar.querySelectorAll("button")) b.disabled = true;
     let res: ArticleReviewOutcome;
     try {
@@ -1297,7 +1298,7 @@ function articleTools(item: ArticleReviewView, has: boolean): HTMLElement {
         regenerate: has,
       });
     } catch (err) {
-      out.textContent = `失败：${reason(err)}。再点一次重试。`;
+      out.textContent = `Failed: ${reason(err)}. Select again to retry.`;
       return;
     } finally {
       for (const b of bar.querySelectorAll("button")) b.disabled = false;
@@ -1309,10 +1310,10 @@ function articleTools(item: ArticleReviewView, has: boolean): HTMLElement {
       return;
     }
     out.textContent = res.noText
-      ? "这篇的正文没有存下来——文章回顾是后来才加的功能，之前读过的文章没赶上。重新读一遍就会存下。"
+      ? "The article text was not saved because article reviews were added later. Read it again to save the text."
       : res.needsConfig
-        ? (res.error ?? "模型服务还没配置好，去「设置」里处理。")
-        : `失败：${res.error ?? "未知错误"}`;
+        ? (res.error ?? "Configure your model connection in Settings first.")
+        : `Failed: ${res.error ?? "Unknown error"}`;
   });
 
   bar.append(open, gen);
@@ -1336,7 +1337,7 @@ if (!document.body.classList.contains("app")) $("add")?.addEventListener("submit
   const input = $<HTMLInputElement>("add-url");
   try {
     const url = new URL(input.value.trim());
-    if (!/^https?:$/.test(url.protocol)) throw new Error("请填写 http(s):// 开头的文章地址");
+    if (!/^https?:$/.test(url.protocol)) throw new Error("Enter an article URL starting with http:// or https://");
     const go = $<HTMLButtonElement>("add-go"); go.disabled = true;
     void chrome.tabs.create({ url: url.href }).then(() => { addDialog.close(); input.value = ""; }).catch(error => {
       $("add-hint").hidden = false; $("add-hint").textContent = reason(error);

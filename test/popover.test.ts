@@ -133,8 +133,8 @@ test("浮层关掉后迟到的增量不会炸，也不会把浮层拉回来", ()
 test("报错会顶掉流式骨架，之后的增量不再落到已经消失的节点上", () => {
   pop.showStreaming(RECT, "leaks");
   // 配置类的失败有好几种（没选服务商、没填 Key、没点同意），浮层照实显示出错处给的那句话
-  pop.showError(RECT, "还没有同意把内容发给模型服务：打开设置页，在顶部确认后才会开始", true);
-  assert.match(txt(".err"), /还没有同意/);
+  pop.showError(RECT, "Consent is required before sending content to your model provider. Open Settings and confirm at the top of the page.", true);
+  assert.match(txt(".err"), /Consent is required/);
   assert.ok(root().querySelector('[data-act="opt"]'), "配置类的失败带一个「去设置」");
   pop.updateStream({ translation: "泄漏", phonetic: null, pos: null, contextNote: null, usage: null, vocab: [] });
   assert.equal(root().querySelector(".tr"), null, "增量不该在错误界面上凭空长出译文");
@@ -293,7 +293,7 @@ test("翻完之后挂上追问入口，但那时选区还在，浮层照常该�
   pop.showResult(RECT, SNIPPET);
   pop.enableAsk();
   const entry = root().querySelector('[data-act="ask"]')!;
-  assert.equal(entry.textContent, "问", "一个字符当图标，不写文字标签");
+  assert.equal(entry.textContent, "Ask", "一个字符当图标，不写文字标签");
   assert.equal(root().querySelector(".qin"), null, "先只给按钮，别一上来就摆个表单");
   assert.equal(pop.asking, false, "还没点开，选区还作数");
 });
@@ -391,8 +391,8 @@ test("回车发送；输入法选词时的那一下回车不算", () => {
 test("追问失败：缺配置时给一个「去设置」", () => {
   const input = openAsk();
   ask(input, "为什么？");
-  pop.failAnswer("尚未填写 API Key：打开设置页填写", true);
-  assert.ok(txt(".aa").includes("API Key"));
+  pop.failAnswer("No API key configured. Enter one in Settings.", true);
+  assert.ok(txt(".aa").includes("API key"));
   click(root().querySelector('[data-act="opt"]'));
   assert.equal(optionsOpened, 1);
   assert.equal(input.disabled, false, "失败之后也要能再问");
@@ -401,8 +401,8 @@ test("追问失败：缺配置时给一个「去设置」", () => {
 test("追问失败：一般错误照原样显示，不给「去设置」", () => {
   const input = openAsk();
   ask(input, "为什么？");
-  pop.failAnswer("网络错误：Failed to fetch", false);
-  assert.ok(txt(".aa").includes("网络错误"));
+  pop.failAnswer("Network error: Failed to fetch", false);
+  assert.ok(txt(".aa").includes("Network error"));
   assert.equal(root().querySelector('[data-act="opt"]'), null);
 });
 
@@ -865,7 +865,7 @@ test("滚过之后再追问：给答案留地方照框里的坐标算，不被�
 
 test("识别标题转圈，译文空着；切换流式沿用同一骨架", () => {
   pop.showRecognizing(RECT);
-  assert.equal(txt(".term"), "正在识别图中文字… ");
+  assert.equal(txt(".term"), "Recognizing text in the image… ");
   assert.ok(root().querySelector(".term .spin"));
   assert.equal(root().querySelector(".tr")!.childNodes.length, 0);
   const tr = root().querySelector(".tr");
@@ -888,9 +888,9 @@ test("setTerm 与流式标题使用相同的 90 字截断", () => {
 
 test("长文本确认按来源区分选中和识别", () => {
   pop.showConfirm(RECT, "hello", 201);
-  assert.equal(txt(".meta"), "选中了 201 个词，较长，确认后再翻译");
+  assert.equal(txt(".meta"), "Selected 201 words. Confirm to translate this longer passage.");
   pop.showConfirm(RECT, "hello", 201, "image");
-  assert.equal(txt(".meta"), "识别出 201 个词，较长，确认后再翻译");
+  assert.equal(txt(".meta"), "Recognized 201 words. Confirm to translate this longer passage.");
 });
 
 /* ---- 原文：长了只露开头，点一下展开全文，再点收起 ---- */

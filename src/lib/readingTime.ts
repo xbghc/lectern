@@ -126,25 +126,25 @@ export function estimateArticle(
  */
 export function formatEstimate(ms: number): string {
   const min = Math.round(Math.max(0, ms) / 60_000);
-  if (min < 1) return "不到 1 分钟";
-  if (min < 20) return `约 ${min} 分钟`;
+  if (min < 1) return "Less than 1 min";
+  if (min < 20) return `About ${min} min`;
   const rounded = Math.round(min / 5) * 5;
-  if (rounded < 60) return `约 ${rounded} 分钟`;
+  if (rounded < 60) return `About ${rounded} min`;
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
-  return m === 0 ? `约 ${h} 小时` : `约 ${h} 小时 ${m} 分钟`;
+  return m === 0 ? `About ${h} h` : `About ${h} h ${m} min`;
 }
 
 /** 估计是怎么来的，一句话。放在数字旁边，让人知道该信几分。 */
 export function describeBasis(e: ReadingEstimate): string {
   switch (e.basis) {
     case "article":
-      return `按你读这篇的节奏（${e.wordsPerMinute} 字/分）`;
+      return `Based on your pace in this article (${e.wordsPerMinute} words/min)`;
     case "personal":
       return e.windowDays > 0
-        ? `按你近 ${e.windowDays} 天的速度（${e.wordsPerMinute} 字/分）`
-        : `按你过往的速度（${e.wordsPerMinute} 字/分）`;
+        ? `Based on your last ${e.windowDays} days of reading (${e.wordsPerMinute} words/min)`
+        : `Based on your previous reading pace (${e.wordsPerMinute} words/min)`;
     default:
-      return "按一般速度估计，读得多了会改按你自己的速度";
+      return "Estimated from a typical reading pace. More reading will personalize the estimate.";
   }
 }

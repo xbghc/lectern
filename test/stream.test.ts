@@ -418,13 +418,13 @@ test("长选区的译文不等闭合：先出头十几个字，一路往后长�
     now: stepClock(),
     fetch: fetchOf(textStream(LONG_JSON, 3)),
   });
-  assert.ok(seen.length >= 3, `应当分几次推出来，实际 ${seen.length} 次`);
+  assert.ok(seen.length >= 3, `应当分几次推出来，实际 ${seen.length} times`);
   assert.ok(seen[0]!.length >= 16 && seen[0]!.length < LONG_TR.length, "头一次是半截");
   for (let i = 1; i < seen.length; i++) assert.ok(seen[i]!.startsWith(seen[i - 1]!), "只往后长，浮层才能只接新长出来的那截");
   assert.equal(seen.at(-1), LONG_TR);
   assert.equal(result.translation, LONG_TR);
   // 八十来个字、每 16 字一推，不是每个 delta 都推
-  assert.ok(seen.length <= 8, `推得太碎：${seen.length} 次`);
+  assert.ok(seen.length <= 8, `推得太碎：${seen.length} times`);
   // 两层各有各的起跑时刻，假时钟下差一格；要盯的是它记在流中途而不是收尾
   assert.ok(timing.firstFieldMs !== null && timing.firstFieldMs <= timing.totalMs);
 });
@@ -467,7 +467,7 @@ test("模型给了空译文：自动重发一次，第二次的结果照常返�
   assert.equal(out.timing.attempts, 2);
   assert.deepEqual(out.usage, { inputTokens: 498, outputTokens: 116 }, "textStream 每条流报 249 / 58");
   assert.equal(out.recovered?.by, "retry");
-  assert.match(out.recovered!.error.message, /没有返回 translation/);
+  assert.match(out.recovered!.error.message, /did not return a translation/);
   assert.equal(out.recovered!.error.raw?.text, EMPTY_TR, "头一次的原文留着进诊断日志");
   // 头一轮推过音标和语境解释（没有译文）；第二轮的译文到了才第一次有译文
   assert.equal(seen[0]!.translation, null);

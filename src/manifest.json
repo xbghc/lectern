@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Lectern — 阅读时用到的工具",
+  "name": "Lectern \u2014 Reading Companion",
   "version": "0.1.0",
-  "description": "记录每篇文章的专注片段与阅读进度；在文章页划词即用你选的模型翻译并存档，之后用间隔重复复习。",
+  "description": "Track reading progress, translate selected text with your own AI provider, and review vocabulary with spaced repetition.",
   "permissions": [
     "storage",
     "alarms",
@@ -25,8 +25,10 @@
   },
   "commands": {
     "screenshot-translate": {
-      "suggested_key": { "default": "Alt+Shift+S" },
-      "description": "截图翻译：框选图片里的文字并翻译"
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Screenshot translation: select text in an image to translate"
     }
   },
   "icons": {

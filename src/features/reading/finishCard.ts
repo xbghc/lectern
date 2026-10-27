@@ -113,9 +113,9 @@ export class FinishCard {
 
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="label"><span class="title">这篇读完了</span><span class="sub">已进入回顾队列</span></div>
-       <button data-act="go">回顾这篇</button>
-       <button class="close" data-act="x" aria-label="关闭">×</button>`;
+    card.innerHTML = `<div class="label"><span class="title">Article finished</span><span class="sub">Added to your review queue</span></div>
+       <button data-act="go">Review article</button>
+       <button class="close" data-act="x" aria-label="Close">×</button>`;
     card.querySelector('[data-act="go"]')!.addEventListener("click", () => this.actions.onOpen());
     card.querySelector('[data-act="x"]')!.addEventListener("click", () => {
       this.hide();

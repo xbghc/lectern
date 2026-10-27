@@ -87,7 +87,7 @@ export function createPageHost<P extends Plugins>(plugins: P, opts: PageHostOpti
   return {
     start: (url) => run(url),
     state: () => {
-      if (!features) return { tracked: false, reason: "初始化中" };
+      if (!features) return { tracked: false, reason: "Initializing" };
       const st: PageState = { tracked: false };
       for (const id of ids) Object.assign(st, features[id]?.state());
       return st;

@@ -30,9 +30,9 @@ export function extractArchive(doc: Document, url: string): ArchiveCapture {
   base.href = doc.baseURI || url;
   copy.head.prepend(base);
   const parsed = new Readability(copy).parse();
-  if (!parsed?.content || (parsed.textContent?.trim().length ?? 0) < 20) throw new Error("未找到可保存的文章正文");
+  if (!parsed?.content || (parsed.textContent?.trim().length ?? 0) < 20) throw new Error("No article text was found to save");
   const html = sanitizeArticle(parsed.content, doc.baseURI || url, doc);
-  if (new TextEncoder().encode(html).length > MAX_RESOURCE_BYTES) throw new Error("文章正文超过 8 MB，无法保存");
+  if (new TextEncoder().encode(html).length > MAX_RESOURCE_BYTES) throw new Error("Article text exceeds the 8 MB limit");
   const holder = doc.createElement("template");
   holder.innerHTML = html;
   const urls = [...new Set([...holder.content.querySelectorAll("img")].map(img => img.getAttribute("src")!).filter(Boolean))];
@@ -44,7 +44,7 @@ export function extractArchive(doc: Document, url: string): ArchiveCapture {
 }
 
 export async function captureCurrentArticle(): Promise<unknown> {
-  if (window.top !== window || document.contentType !== "text/html") throw new Error("只能保存顶层网页文章");
+  if (window.top !== window || document.contentType !== "text/html") throw new Error("Only top-level page articles can be saved");
   const payload = extractArchive(document, location.href);
   // Same-origin requests can reuse the current page's authenticated session.
   // Cross-origin resources are fetched by the extension background without cookies.

@@ -126,21 +126,21 @@ public class NativeBridge {
                 int[] at = new int[2];
                 web.getLocationInWindow(at);
                 int w = web.getWidth(), h = web.getHeight();
-                if (w <= 0 || h <= 0) throw new IllegalStateException("阅读器还没有可截图的画面");
+                if (w <= 0 || h <= 0) throw new IllegalStateException("The reader has no content available to capture");
                 bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
                 final Bitmap frame = bitmap;
                 // 硬件加速下 View.draw 不可靠；PixelCopy 拿窗口 surface 上真正显示的像素。
                 PixelCopy.request(activity.getWindow(), new Rect(at[0], at[1], at[0] + w, at[1] + h), frame, result -> {
                     if (result != PixelCopy.SUCCESS) {
                         frame.recycle();
-                        imageError("__fsCapture", id, "截图失败：PixelCopy " + result);
+                        imageError("__fsCapture", id, "Screenshot failed: PixelCopy " + result);
                         return;
                     }
                     try {
                         pool.execute(() -> {
                             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                                 if (!frame.compress(Bitmap.CompressFormat.PNG, 100, out)) {
-                                    throw new IllegalStateException("截图 PNG 编码失败");
+                                    throw new IllegalStateException("Could not encode the screenshot as PNG");
                                 }
                                 String b64 = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
                                 // 一次几 MB 的 evaluateJavascript 对这个一次性动作可以接受；
@@ -148,19 +148,19 @@ public class NativeBridge {
                                 js("window.__fsCapture&&window.__fsCapture.done(" + JSONObject.quote(id) + ","
                                         + JSONObject.quote("data:image/png;base64," + b64) + ")");
                             } catch (Exception e) {
-                                imageError("__fsCapture", id, "截图失败：" + e.getMessage());
+                                imageError("__fsCapture", id, "Screenshot failed: " + e.getMessage());
                             } finally {
                                 frame.recycle();
                             }
                         });
                     } catch (Exception e) {
                         frame.recycle();
-                        imageError("__fsCapture", id, "截图失败：" + e.getMessage());
+                        imageError("__fsCapture", id, "Screenshot failed: " + e.getMessage());
                     }
                 }, new Handler(Looper.getMainLooper()));
             } catch (Exception e) {
                 if (bitmap != null) bitmap.recycle();
-                imageError("__fsCapture", id, "截图失败：" + e.getMessage());
+                imageError("__fsCapture", id, "Screenshot failed: " + e.getMessage());
             }
         });
     }
@@ -168,7 +168,7 @@ public class NativeBridge {
     /** 绑定线程、识别线程与 shutdown 共用同一把锁，避免重复建模型或关掉后重新创建。 */
     @JavascriptInterface
     public synchronized void ocrWarm() {
-        if (closed) throw new IllegalStateException("识别器已关闭");
+        if (closed) throw new IllegalStateException("Text recognizer is closed");
         if (recognizer == null) recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
     }
 
@@ -180,7 +180,7 @@ public class NativeBridge {
                 try {
                     byte[] bytes = Base64.decode(pngBase64, Base64.DEFAULT);
                     bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    if (bitmap == null) throw new IllegalArgumentException("无法解码待识别图片");
+                    if (bitmap == null) throw new IllegalArgumentException("Could not decode the image for text recognition");
                     final Bitmap frame = bitmap;
                     InputImage image = InputImage.fromBitmap(frame, 0);
                     synchronized (this) {
@@ -190,7 +190,7 @@ public class NativeBridge {
                             try {
                                 if (!task.isSuccessful()) {
                                     Exception error = task.getException();
-                                    imageError("__fsOcr", id, error == null ? "识别已取消" : "识别失败：" + error.getMessage());
+                                    imageError("__fsOcr", id, error == null ? "Text recognition was canceled" : "Text recognition failed: " + error.getMessage());
                                     return;
                                 }
                                 JSONArray lines = new JSONArray();
@@ -209,7 +209,7 @@ public class NativeBridge {
                                 js("window.__fsOcr&&window.__fsOcr.done(" + JSONObject.quote(id) + ","
                                         + JSONObject.quote(lines.toString()) + ")");
                             } catch (Exception e) {
-                                imageError("__fsOcr", id, "识别失败：" + e.getMessage());
+                                imageError("__fsOcr", id, "Text recognition failed: " + e.getMessage());
                             } finally {
                                 frame.recycle();
                             }
@@ -217,13 +217,13 @@ public class NativeBridge {
                     }
                     bitmap = null; // 异步识别还要读它，由完成回调回收。
                 } catch (Exception e) {
-                    imageError("__fsOcr", id, "识别失败：" + e.getMessage());
+                    imageError("__fsOcr", id, "Text recognition failed: " + e.getMessage());
                 } finally {
                     if (bitmap != null) bitmap.recycle();
                 }
             });
         } catch (Exception e) {
-            imageError("__fsOcr", id, "识别失败：" + e.getMessage());
+            imageError("__fsOcr", id, "Text recognition failed: " + e.getMessage());
         }
     }
 
@@ -261,7 +261,7 @@ public class NativeBridge {
             for (int hop = 0; ; hop++) {
                 String protocol = target.getProtocol();
                 if (!"https".equals(protocol) && !"http".equals(protocol)) {
-                    error(id, "只支持 http(s) 地址");
+                    error(id, "Only HTTP(S) URLs are supported");
                     return;
                 }
                 c = (HttpURLConnection) target.openConnection();
@@ -286,7 +286,7 @@ public class NativeBridge {
                 statusText = c.getResponseMessage();
                 boolean redirect = status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
                 if (redirect && !followRedirects) {
-                    error(id, "模型服务地址发生重定向，请在设置中直接填写最终 HTTPS 地址");
+                    error(id, "The model URL redirects. Enter the final HTTPS URL in Settings.");
                     return;
                 }
                 String location = c.getHeaderField("Location");
@@ -392,12 +392,12 @@ public class NativeBridge {
             long total = 0;
             try (InputStream in = activity.getContentResolver().openInputStream(Uri.parse(uri));
                  OutputStream out = new FileOutputStream(copy)) {
-                if (in == null) throw new IllegalStateException("打不开这个文件");
+                if (in == null) throw new IllegalStateException("Could not open this file");
                 byte[] buf = new byte[CHUNK];
                 int n;
                 while ((n = in.read(buf)) > 0) {
                     total += n;
-                    if (total > MAX_EPUB_BYTES) throw new IllegalStateException("这个文件太大了");
+                    if (total > MAX_EPUB_BYTES) throw new IllegalStateException("This file exceeds the size limit");
                     digest.update(buf, 0, n);
                     out.write(buf, 0, n);
                 }
@@ -418,7 +418,7 @@ public class NativeBridge {
                     + JSONObject.quote(hex.toString()) + "," + JSONObject.quote(names.toString()) + ")");
         } catch (Exception e) {
             copy.delete();
-            epubError(id, "打不开这本书：" + e.getMessage());
+            epubError(id, "Could not open this book: " + e.getMessage());
         }
     }
 
@@ -427,9 +427,9 @@ public class NativeBridge {
         pool.execute(() -> {
             OpenBook book = books.get(handle);
             try {
-                if (book == null) throw new IllegalStateException("这本书已经关掉了");
+                if (book == null) throw new IllegalStateException("This book is closed");
                 ZipEntry entry = book.zip.getEntry(name);
-                if (entry == null) throw new IllegalStateException("书里没有 " + name);
+                if (entry == null) throw new IllegalStateException("Missing from book: " + name);
                 long read = 0;
                 try (InputStream in = book.zip.getInputStream(entry)) {
                     byte[] buf = new byte[CHUNK];
@@ -437,14 +437,14 @@ public class NativeBridge {
                     while ((n = in.read(buf)) > 0) {
                         read += n;
                         // 压缩包声称的大小不可信，边读边数
-                        if (read > MAX_ENTRY_BYTES) throw new IllegalStateException("这个条目太大：" + name);
+                        if (read > MAX_ENTRY_BYTES) throw new IllegalStateException("Entry exceeds the size limit: " + name);
                         js("window.__fsEpub&&window.__fsEpub.chunk(" + JSONObject.quote(id) + ","
                                 + JSONObject.quote(Base64.encodeToString(buf, 0, n, Base64.NO_WRAP)) + ")");
                     }
                 }
                 js("window.__fsEpub&&window.__fsEpub.end(" + JSONObject.quote(id) + ")");
             } catch (Exception e) {
-                epubError(id, "读取失败：" + e.getMessage());
+                epubError(id, "Read failed: " + e.getMessage());
             }
         });
     }
@@ -482,9 +482,9 @@ public class NativeBridge {
                 v.put(MediaStore.Downloads.MIME_TYPE, mime);
                 v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Lectern");
                 Uri uri = activity.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
-                if (uri == null) throw new IllegalStateException("MediaStore 拒绝了写入");
+                if (uri == null) throw new IllegalStateException("MediaStore rejected the write");
                 try (OutputStream os = activity.getContentResolver().openOutputStream(uri)) {
-                    if (os == null) throw new IllegalStateException("打不开输出流");
+                    if (os == null) throw new IllegalStateException("Could not open the output stream");
                     os.write(text.getBytes(StandardCharsets.UTF_8));
                 }
                 String msg = activity.getString(R.string.saved_to, name);
@@ -553,7 +553,7 @@ public class NativeBridge {
     public void updateDownload(String url, long expectedBytes) {
         // 自动更新在首页悄悄下着的时候，人也可能在设置页手按一次：两个线程写同一个文件，出来的是个坏包
         if (!updateBusy.compareAndSet(false, true)) {
-            js("window.__fsUpdate&&window.__fsUpdate.error(" + JSONObject.quote("已经在下载了，稍等一会儿") + ")");
+            js("window.__fsUpdate&&window.__fsUpdate.error(" + JSONObject.quote("A download is already in progress. Please wait.") + ")");
             return;
         }
         pool.execute(() -> {
@@ -636,14 +636,14 @@ public class NativeBridge {
              * 「响应里的 URL 字段被换成了别处」，不是「TLS 被破了」——后者出现时这里挡什么都晚了。
              */
             if (!"https".equals(target.getProtocol()) || !"github.com".equals(target.getHost())) {
-                throw new IllegalStateException("升级包的地址不对：" + target.getProtocol() + "://" + target.getHost());
+                throw new IllegalStateException("Invalid update package URL: " + target.getProtocol() + "://" + target.getHost());
             }
 
             File dir = apk.getParentFile();
             // 上一次下到一半的残包留着只会碍事，每次从干净的目录开始
             deleteRecursively(dir);
             if (dir == null || (!dir.mkdirs() && !dir.isDirectory())) {
-                throw new IllegalStateException("建不了缓存目录");
+                throw new IllegalStateException("Could not create the cache directory");
             }
 
             c = (HttpURLConnection) target.openConnection();
@@ -656,7 +656,7 @@ public class NativeBridge {
             c.setRequestMethod("GET");
             c.setRequestProperty("User-Agent", USER_AGENT);
             int status = c.getResponseCode();
-            if (status != HttpURLConnection.HTTP_OK) throw new IllegalStateException("服务器返回 " + status);
+            if (status != HttpURLConnection.HTTP_OK) throw new IllegalStateException("Server returned " + status);
 
             // 对方没报长度时退回 Release 里写的那个大小，两个都没有就报 0（页面只显示已下多少）
             long total = c.getContentLengthLong();
@@ -682,7 +682,7 @@ public class NativeBridge {
 
             // Release 上写着多大就该收到多大。对不上多半是下断了，这种包送进安装器只会白弹一次框
             if (expectedBytes > 0 && received != expectedBytes) {
-                throw new IllegalStateException("收到 " + received + " 字节，应该是 " + expectedBytes);
+                throw new IllegalStateException("Received " + received + " bytes; expected " + expectedBytes);
             }
             js("window.__fsUpdate&&window.__fsUpdate.done()");
         } catch (Exception e) {

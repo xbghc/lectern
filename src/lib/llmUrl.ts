@@ -3,20 +3,20 @@ export function parseLlmBaseUrl(value: string): URL {
   const text = typeof value === "string" ? value.trim() : "";
   // 不接受 URL() 会自动修正的缺斜杠、反斜杠或夹带控制字符的写法。
   if (!/^https?:\/\/[^/\s\\]/i.test(text) || /[\s\\]/.test(text)) {
-    throw new Error("Base URL 要是完整的 http(s) 地址，不能包含空白或反斜杠。");
+    throw new Error("The base URL must be a complete HTTP(S) URL without whitespace or backslashes.");
   }
   let url: URL;
   try {
     url = new URL(text);
   } catch {
-    throw new Error("Base URL 不是有效的地址。");
+    throw new Error("Enter a valid base URL.");
   }
   if (url.username || url.password || /[?#]/.test(text)) {
-    throw new Error("Base URL 不能包含凭证、查询参数或片段。");
+    throw new Error("The base URL must not contain credentials, a query or a fragment.");
   }
   // 沿用同步服务的回环例外，保留清单里的本地模型；不放行局域网、公网或 .localhost 子域。
   if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) {
-    throw new Error("模型服务需要 HTTPS；仅本机 localhost、127.0.0.1 或 [::1] 可使用 HTTP。");
+    throw new Error("Model services require HTTPS. HTTP is allowed only for localhost, 127.0.0.1 or [::1].");
   }
   return url;
 }

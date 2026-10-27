@@ -286,7 +286,7 @@ body.reader.immersive .article { padding-top: calc(14px + var(--rbar-h, 66px)); 
 .sheet .item .m { color: var(--muted); font-size: 11px; margin-top: 1px; font-family: var(--sans); }
 .sheet .item .tr { margin-top: 5px; font-size: 14px; }
 .sheet .item .n, .sheet .item .u { color: var(--fg-soft); font-size: 12.5px; line-height: 1.75; margin-top: 5px; }
-.sheet .item .u::before { content: "用法 · "; color: var(--muted); font-size: 11px; font-family: var(--sans); }
+.sheet .item .u::before { content: "Usage · "; color: var(--muted); font-size: 11px; font-family: var(--sans); }
 .sheet .item .vocab { margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); }
 .sheet .item .v + .v { margin-top: 6px; }
 .sheet .item .vw { font-weight: 600; font-size: 13px; }

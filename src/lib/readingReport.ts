@@ -25,7 +25,7 @@ export function readingReport(sessions: readonly ActivitySession[], articles: re
       group.totalMs += ms;
       if (book) group.bookMs += ms; else group.articleMs += ms;
       const titles = book ? group.titles.books : group.titles.articles;
-      const title = s.title || (book ? "本地书籍" : s.url);
+      const title = s.title || (book ? "Local book" : s.url);
       if (!titles.includes(title)) titles.push(title);
     }
     groups.push(group);

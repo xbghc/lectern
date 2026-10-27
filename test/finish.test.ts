@@ -53,7 +53,7 @@ const btn = (act: string): HTMLElement =>
 test("show 挂出角标", () => {
   card.show();
   assert.ok(card.hostElement);
-  assert.equal(btn("go").textContent, "回顾这篇");
+  assert.equal(btn("go").textContent, "Review article");
 });
 
 test("重复 show 不会挂出第二个角标", () => {

@@ -52,7 +52,7 @@ test("首页开着的时候，另一台设备刚读的文章自己冒到最上�
   // 别的设备上标了读完：看得见的变化照常重画
   articles = articles.map(a => a.title === "on-the-phone" ? { ...a, finished: true } : a);
   broadcast(); await tick();
-  assert.equal(doc.querySelector("#articles .article-card .pill")!.textContent, "读完");
+  assert.equal(doc.querySelector("#articles .article-card .pill")!.textContent, "Finished");
 
   // 正在复习：不在文章这一栏就不取，翻到一半的卡不能被换掉
   (doc.querySelector('.tab[data-tab="review"]') as HTMLButtonElement).click(); await tick();

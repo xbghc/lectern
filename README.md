@@ -1,1593 +1,222 @@
 # Lectern
 
-[![CI](https://github.com/xbghc/lectern/actions/workflows/ci.yml/badge.svg)](https://github.com/xbghc/lectern/actions/workflows/ci.yml)
+A reading companion for Chrome, Edge and Android. Lectern tracks article progress and focus time, translates selected text with your own AI provider, and helps you revisit vocabulary with FSRS spaced repetition.
 
-读书台：阅读时用到的工具都放在这儿。浏览器扩展，外加一个用同一份代码做的安卓 App（见[安卓 App](#安卓-app)）。眼下是两件事：
+The interface and documentation are in English. AI translations, teaching notes, article reviews and vocabulary coaching can still use Chinese. Your articles, books and saved content keep their original language.
 
-1. **阅读追踪** —— 记录你在每篇文章上的注意力片段：每次连续专注了多久、实际读了多少内容、
-   阅读速度是多少，哪些文章真正读完了，以及上次读到了哪一段——重新打开时跳回去。
-   安卓 App 里还能导入 EPUB，一章就是一篇阅读材料，上面这些连同划词翻译原样适用（见[书](#书)）。
-2. **划词翻译与讲解、复习** —— 在被识别为文章的页面上选中英文即调用你选的模型翻译，
-   给出结合本文语境的解释，再像老师那样补一句用法、把句子里的生词逐个讲开并存档；
-   之后在面板里用 FSRS 间隔重复复习。图片里的字可以截图翻译。
+- [Chrome Web Store](https://chromewebstore.google.com/detail/fpplijdeabekpbadojohidampfnjhcdf)
+- [Extension packages and Android APKs](https://github.com/xbghc/lectern/releases)
+- [Interactive interface previews](https://xbghc.github.io/lectern/storybook/)
+- [Privacy policy](https://xbghc.github.io/lectern/privacy/)
+- [Sync server deployment](docs/server-deployment.md)
+- [Chrome Web Store listing and publishing](docs/chrome-web-store.md)
 
-## 从 Focus Session 改名
+## Getting started
 
-这个项目原名 Focus Session，0.3.16 之后改叫 Lectern。
+Install from the Chrome Web Store, or extract a release ZIP and load its directory through **chrome://extensions → Developer mode → Load unpacked**. Chrome and Edge 114 or newer are supported; Firefox is not supported because the extension uses `chrome.sidePanel`.
 
-- **扩展**：更新后照常用。本机的库第一次打开时自动从旧名字搬到新名字，阅读记录、设备号都不变。
-- **安卓 App**：包名从 `com.focussession.app` 换成了 `io.github.xbghc.lectern`，系统把它当成另一个 App，
-  旧 App 不会自动升级过来，要手动装新的。数据不会跟着走：开了设备同步的，在新 App 里填上后端地址和 Token 拉回来；
-  没开同步的，先在旧 App 设置页导出文件，再到新 App 里导入。确认数据都在之后再卸载旧 App。
-- **自建后端**：镜像改名 `ghcr.io/<所有者>/lectern-server`，0.3.16 及更早的版本仍在 `focus-session-server` 下。
-  Compose 项目名、数据库名、`FOCUS_SERVER_IMAGE` 这些部署侧的名字没有动，升级只需改 `.env` 里的镜像地址。
+The settings page opens after installation. Read the content-sharing notice, choose **Agree and start**, select a provider and model, enter your API key, then choose **Save and test connection**. Lectern does not call a model before consent. Without a configured model and key, it cannot classify new articles or translate; existing history remains available.
 
-## 数据去哪了
+The store extension and an unpacked extension have different IDs and separate local data. Sync or export your records before switching installations.
 
-阅读记录、划词记录、复习卡片保存在本机的 IndexedDB 中，扩展与安卓 App 都能独立离线使用。
-设置页的「设备同步」可以连接自己部署的服务器：填写后端地址和 Token 后，在设备间合并数据；
-不启用同步时数据留在本机。仍然支持导出文件、在另一台设备导入合并（见[数据与导出](#数据与导出)）。
-服务器使用 PostgreSQL 存结构化数据和资源索引、持久文件卷存文章内容，详见[后端部署与同步](docs/server-deployment.md)。LLM 调用失败时的现场
-（错误信息、模型的原始输出、当时选中的文本）记在设置页的「诊断日志」里，可以复制或下载，
-只留最近 10 条，不含 API Key，也不进数据导出。同一份日志里还有最近 100 条**翻译链路轨迹**：
-每次划词、点词、截图翻译从手势到浮层画稳各阶段的耗时、浮层的位置、选中文本的前 160 字，
-用来查「为什么慢」（见[翻译链路诊断](#翻译链路诊断)）。**启用了设备同步的话，这份诊断日志也会传到你连的那台同步服务器上**
-（不含 API Key，服务器上留 30 天），出了错不用再手动导出文件，服务器管理员在那边就能看；没启用同步就只留在本机
-（见[诊断日志上传](#诊断日志上传)）。
-还有一份**首页按钮的点击计数**：哪个按钮、哪天、点了几次，留 90 天。只有次数——不记点的是哪篇文章、
-搜了什么词；不进数据导出。**启用了设备同步的话，这份计数会传到你连的那台同步服务器上**，服务器的管理员可以在那边
-汇总分析；没启用同步就只留在本机（见[界面埋点](#界面埋点)）。
+For Android, install `lectern-vX.Y.Z.apk` from Releases and configure the model separately in **Settings**. Android and the extension keep separate API keys. Packages with different signing certificates cannot update each other; export your data before replacing an installation.
 
-**同意之前一个请求都不发**：设置页顶部列着会发给模型服务的内容——哪些是自动发的、哪些是用到功能时发的、发给谁。
-点「同意并开始」之前，文章判别、翻译和其余用到模型的功能全部不发请求（各处报的是「还没有同意…到设置页确认」）；
-同意之后可以在模型分区里撤回。这个确认只属于这一份安装：不进导出文件、不进同步，换设备或重装要再确认一次。
-扩展新装时设置页会自动打开；从 0.3.17 及更早版本升上来、已经填过 Key 的，升级后也会自动打开一次——在点同意之前判别和翻译是停的。
-App 不会自己弹，进「设置」就能看到这一块。
+## Reading workspace
 
-**但划词翻译会联网**：选中的文本 + 它所在的段落 + 文章标题会发送给你在设置页选的那家模型服务
-（见[模型服务](#模型服务)）。扩展只在设置页**翻译白名单**里的站点上自动挂选区监听，
-其余页面要在弹出面板「翻译」页签打开本页开关（只对本次加载有效，刷新即回到默认），或把启用范围改为「本站始终开启」；
-也可以直接关掉划词翻译——关掉后 content script 根本不会挂选区监听。App 的阅读器里打开的都是你自己挑来读的，
-不看白名单，总开关开着就挂。
+The desktop workspace has Reading, Vocabulary, Review, Statistics and Settings navigation. The reading overview uses your actual recent activity, unfinished articles and due review counts. Articles support list/grid views, search, completion filters and bulk actions; each article's menu provides details, completion status and review.
 
-**导入的书不出本机**：EPUB 的正文、图片和每一节的阅读记录只存在这台设备上，
-不进同步、也不进导出文件——书是你自己拿来的文件，正文多半有版权。换一台设备要重新导入，
-那边的进度是新的（见[书](#书)）。划词记录和生词卡不受影响，它们本来就独立于出处。
+The extension popup opens on **Focus**, with today's total, a comparison to yesterday, the longest session, a selectable timeline and a seven-day chart. **Translate** independently controls translation for the page and the site's allowlist entry. Switching tabs does not change tracking or translation state.
 
-**App 还会问 GitHub 有没有新版本**：安卓 App 不走应用商店，装出去的包只能自己管升级，
-所以每天最多一次向 `https://api.github.com/repos/xbghc/lectern/releases/latest` 发一个匿名 GET。
-请求里除了「最新的一次发布是哪个版本」什么都没有——不带 API Key、不带阅读记录，
-连当前版本号都不带（比较在本机做）。设置页的「更新」里能关掉，关掉之后只有手按「检查更新」才联网。
-问到新版本之后，App 会**自己把升级包下下来**（只从 `github.com` 的 https 地址、只在不按流量计费的网络上），
-等你离开 App 之后装上；同一处另有一个开关能关掉，关掉之后回到「首页出一条横幅、下不下由你点」。
-扩展那边没有这回事，浏览器的商店管升级。
+Pausing focus settles the current session and keeps that page paused until you resume it. Scrolling or switching away and back does not resume it. Pausing translation does not change its global setting or site allowlist. These choices survive browser back/forward restoration, but a refresh or a different article uses the default rules again.
 
-隐私政策的正式版本在 <https://xbghc.github.io/lectern/privacy/>（源文件 `site/privacy/index.html`）；上架 Chrome 应用商店要填的内容见 [docs/chrome-web-store.md](docs/chrome-web-store.md)。本节改了，那两处要跟着改。
+Android puts reading first: the bottom navigation contains Reading, Vocabulary and Settings. Continue a recent article or book, browse the bookshelf, or add an article URL. **All articles and management** opens search, filters and bulk actions. Review starts from Vocabulary; Statistics is available beside the home search control.
 
-**用一句话改名单也会联网**：你说的那句话、前几句对话、两份名单的全部内容，以及（在弹出面板里用时）当前页的网址，
-会发给同一个模型，由它翻成改动清单（见[用一句话改名单](#用一句话改名单)）。只在你按「发送」时才发，不会自己发。
+The visual design follows [the Lectern design reference](https://lectern-ui-coo.dreamyglobe32.chatgpt.site), with warm paper surfaces, restrained ochre actions and serif reading text.
 
-**截图翻译的识别在本机做**：扩展用 Tesseract 的 wasm，App 用 ML Kit，截图不联网。
-识别出来的文本和划词一样发给模型服务；截图翻译由人每次主动触发、亲手框出要译的那一块，
-所以不受划词总开关和翻译白名单控制。
+## Model connection
 
-API Key 存在独立的 storage key 里，**不会**进入 content script（它与网页共享渲染进程），
-也**不会**随导出文件带出。所有 LLM 请求都由 background service worker 代发。
+All model features share one connection: article detection, translation, teaching notes, follow-up questions, article review, vocabulary chat and rule suggestions. There is no preset provider for a new installation.
 
-## 模型服务
+- The searchable provider catalog is a build-time [models.dev](https://models.dev) snapshot under its MIT license. Provider names, IDs, domains and aliases are searchable. Selecting one fills the URL and protocol; you can edit them or choose **Custom URL**. Model IDs can be entered manually.
+- Supported protocols are OpenAI-compatible **Chat Completions** and Anthropic-compatible **Messages**, sent directly in their native request formats. There is no protocol-converting proxy.
+- Include the version segment in the base URL, such as `https://api.openai.com/v1`. HTTPS is required except for `localhost`, `127.0.0.1` and `[::1]`. Credentials in URLs, query strings, fragments and redirects are rejected; enter the final endpoint.
+- Changing the protocol, host or effective port requires a different API key. The old key is cleared and is never sent to the new destination. Changing only a path or spelling out the default port does not require a replacement key.
+- API keys are stored separately, excluded from exports and kept out of extension content scripts. Extension model requests run in the background service worker.
+- Earlier MiniMax configurations are preserved on upgrade. JSON response handling was initially tuned with MiniMax; compatibility with every provider/model has not been verified. Reasoning models may need a higher output-token limit to avoid truncation.
 
-文章判别、划词翻译与讲解、追问、文章回顾、用一句话改名单，用的是同一份模型配置，在设置页的「模型服务」里。
-**不预设任何一家**：新装时什么都没选，选哪家、用哪个模型是你自己的决定。
+Update the catalog with `npm run providers:update`, review the diff, then commit it. The snapshot does not contact models.dev at runtime. `scripts/update-providers.ts` supplies a small set of explicit endpoint overrides; providers requiring account-specific URLs or request signing are excluded.
 
-- **服务商清单取自 [models.dev](https://models.dev)**（MIT），设置页里可以搜索：按名称、id、域名找，
-  常用的几家排在前面并带中文别名（搜「智谱」「通义」也找得到）。选一家会带出它的接口地址和协议，
-  模型一栏给出这家较新的模型名当候选。地址和模型名都可以再手改；清单里没有的选「自定义地址」。
-- **清单是构建时的快照**（`src/lib/providers.generated.ts`，约 200 家、80KB），运行时不向 models.dev 发任何请求。
-  更新：`npm run providers:update`，看一眼 diff 再提交。models.dev 没给 OpenAI 和 Anthropic 官方的地址
-  （它们写在各自的 SDK 包里），这两家连同 Google、Groq、xAI、Mistral 的 OpenAI 兼容端点，
-  是 `scripts/update-providers.ts` 里手补的——整件事里唯一手工维护的一张表。
-  要签名或要按账号拼地址的（Bedrock、Vertex、Azure 等）不在清单里。
-- **说两种协议，都是原生直连**：Anthropic 的 Messages（`…/messages`，`x-api-key`）和 OpenAI 的 Chat Completions
-  （`…/chat/completions`，`Authorization: Bearer`）。选哪一家就用它自己的格式发到它自己的地址，
-  中间没有代理，也不把一种协议转成另一种。各家「OpenAI 兼容」端点实现的都是 Chat Completions，
-  所以用的是它而不是 OpenAI 更新的 Responses 接口。协议在线上的样子在 `src/lib/llmWire.ts`，
-  超时、重试、取消、诊断在 `src/lib/llm.ts`，两种协议共用。
-- **Base URL 带版本那一段**（`https://api.openai.com/v1`），和 models.dev 的写法一致。
-  必须用 HTTPS；仅本机 `localhost`、`127.0.0.1`、`[::1]` 允许 HTTP，不支持局域网或公网明文地址。
-  地址不能包含账号密码、查询参数或片段；请求不跟随重定向，请直接填写最终地址。
-- **换了协议、主机或有效端口要重新填不同的 Key**：后台会清掉原 Key，即使表单又提交了原值也不会带过去。
-  同 origin 只改路径或补默认端口（HTTPS 的 `:443`）不用重填。
-- **从更早的版本升上来**：那时只有 MiniMax 一家，存下的配置照原样接着用（标成 MiniMax，地址和模型名不变）。
+## Article detection and rules
 
-两点要知道。其一，提示词和输出格式的容错是在 `MiniMax-M3-highspeed` 上调出来的；换成别家的模型，
-翻译结果的 JSON 是否同样稳定没有逐家验证过。其二，带推理过程的模型会把输出上限的一部分花在思考上，
-`max_tokens` 留得不够时会报「输出被截断」，在设置里调大即可。
+After consent and model setup, opened pages outside the **Reading blocklist** are sent to the model for classification. The request includes the URL, title and up to 30,000 characters of page text, sampling the beginning, middle and end for longer pages. Classification considers the content type, not quality, interest, word count or reading duration. Tracking begins only after an affirmative result. Readability locates the body text; it does not decide whether a page is an article.
 
-## LLM 文章判别、批量删除与文章记录黑名单
+Network failures retry after 5 and 20 seconds. Content-policy refusals do not retry; the extension suppresses repeated requests for the same URL for one hour within its browser session. Errors appear in page status and diagnostics. Existing history is not deleted automatically.
 
-未命中文章记录黑名单的页面会立即交给配置的 LLM 判断是否为文章，不设置阅读时长、字数或质量门槛。请求包含网址、标题和页面文本；超过 30,000 字符时保留头、中、尾抽样。只有明确返回“是文章”后才开始记录；失败会在当前页状态中说明，刷新可重试。断网（`Failed to fetch`）时隔 5 秒、再隔 20 秒各重发一次，判别期间页面照常显示“正在判断”。模型服务商的内容审核拒答（MiniMax 回 `new_sensitive`，错误码 1026 / 1027）不重发：拒答看的是这段内容，重发也一样。当前页状态直接说“内容审核拒绝了这段内容，这一页不记录”，同一网址一小时内再打开不再去问（记在 `storage.session`，浏览器关掉就清）。判别失败的现场连同网址和标题记进诊断日志，不含正文。Readability 只负责定位正文。旧历史不会自动删除。
+**AI filter** rechecks selected saved records and shows the result, reason and text source for each. When saved text is missing it may fetch the original URL. Fetch failures, login pages and model failures remain errors, rather than being treated as non-articles. You can stop new requests, retry failures and select non-articles, then explicitly delete selected records. Results last only for the current panel session.
 
-历史页勾选记录（可先用「全部 / 未读完 / 已读完」三个键筛选、点搜索键展开搜索框，再选择当前筛选结果），点击“LLM 筛选所选文章”可复查已有记录。逐条显示是文章/非文章、理由和正文来源；缺少已存正文时会重新请求原网址。HTTP 错误、空正文、登录验证页和模型失败都标为失败，不会当作非文章。支持查看进度、停止后续请求、重试失败项；正在进行的请求会完成后返回。点击“仅勾选当前列表中的非文章”会替换当前选择，再点击“删除所选”执行删除。筛选结果只保留在当前面板会话，刷新后清除；不会自动修改完成状态、黑名单或删除记录。
+Bulk deletion removes the selected articles' sessions, paragraphs, positions, cached text, review material and article review cards, and recalculates reading speed. It preserves translations and vocabulary cards. Deletion propagates through sync and cannot be undone. To prevent future tracking, add a reading blocklist rule.
 
-Storybook → 扩展 → 页面 → “LLM 文章筛选”提供混合结果、处理中、失败重试场景，安卓页面也有对应预览。
+The model can also suggest blocklist rules from selected titles and URLs. Each suggestion includes its rationale, possible collateral matches and the number of existing records it affects. Only selected, confirmed rules are saved; history is not deleted and translation rules are not changed.
 
-文章判别会自动联网发送页面文本，即使页面未读完、未开启划词翻译；使用现有模型配置。文章记录黑名单可阻止这些页面的判别请求。**记不记专注和翻不翻译是两件事，各判各的**：文章判别只决定这一页记不记阅读，不影响划词翻译（翻译看自己的白名单，见[划词翻译](#划词翻译)）；运行中把一页加进文章记录黑名单，追踪当场收摊，已经开着的翻译照旧。
+Rules accept one bare domain or complete HTTP(S) URL per line. A domain includes its subdomains. A URL matches the same origin and its case-sensitive path or child paths, without query strings or fragments: `/search` does not match `/searching`. Legacy shared blocklists migrate to the reading blocklist.
 
-历史页可以逐条勾选，或选择当前筛选结果，然后批量删除。删除会清除所选文章的阅读片段、段落、位置、正文缓存、回顾材料和文章回顾卡，并重算阅读速度；划词记录和生词卡保留。删除不可撤销，重新打开页面仍可重新记录；如需阻止未来记录，请加入文章记录黑名单。
+Reading tracking and translation are independent. A reading block does not disable translation. The **Translation allowlist** automatically enables selection translation on matching sites; elsewhere, enable it from the popup for the current visit or choose **Always enable on this site**. The allowlist is device-local and does not sync.
 
-选中历史记录后，可以请求“LLM 建议记录黑名单”。模型根据所选标题和网址提出规则、依据及可能误伤的内容，界面显示匹配现有记录数。建议只有勾选采用后才写入文章记录黑名单，不自动删除历史，也不修改翻译白名单。
+### Edit rules in plain language
 
-文章记录黑名单和翻译白名单用同一套规则：每行一个裸域名（包含子域），或完整 HTTP(S) 网址（匹配同源、区分大小写的路径及其子路径，不含查询参数和片段）。例如 `https://example.com/search` 不会匹配 `/searching`。旧版共用黑名单首次升级时迁成文章记录黑名单。
+Use the popup's translation tab or the settings rule editor to request changes such as “Stop tracking example.com” or “Enable translation on GitHub.” In the popup, “this site” refers to the active page; settings has no current-page context.
 
-### 用一句话改名单
+The model proposes changes; nothing is written until you confirm. Rules are validated both when proposed and against the latest stored lists when applied. Invalid patterns, public-suffix-wide blocks, duplicates, covered rules and missing removal targets are rejected. Existing unsaved edits in settings are preserved. The conversation includes the last eight messages and summaries of applied changes, and lasts only while that editor remains open.
 
-两份名单除了在设置页逐行改，也可以直接说：「知乎和微博以后别记了」「GitHub 上自动开翻译」「把 example.com 从翻译白名单去掉」。
-入口有两个：弹出面板「翻译」页签底部的「用一句话改黑名单、白名单」，那里说「这个站」「这一页」指当前标签页；设置页「用一句话改名单」一节，
-扩展和 App 共用，没有当前页，说「这个站」时模型会反问是哪个。
+## Focus, progress and reading time
 
-- **模型只出清单，点确认才写**。每条改动一个勾（默认勾上），写着加进 / 移出哪份名单、规则、一句依据；加的那条还写着
-  **命中了几篇已有的阅读记录**，范围宽不宽一眼看得出。点「不改了」就什么都不写。
-- **规矩挡在模型和名单之间**（`lib/ruleChat.ts`），出清单时过一遍、确认写入时在最新的名单上再过一遍——出清单到点确认之间，
-  名单可能被设置页或「本站始终开启」改过。挡的是：写法不对的规则；`co.uk`、`com.cn` 这种一条就命中一整个国家后缀的规则；
-  名单里已经有、或已经被更宽的规则盖住的（`www.zhihu.com` 在 `zhihu.com` 下）；删一条名单里没有的。挡掉的另起一行说为什么。
-  单段的 `com` 本来就不是合法规则。
-- **对话有上下文**：最近 8 句一起发，写进去了什么也补进记录里（「已写入：…」），所以可以接着说「还有微博」「刚才那条撤掉」。
-  记录只活在这个框里，关掉弹出面板就没了。
-- **设置页里有没保存的手改不会被冲掉**：确认写入的是存储里的名单；名单框没动过就换成存储里的新值，动过就在手改上套同样的改动，
-  仍然显示「有修改尚未保存」，不替人按保存。
-- 调用失败、没听懂，这句话放回输入框，改一改再发；失败现场进诊断日志（来源「名单对话」）。
+Focus requires a visible page and a focused window. Idle and stall timeouts distinguish no activity from activity without scrolling. Both adapt to visible text: the inactivity limit is the greater of its fixed value and 1.5 times the estimated screen-reading time, capped by the adaptive maximum. Set that maximum to zero to disable adaptation. Very short sessions are discarded.
 
-哪几份名单能这样改，不写死在这里：每个功能插件在自己的 `settings.ts` 里声明它的网址名单和命中了意味着什么
-（`READING_URL_LISTS`、`TRANSLATION_URL_LISTS`），`background/handle.ts` 组装时交给 `core/background/ruleChat.ts`。
-以后新功能带着自己的名单进来，对话框不用改。
+Paragraphs count as read after a configurable fraction of their estimated reading time in view, with a minimum dwell time. Estimates use 238 words/minute for English and 400 characters/minute for CJK text. The default fraction is 50%; briefly scrolling past text is not enough.
 
-## 更新后的阅读界面
+The optional top progress strip sizes segments by text length. Dark segments were read this visit, blue-gray segments were read before, pale segments were briefly visible and empty segments are unseen. The current viewport is highlighted. This display preference is local to the device.
 
-按照 [Lectern UI 设计稿](https://lectern-ui-coo.dreamyglobe32.chatgpt.site) 第 7 版实现，延续暖纸色、赭色操作与衬线内容字体：
+An article is finished only when its read percentage reaches the configured threshold **and** its final paragraph has been visible. Completion can also be changed manually. Article review, when enabled, saves the body text and generates an outline and three recall questions at the threshold, ready for the completion card. This automatic model call consumes tokens.
 
-- 桌面侧栏组织我的阅读、生词本、间隔复习、阅读统计与设置。首页显示近七天的真实阅读数据、最近未读完的文章和待复习数量；文章支持列表/网格视图，详情、完成标记和回顾收在每篇的操作菜单中。
-- 弹出面板每次打开默认显示「专注」：今日累计、昨日对比、最长片段、可点选的片段时间线与七天趋势。「翻译」独立控制本页翻译与站点白名单，切换页签不改变功能状态。「查看完整统计」进入首页的统计与历史明细。
-- 专注暂停只作用于当前页面，会结算当前片段；滚动、切走再回来不会偷偷继续，需手动恢复。翻译暂停不修改全局开关或站点白名单。两种选择在浏览器前进/后退恢复页面时保留，刷新或换文章后按默认规则重新开始。
-- 七天图表按本地日历日归集，跨午夜的片段按实际重叠时长分配；已保存片段与当前实时片段去重。统计页的回合分位数保留原来的最近 168 小时口径。原型的示例数字没有写进产品。
-- 安卓以阅读为先：底部只保留阅读、生词、设置三个入口；首页先显示最近的文章或书籍续读，再放书架缩略列表与待读文章。书架从首页进入，复习从生词页进入；设置不再在每页顶部重复出现。历史、筛选和批量操作仍可从「全部文章与管理」展开。
-- 首页搜索右侧是阅读统计：今天、近 7 天、近 30 天按本地日历日统计已保存的专注片段，可点柱状图查看所选时段的文章与书籍时长。读完文章按完成日期计算，不把 EPUB 章节算作文章；收藏生词按所选日期内的词条去重。30 天视图每 5 天合计，原始记录不会改变。
-- 生词页顶部或单个词条可打开 AI 生词伙伴，选择 1–3 个词做语境讲解、造句或情景对话。使用设置中的模型和原有同意机制，支持流式回复与中途停止；仅把选词语境、当前消息和最近 6 轮对话发给模型。最近 20 次练习（每次最近 20 轮）与草稿保存在本机，可在历史中删除，不进入设备同步或导出文件；不会自动改变生词复习排期。Storybook 使用明确隔离的模拟回复，不调用模型。
-- 阅读器提供字号切换、本机书签、章节目录与底部进度。调整字号时保持当前可见段落；书签记录段落与偏移，关闭翻译或目录后继续原处阅读。字号和书签仅存在本机，不进入设备同步。
-- 安卓划词翻译改为阅读器内的底部面板，保留原有流式译文、词汇讲解和追问；截图翻译与本文生词在阅读工具中。EPUB 正文、图片和章节进度仍只存在本机，书架进度由章节记录现算，不另存一份。
+Reading rounds combine nearby sessions on the same article; the overview displays the merge threshold. This avoids treating every tab switch or inactivity boundary as a separate reading effort. Estimated reading times and historical statistics are approximate, not a measure of comprehension.
 
-## UI 开发预览（Storybook）
+### Resume reading
 
-[在线查看 Storybook](https://xbghc.github.io/lectern/storybook/)。每次推到 `main`，`.github/workflows/pages.yml` 会重新构建并发布到 GitHub Pages；`site/` 下的静态页面发布在站点根目录，和 Storybook 并排。
+Lectern remembers the last paragraph and restores it when you reopen the article. URL anchors, browser-restored positions and scrolling during extraction take priority. A notice offers **Back to top** after restoration. Synced article positions can continue on another device, although changed page structure may prevent an exact match.
+
+### Statistics
+
+The popup's seven-day chart uses local calendar days and splits sessions crossing midnight by their actual overlap. Saved sessions and live session snapshots are deduplicated. The statistics page's round percentiles retain their rolling 168-hour window.
+
+Android statistics offer Today, Last 7 days and Last 30 days. Select a bar to see article and book time. Finished articles use completion dates and exclude EPUB chapters; saved vocabulary is deduplicated within the selected dates. The 30-day chart groups five days per bar without changing stored records.
+
+## Translation and vocabulary
+
+Select text on an enabled page for a context-aware translation. Short selections are ignored; selections over the automatic word limit require confirmation. The surrounding paragraph helps choose the meaning. Teaching notes add usage, collocations or word distinctions, and can explain unfamiliar words within a selected sentence. They increase response length and latency; translation appears first.
+
+On Android, tap an English word to translate it, or double-tap for its sentence. A short delay distinguishes the gestures. Links keep working, and scrolling does not translate. Tapping outside an open translation panel closes it; another deliberate tap is needed for a new translation.
+
+The translation panel supports streamed output, pronunciation where available, source context and follow-up questions. Explanations can remain in Chinese while examples use English. Speech availability depends on voices installed on the device.
+
+### Screenshot translation
+
+Use **Alt+Shift+S** in the extension, or the Android reader's tools, and select a region. OCR runs locally with bundled Tesseract in the extension and ML Kit in Android. The screenshot is not uploaded; recognized text is sent to your configured model. Because this is an explicit action, it does not depend on the selection-translation switch or allowlist.
+
+### Review
+
+Looked-up words and phrases become FSRS review cards. Reveal an answer and rate recall to schedule the next review. AI assistance can provide examples, a different explanation or a quiz. Article review separately revisits saved outlines and recall questions. Editing or deleting one translation preserves a card while other sources remain; an orphaned card is hidden, with its review history retained for a later matching source.
+
+### Vocabulary chat
+
+Choose one to three words from Vocabulary to practice context, sentences or a short role-play. Chat uses the configured model and consent, supports streaming and stopping, and sends the selected words, source context, current message and recent six rounds of conversation. It does not change review schedules automatically.
+
+The latest 20 practices, up to 20 rounds each, and drafts stay on this device. History can be deleted locally and is excluded from sync and exports. Storybook supplies isolated sample replies instead of calling a model.
+
+## Android reader and books
+
+Add a URL, share one from a browser, or open an article saved by the extension. A fetched article is cleaned for the reader; sites requiring login, complex interaction or anti-bot checks may not extract correctly. A browser-saved archive is preferable when the desktop browser already has access. The reader does not execute source-site scripts.
+
+Reader controls include font size, device-local bookmarks, a chapter outline and bottom progress. Changing font size preserves the visible paragraph. Translation and outline panels return you to your position when closed. Font size and bookmarks do not sync.
+
+Import EPUB files from the bookshelf or open them with Lectern from a file manager. Chapter HTML uses the same sanitizer as saved articles; images are stored locally by content hash. Books, their images and chapter progress remain on this device and are excluded from sync and JSON exports. Import the original EPUB again on another device; its chapter progress starts fresh. Vocabulary and cards derived from books are independent and can sync.
+
+The Android shell handles back navigation, foreground/background transitions, safe-area insets, local file sharing, OCR and updates. Reading text remains selectable; controls are sized for touch. A web preview cannot verify every native behavior.
+
+### App updates
+
+The app checks the public GitHub latest-release endpoint at most once a day unless disabled in Settings. This anonymous request does not include API keys, reading data or the current version; comparison happens locally. Manual checks remain available.
+
+Automatic downloading, when enabled, uses an unmetered network and HTTPS GitHub APK URLs, then attempts installation after you leave the app. Android may require permission or confirmation. Disable this option to use the update banner manually. The extension instead receives updates through the Chrome Web Store. A submitted extension update still requires store review.
+
+## Data, sync and privacy
+
+Business data is local-first. Optional sync uses the server URL and token you configure; read [deployment and recovery instructions](docs/server-deployment.md) before operating one. The server stores structured records in PostgreSQL and article files separately. It does not fetch original websites or call models.
+
+Test a connection to verify the account and server identity before enabling it. The first sync merges local and server records. Offline work remains available and queues for later upload.
+
+- **Pause sync** keeps credentials and queued changes.
+- **Disconnect** removes the local token and keeps records and their account binding.
+- **Clear this device's records** disconnects and clears local records and binding while preserving settings and model keys. It does not delete server data.
+- To switch accounts or servers, export a backup first, clear local records, then connect. Already-bound data cannot be silently uploaded to another identity.
+
+Reading and translation preferences sync by field, except explicitly device-local options such as the translation allowlist and progress-strip display. Model configuration, keys, consent, sync tokens, font size, bookmarks, update preferences, EPUB data and chat history remain local. Diagnostic logs and usage counts have separate upload endpoints when sync is enabled; they are not downloaded to other devices.
+
+### Saved article archives
+
+On an accessible, fully loaded desktop article, choose **Save article to sync library** in the popup. Body text and available images are saved locally and uploaded when sync is connected. Missing images are reported; retry after the source page loads, although access restrictions can still prevent capture.
+
+After syncing on Android, open the saved article to download its resources. The **Available offline** state indicates downloaded content can be read without a network. Syncing the article list does not download all files in advance. Ordinary URL caches are not automatically converted into browser archives. The archive reader never reloads the source URL or executes its scripts.
+
+### JSON export and merge
+
+Export JSON for a backup or to merge records on another device. Articles, sessions, translations, review cards and available review events merge by identity. Importing the same file twice does not duplicate records. Cards for the same word merge, using the latest review history or scheduling baseline. Older files without individual review events retain their existing schedule as a baseline.
+
+Exports do not contain API keys, sync tokens, complete archive resources, local EPUB content or vocabulary chat history. They are not a substitute for a server database-and-file backup. Import does not replace settings or keys.
+
+### Diagnostics and usage counts
+
+Local diagnostics keep the latest 10 model failures, 50 request timings, translation traces, and (in the app) 30 fetch logs and 30 runtime errors. Failure details can contain selected text, context and raw model output. Keys are excluded. Diagnostics are separate from record exports and can be copied, downloaded or cleared in Settings.
+
+When sync is enabled, new or updated diagnostic entries are uploaded to the configured server. Server operators can inspect them with the admin `logs` command; server retention is 30 days. Translation trace previews include up to 160 characters of selected text. Treat diagnostic exports as private reading data.
+
+Workspace buttons record daily counts for 90 days locally. Counts contain event identifiers, not article identities or search terms. Enabled sync uploads cumulative counts for administrator analysis; retries cannot double-count them. **Clear logs** does not clear usage counts. Event definitions live in `src/lib/uiUsage.ts`; keep event IDs stable when changing display labels.
+
+## Development
+
+Use Node.js 22.14 or newer within the supported Node 22 line.
 
 ```bash
-npm install
-npm run storybook          # http://localhost:6006
+npm ci
+npm run check                 # TypeScript, unit tests, extension and Android web builds
+npm run watch                 # Extension development build
+npm run build:app             # Android web assets
+```
+
+Extension output is `dist/`. Android web output is copied into the app's assets by the build script.
+
+For a native debug APK, use JDK 17, Android SDK 36 and build-tools 36.0.0:
+
+```bash
+cd android
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+The Gradle build runs the web build first. Set `sdk.dir` in an untracked `android/local.properties`, or use Android Studio. Never commit signing keys or local credentials.
+
+### Storybook
+
+```bash
+npm run storybook             # http://localhost:6006
 npm run typecheck:storybook
-npm run test:storybook     # 编译真实页面并检查主要场景的渲染
-npm run build-storybook    # 静态预览输出到 storybook-static/
+npm run test:storybook
+npm run build-storybook       # storybook-static/
 ```
 
-建议使用 Node.js 22.14 或更新的 Node 22 LTS。无需先构建扩展、安装 APK 或配置 API Key。
+Choose **Extension** or **Android** stories for the popup, workspace, vocabulary, review, statistics, settings, side panel, bookshelf, reader and chat. Controls change frame size, state and initial tab. Media queries use the iframe's actual width.
 
-左侧选择扩展/安卓页面：弹出面板的专注与翻译，阅读首页、阅读统计、生词本、生词复习、文章回顾、设置、侧边栏，以及安卓首页、书架、阅读器和设置。Controls 可以调整预览宽高、数据状态和初始标签页；修改 `src/` 下的 HTML/CSS/TypeScript 或预览数据后会自动刷新。手机布局按 iframe 的实际宽度触发媒体查询。
+Previews compile the real templates and entry points. `storybook/fixtures.ts` provides sample records; `storybook/runtime.ts` supplies memory storage and simulated host/model responses. Search, filters, settings and review actions work within the preview. Reloading resets sample data without touching real history. OCR, installation and cross-page native navigation require their actual host.
 
-预览直接编译并运行真实页面模板和入口脚本；`storybook/fixtures.ts` 提供样例文章、生词与复习卡，`storybook/runtime.ts` 使用内存存储，模拟 LLM、浏览器标签页和安卓启动环境。搜索、筛选、批量操作、保存设置与复习评分都可试用；切换场景/Controls 或刷新后恢复样例数据，不触碰真实阅读历史，不发送模型请求。需要宿主的 OCR、安装升级、跨页导航不在这里执行；OCR 后台页面本身没有可视 UI，因此不单列场景。
+Add scenarios in `storybook/*.stories.ts`. Register new full pages in `.storybook/pages-plugin.mjs`. Frames are isolated documents, destroyed on exit to clean up listeners and timers. Serve the static build over HTTP instead of opening it as a file.
 
-新增场景在 `storybook/*.stories.ts` 中添加导出；新增完整页面则在 `.storybook/pages-plugin.mjs` 的 `pages` 中登记模板和入口，再补充 story。预览框使用独立文档，离开时自动销毁页面定时器和监听，避免不同页面重复 ID、全局样式与模块状态互相干扰。静态产物需通过 HTTP 服务打开，例如 `npx http-server storybook-static`。
+### Architecture
 
-## 安装
+`src/core/` coordinates page and background hosts. Reading and translation features live under `src/features/`, with their own page hooks, background handlers and settings declarations. `src/lib/` contains shared model, parsing, scheduling and statistics logic. `src/sync/` defines shared protocol and merge behavior; the backend compiles the same protocol sources. `src/archive/` and `src/books/` handle saved content and local EPUBs.
 
-**从 Chrome 应用商店装**：打开 [Lectern 的商店页面](https://chromewebstore.google.com/detail/fpplijdeabekpbadojohidampfnjhcdf)，
-点「添加至 Chrome」，之后由浏览器自动更新。
+Keep feature boundaries, storage keys, protocol IDs and account binding intact. UI language changes must not rewrite user content or change AI output-language instructions. New UI controls should register a stable event in `UI_EVENTS` where appropriate.
 
-**自己构建**（Chrome / Edge 114+）：
+### CI and releases
 
-```bash
-npm install
-npm run build      # 产出 dist/
-```
+Main and pull-request workflows check client/server code, run PostgreSQL integration tests, build the extension, Android app and Storybook, and validate server images as configured in `.github/workflows/`. Main publishes the preview and static site to GitHub Pages.
 
-打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选 `dist/`。
-不想自己构建的话，[Releases](https://github.com/xbghc/lectern/releases) 里有打好的
-`lectern-extension-vX.Y.Z.zip`，解压后同样用「加载已解压的扩展程序」选那个目录。
-这样装的和商店版是两个扩展（ID 不同），本机数据各存各的，要互通得靠设备同步或导出导入。
+A `v*` tag triggers release ZIP/APK artifacts and server images. Root and server package versions and lockfiles must match the tag. Keep the Android release certificate stable so existing installations can update. Required signing secrets are documented in the release workflow; never substitute a different key for an existing release app.
 
-装好后**设置页**会自动打开。先看顶部那块「会发给模型服务的内容」，点「同意并开始」；再到「模型服务」里选一家服务商，
-填上模型名和这一家的 API Key，点「保存并测试连接」验证（见[模型服务](#模型服务)）。
-没同意、没选服务商或没填 API Key 时不会向模型发任何请求，也就无法进行文章判别，不会新增文章阅读记录；已有历史仍可查看，翻译浮层会提示去设置页。
+Chrome Web Store automation uploads the same extension ZIP and submits it for review when configured. Upload success does not mean public availability. Store descriptions, screenshots and privacy declarations are maintained separately; see the [store guide](docs/chrome-web-store.md).
 
-只支持 Chrome / Edge：侧边栏用的 `chrome.sidePanel` 是 Chrome 专有 API，Firefox 变体已移除。
+## Migration and limits
 
-### 安卓 App
+The project was renamed from Focus Session to Lectern. The extension migrates legacy IndexedDB data on first open. Existing deployment names, the `focus-session` Compose project, `focus` PostgreSQL role/database, `FOCUS_SERVER_IMAGE` and `fs:` storage prefixes are intentionally retained to preserve data and compatibility.
 
-```bash
-npm install
-cd android && ./gradlew assembleDebug   # 会先跑 npm run build:app 生成网页部分
-```
+The old Android package `com.focussession.app` cannot update in place to `io.github.xbghc.lectern`; install Lectern separately and transfer records through sync or export/import. Preserve local book files yourself.
 
-产物在 `android/app/build/outputs/apk/debug/app-debug.apk`：`adb install -r` 装到手机，
-或者把文件传过去点开安装（要允许安装未知来源的应用）。也可以用 Android Studio 打开 `android/`
-目录直接运行。需要 JDK 17 和 Android SDK（compileSdk 36、build-tools 36.0.0）——Android Studio
-自带前者、会代下后者；没有 Android Studio 的话，便携版 JDK + Gradle 8.13 也能构建，
-`android/local.properties` 里指一下 `sdk.dir` 即可。
-
-[Releases](https://github.com/xbghc/lectern/releases) 里也有打好的 APK，不装工具链也能用。
-签名不同的两个包不能互相覆盖安装（见[持续集成与发布](#持续集成与发布)），换包前先在 App 里导出数据。
-装的是 Releases 里那个正式签名的包时，之后的升级 App 自己管（见[更新](#更新)）：
-设置页能查、能装，首页每天自动问一次。
-
-装好后进「设置」确认发送内容、选一家模型服务并填它的 API Key。App 和扩展**各存各的密钥**，导出文件不带它。
-
-App 阅读器中，单击英文单词翻译当前单词，双击翻译该词所在的完整句子。单击会等待约 150ms 以区分双击；双击只发起整句翻译。正文中的链接仍可正常打开，滑动阅读不触发翻译。浮层开着时，点浮层外面（词上、空白处、链接上都一样）只关浮层、不翻译，紧跟着的第二下也算在这一下里；浮层关了再点词才翻译。
-
-## 它怎么判断你在专注
-
-### session 的划分
-
-「活跃」= `document.visibilityState === 'visible'` **且** 窗口有焦点。两个独立的走神阈值：
-
-| 阈值 | 默认 | 含义 |
-| --- | --- | --- |
-| `idleTimeout` | 30s（下限） | 完全没有活动信号（scroll / wheel / mousemove / keydown / touchmove） |
-| `stallTimeout` | 90s（下限） | 有输入但滚动位置不变，视为发呆 |
-| `maxQuiet` | 300s | 两个阈值随视口文字量放宽的上限；0 关闭自适应 |
-
-**两个阈值都随视口里的文字量自适应**：静默上限 = max(固定阈值, 读完当前一屏所需时间 × 1.5)，
-再夹到 `maxQuiet` 以下。理由很直接——阅读本身不产生任何输入。一屏约 400 词按成人默读速度
-（Brysbaert 2019 的元分析：238 wpm）要读 100 秒，期间可以一下都不动；Turner、Iqbal & Dumais
-（2015）用眼动仪测到阅读时平均每 19 秒滚一次，那还是 32px 大字、每屏只有 22 行的实验设置。
-固定 30 秒的阈值落在正常阅读的静默间隔中间，每读一屏就切一刀：改之前的实测数据里近半 session
-以 idle 结束，时长中位数正好卡在阈值附近。
-
-「读完当前一屏所需时间」由段落追踪器按露出比例加权算出（一段只露了三成就算三成），
-用的是 `src/lib/reading.ts` 里的同一套速度常量。固定阈值成了下限：视口里没什么字（图、评论区、
-文章末尾）时它照旧起作用。代价是真离开时最多高估一个静默上限的时长——有 `maxQuiet` 封顶，有界。
-对照：ActivityWatch 判 AFK 的默认是 180 秒无键鼠，RescueTime 是 5 分钟。
-
-切标签、窗口失焦、页面隐藏 → session 立即结束。短于 `minSession`（默认 3s）的片段直接丢弃，
-否则 alt-tab 抖动会产出大量无意义的碎片。
-
-**两种走神的恢复条件不同**：`idle` 之后任意活动信号都能重新开始计时（人回来了就是回来了）；
-`stall` 之后必须出现**真实的滚动位移**才重新开始。否则盯着同一屏、只是随手晃鼠标的半小时会被
-切成一串 90 秒的 session 并全额计入专注时长——那正好把这个指标的含义弄反。
-
-### 已读内容的估计
-
-正文用 `@mozilla/readability` 抽取。这里有个绕不开的问题：Readability 会破坏传入的文档，
-所以必须解析副本；但副本里的节点无法用 `IntersectionObserver` 观察，而 Readability 没有提供
-回到源节点的映射。
-
-本项目的做法是**先在活动 DOM 上给候选块打 `data-fs-p` 标记再克隆**。已验证 Readability 只清除
-`class` 和表现型属性，自定义 `data-*` 会原样保留（连 `_setNodeTag` 换标签时都会复制属性），
-于是能拿到精确的节点身份映射，比按段落文本模糊匹配可靠得多。解析结束后标记会从页面上清掉。
-
-段落可见性判定不依赖 `IntersectionObserver` 的 threshold 回调——一个高度三屏的长段落
-`intersectionRatio` 可能永远到不了 0.5，回调根本不会再触发。IO 只用来维护"与视口有交集"的小候选集，
-精确判定放在 500ms 的结算循环里：
-
-> 段落在读 ⟺ 可见高度 ≥ min(段落高度 × 0.5, 视口高度 × 0.5)
-
-短段落要露出一半；比视口还高的段落只要占住半屏就算在读。停留累计**只在 session 活跃期间进行**，
-否则后台标签页会把整个视口算成已读。
-
-**记为「已读」的停留阈值按段落长度缩放**：阈值 = max(最短停留 1s, 读完这段所需时间 × 50%)。
-固定 1 秒的老规则会让一屏文字露出来的那一秒就全部记成已读，之后在同一屏上读多久都记为
-"没有新进展"——正是 Kim 等人（WSDM 2014）对搜索领域 30 秒 dwell 启发式指出的毛病：单一阈值
-假定读任何内容都花同样的时间。50% 落在阅读与跳读之间：正常阅读的停留是所需时间的 0.8 倍以上，
-跳读（~650 wpm）只有 0.4 倍左右。所需时间按拉丁 238 词/分、中日韩 400 字/分估算
-（后者没有同等分量的元分析可引，是个保守近似）。段落记录里的 `firstSeenTs` 是**跨过阈值的时刻**，
-0 表示只是露过面。
-
-段落快照里的 `dwellMs` 是**自上次快照以来的增量**。改之前发的是页面生命周期内的累计值，
-而后台用加法合并——同一次页面加载里结束 30 个 session，同一段落就被加 30 遍，实测一个 2 个字的
-段落攒出了 126 分钟的停留，超过整篇文章的总时长。存量数据里的 `dwellMs` 因此是虚高的，
-无法事后修正；界面只看它是不是大于 0（阅读情况条上的「扫过」），拿导出文件做分析时别用改动之前的这一列。
-
-字数按语言分别统计后相加：中日韩按字符数，拉丁按词数。`读 React 文档` = 1 + 1 + 2 = 4。
-
-同一段落用文本指纹（FNV-1a）去重，**跨刷新、跨 session 都只计一次**，所以"已读比例"不会因为
-重新打开同一篇文章而虚增。
-
-### 页面顶上的阅读情况条
-
-记着专注的页面，顶上贴一条 3 像素的细条（`features/reading/focusBar.ts`），这篇文章每一段读过没有一眼看完：
-
-- **深棕**：这次停够了已读阈值的段落。以前读过、这次又停够了的也算这次——条上看的是这一次的专注。
-- **灰蓝**：以前读过（段落记录里 `firstSeenTs > 0`，跨设备同步过来的也算），这次没停够。
-- **浅棕**：扫过——露过面、停留没到阈值，这次或以前都算。
-- **浅灰**：没看过。
-- 条下面那道深色短线是**屏幕上正显示着的那一截**，相当于滚动条的滑块；滚到评论区、视口里没有正文时不标。
-
-每段**按字数**占宽度，不按它在页面上的高度：配图、代码块占一屏却没几个字；按字数排，深棕加灰蓝正好就是
-弹出面板里的「已读比例」。这也让它完全不看页面布局——正文在内层滚动容器里的站点、图片懒加载把页面撑高，
-条都不会错位。最初想贴着滚动条画，没做：扩展画不到原生滚动条上（只能把整页滚动条换成自绘的，页面宽度会变，
-还会和网站自己的滚动条样式打架），贴在旁边另画一条又得逐段对齐页面布局，上面那两种站点都会对不准。
-
-只看不点：鼠标和手指都穿过去，不挡页面自己的导航栏。段落换了档、进出视口的段落变了、滚动了，都排到下一帧
-画一次，整条是一个元素上的硬边渐变，档位没变时只挪那道短线。设置页「段落已读判定」里能关，**只在这台设备上
-生效**——同步协议的设置项是白名单制，服务器认不得的设置推上去整批 400，所以本机只推 `SYNCED_SETTINGS` 里有的，
-新加的设置默认留在本机（这一项本来也该各台设备各自定）。App 的阅读器里同样有，顶上让开状态栏那一截。
-
-### 一篇文章什么时候算「读完」
-
-两个条件**同时**满足才置位：
-
-1. 已读比例 ≥ 阈值（默认 80%，设置页可调）；
-2. 正文的**最后一个被追踪段落**进入过阅读视野。
-
-只看比例会把「读了 80% 就关掉」算成读完；只看触底会把一路滚到底的跳读算成读完。
-
-触底判定用的是「最后一段进入视口」，不是 `scrollY + innerHeight >= scrollHeight`——
-带评论区、相关推荐、长页脚的页面永远滚不到文档底，用文档高度判定会让这类站点上的文章一篇都
-标不成读完。
-
-触底标记与读完状态都是 **sticky** 的：分两次读完一篇文章仍然算读完，事后调高阈值也不会把
-已经读完的文章批量变回未读。dashboard 里可以手动改，手动取消会连触底标记一起清掉，
-否则下一个 session 结算立刻又把它置回去。
-
-一个已知边界：如果在**当前正开着的那个标签页**上手动取消「读完」，content script 内存里的
-触底状态并没有跟着清掉，继续读下去、下一个 session 结算时它还会被判成读完。
-换句话说取消只对"之后没再读到末尾"生效。想彻底取消就先关掉那个标签页。
-
-### 读完的那一刻：右下角的回顾角标
-
-两个条件一满足，页面右下角就浮出一个「这篇读完了 / 回顾这篇」的角标，点进去直达 dashboard
-里这一篇的回顾。
-
-判定**在页内做**，和后台共用 `src/lib/finish.ts` 里的同一个函数。不能只靠后台：后台的
-`finished` 是 session 结算时才置位的，而 session 结束意味着用户已经走神或关掉了页面——
-那时候再弹角标没人看得见。所以 content script 每一拍心跳（5s）自查一次，判定成立就通知后台
-当场落盘建卡，**拿到确认之后**才把角标挂出来；不等确认的话，手快的用户点进去会看到
-「这篇还没读完」。后台落盘走的是幂等的 `markFinished`，重复到达不会改完成时刻、不会重复建卡，
-之后那次 session 结算也会因为 `finished` 已置位而跳过。
-
-三条刻意的取舍：
-
-- 角标**不会自动消失**，只能手动关。读完那一刻用户常常正翻评论区，几秒后自动收掉等于白弹一次。
-  唯一的例外是离开这一篇：整页跳转靠 `pagehide`，SPA 内部换文章靠后台推来的 `page:url-changed`
-  （见[数据与导出](#数据与导出)末尾）。角标是**这一篇**的入口，跟着新文章走就成了误导。
-  新那一篇读完了照样会弹它自己的。
-- 本次加载**之前**就已经读完的文章不再弹。重读一篇老文章不该每次滚到底都被打断一下。
-- 关掉「文章回顾」总开关时不弹——那时正文没存、材料不会生成，角标是条死路。
-
-## 跳回上次读到的位置
-
-重新打开一篇读过的文章时，插件把你放回上次停下的地方，左下角给一行说明（第几段、还需约多久）和「回到顶部」，
-**被看到之后** 6 秒自己消失（从信息流中键新开的后台标签页里，跳转发生在没人看着的时候，
-立刻起表的话等你切过来提示早没了——而那正是最需要解释的一刻）（读完角标那种常驻到手动关的做法在这里是挡路：它说的是一件已经发生的事，
-而正文此刻就在它旁边）。整个功能在设置页可以关掉。
-
-位置认的是**段落指纹**而不是 `scrollY`：换字号、站点改版、图片懒加载完成、折叠区展开，
-像素坐标全都错位，而指纹在这些变化下还指着同一段文字。存的是「视口里最靠上那个段落的指纹
-+ 视口顶相对它顶端的偏移」，所以恢复出来的画面和离开时一致——包括被吸顶导航挡住的那部分。
-
-指纹对不上时（文章被改过、或这次抽取的结果不同）只有在**段落总数完全一致**时才按序号兜底。
-跳到错的地方比不跳更糟：那会让人以为自己上次读到的是另一段。
-
-### 换一台设备接着读
-
-在电脑上读到一半，拿起手机打开同一篇（首页的文章列表是同步过来的，点标题就进阅读器），落点是电脑上停下的那一段；
-反过来也一样。位置本来就是一条同步记录（`position`），两头跑的又是同一份恢复代码，段落指纹按正文文本算，
-换了设备、换了抽取路径（扩展在活的页面上抽，App 自己抓回来抽）指纹照样对得上。要专门处理的是两件事：
-
-- **读位置之前先等一轮同步，但只等一小会儿。**位置是几秒前才从电脑传到服务器的，而手机上一次拉取可能是一分钟前，
-  App 刚冷启动的话头一轮还排在一秒之后——已缓存、已存档的文章打开得比它快。不等的话读到的是旧位置，
-  人被放回**上上次**停下的地方，比不跳还糟。所以后台答 `article:local-state` 之前先跑一轮同步（`syncBefore`）：
-  十秒内刚同步过就不跑，服务器连不上正在退避也不跑，最多等 2.5 秒，等不到就用本机已有的，那一轮照常在后台跑完。
-  非存档的页面本来要先问模型「是不是文章」，同步趁那一两秒先跑起来，轮到读位置时多半已经是新的，不额外等。
-- **像素偏移要按这台设备的段落高度夹住。**偏移是在记下它的那台设备的排版下量的：同一段字手机上六百像素高、
-  电脑上一百五，手机上「滚进这段四百像素」原样搬到电脑上会越过段尾，后面两三段直接被跳过，而人会以为那些读过了。
-  夹住之后最坏是停在这段的最后一行——多读半段，不漏读。电脑到手机方向段落只会更高，偏移原样用。
-
-**反过来——在手机上读、关了屏、走到电脑前——**缺的不是「跳到哪」，是**先得找得到这一篇**：电脑上这篇文章多半从没打开过，
-入口只有首页的文章列表（按最近阅读排，手机上刚读的排第一；点标题开原文，落点照上面的规则恢复）。文章记录一打开就传了，
-位置读着的时候跟着心跳在传，到关屏那一刻服务器上缺的只有最后一段专注和最后几秒的落点。要专门处理的是链条的两头：
-
-- **手机这头，关屏那一刻写下的东西当场传，不攒。**平时本机写入之后攒 2 秒再同步，一次结算连着的好几笔凑成一轮。
-  最后一段专注恰恰是 `onPause` 之后才写下的，而屏幕一黑，这个进程还能跑多久、网还能通多久都说不准。所以宿主一说
-  「看不见了」（`setHostVisible`，先于阅读器的结算），之后的写入就不攒；而且不经定时器——看不见的页面里定时器被压成
-  一秒一跳，`setTimeout(0)` 也得等。模拟器上实测（本机假服务器，没有网络延迟）：从页面得知关屏到最后一段专注落到服务器，
-  原来约 2.6 秒，现在约 0.15 秒；整串结算（位置、文章、专注时段、段落）仍然是一个请求发完。
-- **到点时上一轮还没跑完，要补一轮。**读着的时候每五秒一次心跳、一轮同步一两秒，关屏那一刻撞上一轮正在跑的机会不小。
-  那一轮多半已经读过队列了，这之后写下的东西它带不走，也没有人再来催——要等到下次打开 App。所以等它跑完，
-  队列里还有货就补一轮；没货（它带走了，或者这次只是想下载）就不多问服务器。等着的只留一个。
-- **电脑这头，有人看列表就是该同步的时候，拉到了要告诉开着的页面。**扩展平时一分钟才拉一回；首页和弹窗要文章列表时
-  （`articles:list`）照旧立刻用本机的答，同时催后台同步一轮（十秒内刚同步过、正在退避都不跑）。同步跑在 service worker 里，
-  页面在另一个上下文：拉到让本机数据变样的东西就广播一条 `sync:updated`（App 里是 window 事件 `focus-sync-updated`，
-  两条路收在 `lib/syncUpdated.ts`），首页的文章栏和弹窗的历史再取一次；首页重新回到眼前时也取。此前首页只在打开时读一次，
-  早就拉到本机的文章要手动刷新才看得见。取回来的和画着的一样就一个节点都不换（速度摘要里每次落库都变的时间戳不参与比较）；
-  什么都没拉到的空转、自己刚传上去又在收尾下载里回来的那几条，都不通知——开着的页面不该每分钟重画一次。
-  只管文章栏：复习翻到一半的卡不能被换掉；批量删除、逐篇判别正跑着时也不动。
-
-够不着的情形：App 自己抓不到正文的页面（要登录、正文靠脚本渲染）在手机上本来就打不开，除非在扩展里点过「保存」把存档传上去；
-两边抽出来的正文差得太多、锚点那一段在这边根本不存在时，按上面「宁可不跳」的规则不跳。
-
-### 什么时候不跳
-
-「网页不含位置记录」是这个功能的前提——落点已经有人安排了的时候，插件不抢：
-
-- **URL 带 `#锚点`**。网页自己带了位置记录，浏览器会跳到那一节，那是更明确的意图。
-- **页面已经不在顶部**。F5 刷新时 Chrome 自己就会恢复滚动位置，它已经把你放回原处了，
-  再跳一次只会打架。所以这一跳实际发生在浏览器没管的场合：从链接或书签重新点进来、
-  站点自己设了 `history.scrollRestoration = 'manual'`、正文渲染得比浏览器的恢复时机晚。
-- **你已经自己滚了**。正文抽取最长要重试到 4 秒，这期间人可能早就读起来了，
-  这时候把画面抽走是最恼人的一种交互。哨兵在第一个 `await` 之前就挂上，认的是真实输入事件
-  （滚轮 / 按键 / 触摸 / 点击）而不是 `scroll`——插件自己那一跳也会发 `scroll`，
-  拿它当依据等于每次跳完都判自己出局。
-- **上次停在最后一段**。读到结尾了，再打开多半是想重读或找东西，甩到文末只会挡路。
-  判据用的是"锚点是不是最后一段"，不是文章的 `finished`：读到 85% 停下的人同样该跳回去。
-- 落点就在第一段开头附近：跳了等于原地不动，那就别弹提示打扰人。
-
-跳完之后在 250 / 750 / 1500ms 复查三次并修正落点——图片撑开、广告位插入都会把它顶走。
-复查期间你一动手就立刻收手。滚动一律用 `behavior: "instant"`：站点若设了
-`scroll-behavior: smooth`，`auto` 会一路动画滚过几十屏，而且紧接着量到的 `rect.top`
-是动画中途的值，据此算出的修正量全是错的。
-
-每次程序性滚动都会同步滚动里程表的基准，否则这一跳会被记成"用户真的滚了"，
-把发呆判定（stall 之后必须有真实滚动位移才重新计时）骗过去。
-
-位置捎在心跳（5s）和 session 结束消息上，不另开一条链路——这样它天然享有 session 的补记机制。
-位置没变的那些心跳不落盘（几十像素的抖动也当没动过），否则就是每 5 秒重写一次。
-落盘**不看 `discard`**：那是 session 时长的过滤器，而"翻两页就被叫走"的那两页照样要记住落点。
-
-## 预计阅读时间
-
-popup 的当前页、历史列表、dashboard 的文章卡，以及跳回上次位置时左下角那行提示，都会说一句
-「还需约 N 分钟」。这个数**按你自己的阅读记录校准**，不是字数除以一个写死的速度。
-
-估计分三层，每一层拿上一层当先验、用自己的证据往回拉（`src/lib/readingTime.ts`）：
-
-| 层 | 证据 | 先验权重 |
-| --- | --- | --- |
-| 一般速度 | Brysbaert (2019) 的 238 wpm；中日韩取 400 字/分。剩余文字**分文种**折算，同样 1000 字中文比英文短 | — |
-| 你的速度 | 近 30 天里**读到了新内容**的片段：已读字数 ÷ 片段时长。不够 5 分钟就退回全部历史 | 5 分钟 |
-| 这一篇的节奏 | 这篇自己的已读字数 ÷ 读到新内容的时长（加载前后台聚合的 + 本次加载里已结束的片段） | 3 分钟 |
-
-融合是加权平均：把先验当作「按先验速度读了 W 分钟」的一段虚拟记录，和真实记录合在一起算
-字数 ÷ 时长。证据少时几乎就是先验，证据一多先验就淡出，中间没有跳变。数字旁边写明依据
-（「按你近 30 天的速度」「按你读这篇的节奏」「按一般速度估计」）；证据量过了先验权重——
-自己的数据占到一半以上——才敢说是按你的速度。
-
-几条取舍：
-
-- **不用段落 `dwellMs`**。同屏的几段各自都在累计停留，加起来是重复计时；早期版本还有过
-  重复累加的 bug，存量数据里它是虚高的。用的是 session 的 `wordsRead` 与时长，和界面上
-  「字/分」一个口径。片段时长按 session 的规矩带着走神前最后那段静默（见上文），
-  速度会因此略偏慢——有界、方向已知。
-- **只算读到新内容的片段**（`wordsRead > 0`）。重读、翻回去找一句话、页面开着没在读，
-  这些时间不该算进"读一个字要多久"。文章记录上因此多了一个 `readingMs`，
-  `totalMs` 照旧是全部专注时长。
-- 个人速度的摘要由后台在每次 session 结算时顺手重算，存在 `speed` 键里；content script、
-  popup、dashboard 读的是同一份，数字不会互相打架。升级上来的存量用户在 service worker
-  启动时补算一次，不必等下一个 session 结束。
-- 文字太少时说「不到 1 分钟」；20 分钟以内按分钟给，再往上按 5 分钟取整——这个估计本来
-  就没有分钟级的精度。估计被夹在一般速度的 1/4–4 倍之间，坏数据（时钟跳变、补记出来的
-  超长片段）不至于把它推到荒谬。
-- **已知的粗糙处**：历史速度是混合口径，中英文都读得多的人，估计会偏向读得多的那种文字。
-  要分文种就得在 session 上分开记字数，目前不值得为此改存储结构。
-
-## 划词翻译
-
-在**翻译白名单**里的站点上，选中一段英文后浮层会自动弹出，给出译文和结合本文语境的解释。
-挂不挂只看翻译自己的设置，和这一页是不是文章、记不记专注无关（见[功能插件](#功能插件)）。
-
-白名单外的页面**默认不挂监听**——在邮件、聊天里选中一段文字，不该悄悄发给模型服务。
-真想在这种页面上查词，打开 popup 点「本页启用划词翻译」：点一下就挂上，**只对本次加载有效**，刷新即恢复默认；
-或者点「本站始终开启」，把站点加进白名单（`localhost` 这类不带点的主机名写不成域名规则，记的是整个源）。
-总开关关着时两个按钮都没有。文章页上这两个按钮排在进度表下面。App 的阅读器不看白名单，总开关开着就挂。
-划的词照常入库、进复习队列，出处记的是页面地址和标题——认出是文章时用抽出来的正文标题。
-
-白名单只存在这台设备上，**不参与同步**：同步协议的设置项是逐项认的，服务器和旧版客户端都不认得这一项，
-推上去整批 400、旧客户端拉到了也会整轮失败。升级那一次，白名单用这台设备上读过文章的站点种一遍
-（此前被认成文章的页面都自动挂翻译，常读的站点照旧不用先点一下），旧翻译黑名单里的站点不种；
-之后清空了也不会再种。
-
-翻译器本就不依赖正文抽取：文章 id 只是归一化的 URL，语境段落沿 DOM 往上找，后台落库也不看有没有这篇的阅读记录。
-
-几条边界：
-
-- 触发用 `mouseup` + 280ms 静默期，不是 `selectionchange`——后者在拖选过程中连发几十次。
-- 不含拉丁字母的选区（比如页面里的中文）不触发；输入框和 `contenteditable` 里的选区也不触发。
-- 超过 **200 个词**（可调，上限 360）不自动翻译，改成在浮层里给一个「翻译这段」按钮。
-  这道闸只拦离谱的量，不拦「有点长」：实测 200 词的选区连讲解一起也才 671 个输出 token、
-  7 秒出完，为这种量级弹一次确认，等于把「选中即翻译」改成「选中再点一下才翻译」。
-  阈值按词数而不是字符数：读英文时「这段有多长」是按词感知的，按字符会把一串长单词
-  误判成长选区。硬上限仍按字符：超过 2000 字符完全不处理，这样才拦得住 URL、base64
-  这类「一个词」的长块——设置页 360 词的上界正是照着它换算的（÷5.5 字符/词），
-  再往上填是空档。
-  > 这个默认值早先是 40 词。**光改默认值对老用户无效**：设置一经保存就是整份写回，
-  > 40 已经固化在 storage 里。所以 `store.ts` 里带一次性迁移，把停在旧默认值上的
-  > 阈值抬上来，并落一个标记——不落标记的话，以后主动填回 40 会被再抬走一次。
-- 同一篇文章内重复选中同一段文本走内存缓存，不再发请求；并发的相同请求会合流（双击选词容易触发两次）。
-- 浮层装在 **closed 模式的 Shadow DOM** 里。宿主页面的 CSS 五花八门，不隔离的话浮层在不同
-  网站上会长得完全不一样。
-- **浮层里的字能选中复制**。`mousedown` 只在按钮上 `preventDefault()`，页面上的选区不塌、还亮着，
-  看得出浮层讲的是哪一段；字上不拦。`.box` 明写 `user-select: text`——有的网站给 `html` 挂
-  `user-select: none` 防复制，不写明的话会继承进浮层。能选字之后跟着改了两处：
-  - 划词判选区之前先问浮层手里有没有选区（`Popover.holdsSelection`）。Chrome 的 `document.getSelection()`
-    会把浮层里的选区原样交出来，照常判下去，浮层自己的字就成了新选区：中文译文判不成英文，浮层被收掉；
-    英文原文则被拿去再翻一遍。拖选拖出浮层的边、松手落在页面上时就会撞上。认的是
-    `getComposedRanges({ shadowRoots: [root] })`——传进 shadow root，它才把里面的范围交出来。
-  - 流式更新只在字真变了时才写，追问的答案只接上新长出来的那截：每一批都会把已经到的字段原样再带一遍，
-    照写就是换新的文本节点，正选着的字会被冲掉。打字机也只往同一个文本节点上接字（见下一条）。在截断的原文上拖着选字，松手那一下也不算点。
-- **打字机**（`features/translation/typewriter.ts`）。模型的增量是成块到的：译文几个字一闭合、语境解释整段一起到、
-  生词一条一条来，直接写进去浮层就一顿一顿地蹦。现在写进去的只是目标，每一动画帧按浮层里从上到下的顺序多露几个字：
-  平时每秒 60 个字，一次到得多就定一个速度在 0.7 秒内打完这一波（速度只在新字到的时候定，不每帧照剩下的重算——
-  那样剩得越少打得越慢，尾巴拖到两秒），所以永远不会越打越落后于模型。按码点走，emoji 不会被劈成半个；
-  模型改口、最终结果和流式不一样时，退回公共前缀接着打。音标词性、念的按钮是短标签，直接显示；生词的词和意思照打。
-  追问的答案也这样打，打的那几帧照旧「本来贴着底就跟着滚」。**不演假打字**：命中缓存的结果没流过字，整块直接显示；
-  系统设了减少动画（`prefers-reduced-motion`）、或者没有动画帧的环境，写进来就显示。代价是整段内容比直接显示
-  晚打完一小会儿——最后一个字段（常是用法）收尾时才闭合，要再打约 0.7 秒；译文本身几个字，一百毫秒以内就打完。
-- **浮层不跟着内容跳**。译文、语境解释、用法、生词是一批批流进来的，旧的贴法每长一截就重新贴一次：
-  浮层底边贴着选区一路往上爬，长到上面塞不下再翻到选区下方，再长就贴顶压住选区。在 Chrome 里按真实节奏
-  量过，一次单词翻译要挪 5 次，手机上选区在屏幕中段的短语能上下来回翻 4 次。现在挑边看的是浮层
-  **会长到多高**——按单词 / 短语 / 整句预估（270 / 400 / 520px，同样是量出来的），一个选区只挑一次：
-  放上方就按预估留出位置、钉住上边往下长，放下方就钉住选区下沿；两边都不够就挑宽的那边，收矮了在里面滚。
-  宽度一上来就定死，不随内容撑开。流式期间一次都不挪，代价是估高了浮层和选区之间会空一截（单词十来二十像素）。
-  只有两处会动：内容比预留的高时，收尾往上让一次；发出一问时，贴在选区上方、底下没空的浮层把上边往上提，
-  给答案腾出 120px（150 个汉字的答案比问题加转圈多长 117px），之后钉住上边往下长，答案流出来的时候一格都不挪，
-  再长就在浮层里滚。早先是点开追问就钉住下沿、答案往上长，好让输入框不动；代价是答案每多一行，浮层就连同译文往上爬一截——
-  桌面三种视口 36 个场景（每个连问两问）量下来，答案流出来时共挪 36 次，现在是 0。
-  诊断日志里的 `popup.positionChanges` 看的就是这件事，正常应当是 0。
-- **滚动不再把浮层收走**。浮层从前是 `position: fixed` 按视口坐标摆的，页面一滚就和原文错开，
-  所以早先收到任何一次 `scroll` 都直接关掉。用真实滚轮量过，这一条把这些也算了进去：在浮层上滚轮
-  （内容放得下时滚轮直接滚页面，长浮层滚到底会把滚动接力给页面）、拖页面滚动条（Chrome 照发一个 `mousedown`，
-  target 是 `html`）、页面里任何一个滚动容器在滚（站点脚本自己滚的也算）——正读着讲解，浮层连同内容一起没了。
-  现在宿主是 `absolute`、定位时冻结成那一刻的视口（`freeze`），浮层挂在里面按同一套坐标摆：页面滚动由浏览器
-  带着浮层和原文一起走，不跑 JS，也不会比原文慢一拍（主线程跟着滚要落后一两帧，滚起来看得出抖）。
-  什么时候关改由 `Popover.followAnchor` 每帧判一次：贴选区的浮层滚到只露出不到 40px（矮浮层按自身一半算）
-  才关，看得见就留着——看不见还开着的话，App 里下一次点词会被它吞掉（浮层开着时点正文只关不翻）。
-  正文放在内部滚动容器里的站点（document 本身不滚）靠量原文此刻的位置补一个 `transform` 跟上。
-  贴屏幕顶的浮层钉在屏幕上不跟，要原文挪开 1/4 屏、并且被浮层整个遮住或出了屏幕才关：只看遮没遮住，
-  词紧挨着浮层下沿时滚几像素就关；只看挪了多远，词还露在屏幕上浮层就没了。
-  内容真溢出时才给 `.box` 加 `overscroll-behavior: contain`——内容放得下时加了也会把滚轮吞掉，
-  指针停在浮层上页面就滚不动。跟着松掉的还有几处「滚一下就没」：按在页面滚动条上、非主键按下不算点到外面；
-  非主键松开、以及没按 shift 且页面上没有选区的方向键（那是在滚页面、挪光标）不去判选区；
-  选区还是浮层正在讲的那一段时不拆了重建。
-- **手机上浮层贴屏幕顶**（主指针是手指的设备，也就是 App 里）。窄屏上浮层本来就占满整宽，放上方时不再
-  贴着选区，而是固定在屏幕顶上（让开状态栏和刘海，读宿主写的 `--inset-top`），每次点词都在同一个地方出现。
-  从顶上往下长，长到选区上沿为止，再长在里面滚；顶上没地方可让，所以收尾和追问时也不挪。
-  顶边到选区之间放不下预估的高度（选区太靠上）时，才照旧落到选区下方。
-- **点音标能听发音**：浮层、侧栏、生词本、复习卡上的音标都带虚线下划线，点一下念出来。
-  走浏览器自带的 `speechSynthesis`，不联网、不花 token、不需要额外权限。
-  几处讲究见 [朗读](#朗读)。
-
-### 截图翻译
-
-图片里的英文选不中时，用截图翻译。扩展有三个入口：popup 的「截图翻译」按钮、
-`Alt+Shift+S`、页面右键菜单；App 点阅读器顶栏的「截」。OCR 不看划词总开关，也不看翻译白名单，
-因为每次都得人动手框选。
-
-流程是**先拍后选**：先截下可见区，把冻结帧画在覆盖层上，再用鼠标或手指拖一个矩形。
-这样选的就是刚才看到的那一帧，网页继续动也不会错位。按实际截图尺寸换算裁剪范围，
-小图放大到等效 2x（大选区限制继续放大的尺寸），深底浅字反色后交给识别器。
-Esc、右键或 App 系统返回键取消框选；覆盖层隔离页面快捷键，但保留 F5、Ctrl+R 等浏览器默认行为。
-
-分两阶段：**先识别文本，再走划词那条翻译路径**。长文本的确认闸、缓存、入库、追问全都一样，
-识别出的文字同时作原文和语境；太长就提示缩小框选范围，没认出英文就停在识别错误，不发翻译。
-
-为什么不让 MiniMax 直接识别？M3 其实收图，前期实测却要 **4–8 秒**，一次流式用了 **22 秒**，
-用户正框着一行字等答案，这个延迟太慢。OCR 留在本机，只把文本交给它翻译。
-
-两端引擎不同也是宿主约束：Tesseract 的 wasm 需要 Worker，service worker 起不了 Worker，
-content script 起的 Worker 又受宿主页 CSP 管，只能放进扩展的 **offscreen document**。
-App 用手机上快约十倍的 ML Kit，bundled 拉丁模型随 APK 打包，没有 Google Play 服务也能用，
-不等首次下载模型。速度差是选型依据，具体手机上的冷启动和识别耗时仍要真机验证。
-
-CSP 还绊过另一脚：宿主页的 `img-src` 管得到 content script 放的 `<img>`，`fetch(data:)`
-也会被宿主页的 CSP 拦住。所以截图用 **atob → Blob → createImageBitmap** 解码，
-冻结帧画在 canvas 上，不借 `<img>` 或 `fetch(data:)` 绕一圈。
-
-体积代价：`dist/` 增加约 **10MB**，包括 worker、两个 lstm wasm 变体、tessdata_fast 英文数据；
-APK 从 2.8MB 涨到 **17.2MB**：ML Kit 的原生库 `libmlkit_google_ocr_pipeline.so` 一份 11MB（现代打包方式下它在 APK 里不压缩）、
-未经 R8 裁剪的 dex 多出约 10MB（压缩后 3.9MB）、模型文件约 1.6MB；只留 `arm64-v8a`，四个 ABI 就是 40MB 以上。
-想再小，两个杠杆都还没动：release 开 `isMinifyEnabled`（要在真机上确认 R8 没裁掉 `@JavascriptInterface`），或 `jniLibs.useLegacyPackaging` 让原生库在 APK 里压缩（装机时解压，占的空间不变）。
-Tesseract 对花体、极小字、非英文有局限，1x 屏补到 2x 就是为了让它看清笔画，放大也救不了所有图。
-前期 `scripts/ocr-check.ts` 在 Node 里的实测是初始化 **164ms**、识别 **142ms**，
-这两个数不包含截图、框选、翻译，也不代表手机或浏览器的端到端延迟。
-
-### 翻译链路诊断
-
-「为什么这次翻译慢」光看模型耗时答不了：手势到请求发出之间还有防抖、选区解析、确认，
-请求回来之后还有增量渲染、浮层定位、字体加载。所以每次划词、点词、截图翻译都记一条**从手势到浮层画稳**
-的轨迹，存进诊断日志（最多 100 条，随日志一起导出与清空，不进同步记录与数据导出；启用同步时随诊断日志上传，见[诊断日志上传](#诊断日志上传)）：
-
-- **打点**（`marks`，相对手势起点的毫秒）：选区提交、解析、防抖结束、准备好、长选区弹出确认、
-  请求发出、第一个增量、译文进 DOM、译文露出、最终结果、打字机打完（`typingDone`）、浮层出现、渲染稳定、结束；
-  截图翻译另有识别起止。`typingTailMs` 是最终结果写进去之后打字机还打了多久，命中缓存、减少动画时为 0。
-  `durations` 是这些点两两相减的阶段耗时，缺了端点就不填，不把没发生的阶段伪装成 0ms。
-- **后台计时**（`backend`）：命中缓存、合流到别人的请求还是真发了一次；读配置、调模型、首字、译文第一次推给浮层、
-  落库各多久。后台用自己的时钟，和页面上的打点不能相减，所以分开放。记账、写诊断两格（`accountingMs` /
-  `diagnosticWriteMs`）只在旧轨迹里有数：那两笔现在在回复之后才写，不占人等的时间。
-- **浮层位置**（`popup`）：初始与最终位置、挪动了几次、每次从哪到哪（最多 100 次）。位置按动画帧采样，
-  量的是真正画出来的那一帧；每次定位后只采一帧，只在最终内容更新之后才逐帧连续采，长选区等确认时
-  浮层开着不该每帧量一次布局。流式期间浮层本就不该挪（见上面「浮层不跟着内容跳」），挪动次数正常是 0；
-  内容比预留的高、收尾往上让的那一次记 1。
-- **渲染稳定**：最终内容更新、**打字机也打完之后**，连续两帧位置尺寸不变、字体已就绪，记 `renderComplete`。
-  要等打完是因为打最后一行时浮层宽高都不变，光看两帧稳定会把「还在打」当成画稳（上线前在 Chrome 里撞见过：
-  画稳比打完早了半秒多）。两秒内不稳定记
-  `render-timeout`。这是「有过绘制机会」的观测，不声称测到了 GPU 呈现。稳定前浮层被关掉，按结果记成功或
-  失败，只是没有 `renderComplete`；还没拿到最终结果就关掉才是 `cancelled`。
-- 轨迹里有选中文本的**前 160 字**。后台只认已知字段、截尾限量，不透传上下文、DOM 或密钥。
-  http 页面不是安全上下文，没有 `crypto.randomUUID`，id 退回 `getRandomValues` 拼——内容脚本跑在
-  别人的网页上，这种页面并不少见，直接调会抛错，选中文本就再也翻不出来。
-
-### 就着这一段追问
-
-译文和讲解是模型主动给的那几样，剩下的想问什么只能自己开口。浮层底部因此有一个「问」字图标：
-点开是一个输入框，问题就着**眼前这一段**问，答案流式写在下面，答完可以接着问下一问。
-
-几处取舍：
-
-- **译文出来之后才有这个入口**。没有译文可倚，追问问的是空气；出错的浮层上也没有。
-- **不入库**。追问的答案不进生词本、不进复习队列、不进导出文件——和复习卡上的
-  「再给个例句 / 换个说法讲 / 考我一下」是同一个决定（见 `features/translation/translate.ts` 的 `handleAssist`）。
-  想留下来的东西是划下的那个词本身，不是当时随口问的那一句。
-- **译文和语境解释随请求一起带给模型**，让它别把用户已经看见的再复述一遍——这是追问最容易变废话的一种方式。
-- **只带最近三轮历史，且每轮的答案只带前 200 字**。追问是「就着这个词再聊两句」，不是完整对话：
-  轮数不封顶的话，一个浮层能攒出几千 token 的前情，而其中大半和当前这一问无关。
-- **入口是纯图标按钮，不写文字标签**，同 App 阅读器顶栏（`‹`、`词`）和读完角标的 `×`：
-  图标一律是正文字体里的字形，全项目不引矢量图标、不引图标字体。代价是纯图标按钮天然有
-  **图标歧义**，所以真正的名字挂在 `aria-label`（给读屏软件）和 `title`（给鼠标悬停）上，
-  两个都不能省。发送键用 `↵`，title 里写明回车也能发——否则这条捷径没人知道。
-- **回车发送要判 `isComposing`**。中文输入法选词时的那一下回车是「确认候选」，不是「发送」——
-  不判的话中文用户第一次追问就会把半截拼音发出去。
-- **追问期间浮层不跟着选区走**。点进输入框会让页面上原来那段选区塌掉，触屏上这一下还会走
-  `selectionchange`；照常判下去就是「选区没了」→ 关掉浮层，用户的问题打到一半凭空消失。
-  所以从点开输入框那一刻起，选区的存亡不再决定浮层的去留；追问期间连「滚出视野就关」那一条也不算数——
-  手机上弹出键盘就是一次滚动加一次 resize，正打着字的问题不该被这一下收走。
-  关浮层改由明确的动作负责：按 Esc、或者点到浮层外面。
-- 走的是**翻译那条 port**，只是发的消息不同（`ask` 而不是 `start`）。安卓 App 的垫片按 port 名字接线，
-  因此阅读器里的浮层同样能追问，不必再认一个新名字。
-
-### 讲解生词
-
-翻译之外还有两样东西，按选区粒度分工——不是所有选区都套同一份要求：
-
-| 选中的是 | 译文 | 语境解释 | `usage` 用法 | `vocab` 生词 |
-| --- | --- | --- | --- | --- |
-| 单词 | ✓ | ✓ | ✓ | — |
-| 短语 | ✓ | ✓ | ✓ | ✓ |
-| 整句 | ✓ | ✓ | — | ✓ |
-
-单词没有「其中的生词」——整条记录讲的就是它自己；整句没有「这个词怎么用」——那是词的属性，
-不是句子的。所以划一个词你会多得到一句搭配/词根/近义辨析，划一句话你会得到句子里最多
-**5 个**值得讲的词，每个带音标、词性、**它在这一句里的意思**，以及一句用法提示。
-
-挑词的标准写在 system prompt 里：只列中文母语读者可能不认识、或在这里是熟词僻义／习语的词；
-`the`/`make` 这类常见词除非构成固定搭配否则不列；专有名词只在影响理解时列；全是常见词就给空数组。
-这条约束是必要的——不加的话模型会把每个词都注一遍，那是词汇表不是讲解。
-
-**讲的只能是选中的那部分。** 请求里除了选区还带着它所在的段落，那是给模型判断多义词用的，
-可模型常常顺手把段落里的生词也一并讲了——用户只划了半句，浮层里却冒出没划中的词。
-所以段落在 prompt 里挂的标签写明「仅供判断词义，不要讲解其中的词」，讲解要求里也说死一遍；
-但光靠 prompt 约束不住，`normalizeVocab` / `closedVocab` 再按选区文本挡一道：条目的 `word`
-折成小写、压掉多余空白、弯引号换成直引号之后，必须是选区的子串。
-
-用子串而不是词形还原，是因为原形（`leak`）要能对上原文里的 `leaks`，固定搭配（`in hindsight`）
-也要整条对得上；代价是不规则变形——模型给 `run`、原文是 `ran`——会被丢掉，而 `VocabNote.word`
-的约定本就是「原文里出现的形式」，按约定给就撞不上。宁可少讲一条，也不讲用户没选的词。
-过滤发生在数满 5 条**之前**：否则一条被丢掉的词会白占一个名额，明明有 5 条够格的只剩 4 条。
-
-生词**逐条出现**，不是等整段生成完才亮：流式解析靠数花括号找出已经闭合的对象，
-半条不推。判断闭合时要认字符串状态，`meaning` 里出现一个 `}` 是完全可能的
-（"花括号 `}` 本身"），不跟踪引号就会把它当成对象结束，显示出半条讲解。
-
-顶层字段的扫描要在 `vocab` 键之前打住，靠一个正则找这个键。它之所以安全有两条依据：
-合法 JSON 的字符串里引号必须转义，所以译文写到这个词时长成 `\"vocab\":`，匹配不上；
-而模型在 JSON 之前先啰嗦一句、还照抄了字段名的情况，靠"取最后一次出现"绕开。两条都有用例。
-
-**为什么非要打住：** 流式那套 `closedFields` 是拍平扫的，
-而生词数组里每条也有 `word` / `pos` / `phonetic`——顺着扫下去，最后一条生词的词性会盖掉
-整条选区的词性。短语选区上这个错误看得见：明明选的是名词短语，词性却成了里面某个动词的。
-`test/stream.test.ts` 里有一条用例专门盯着它。
-
-代价要说清楚，下面是拿真 key 实测的数字（`MiniMax-M3-highspeed`，默认配置）：
-
-| 选区 | 关掉讲解 | 开着讲解 |
-| --- | --- | --- |
-| 单词 | — | 3.5s / 68–88 输出 token |
-| 短语 | — | 2.7–7.2s / 97–137 |
-| 整句（22 词） | 2.6–3.5s / 71–78 | 7.9–9.6s / **262–329** |
-| 长选区（130 词） | — | 5.5–10.9s / 424–481 |
-| 自动翻译上限（200 词，单次） | — | 7.1s / 671 |
-| 逼近硬上限（1955 字符） | 94 | 462 |
-
-整句的输出 token 是**三到四倍**，墙上时间**多五到六秒**。这不是小代价，所以设置页给了开关，
-关掉后 prompt 里连这两个字段都不提（上表第二列就是关掉的样子）。
-
-流式把体感拉了回来：译文 1.1–2.6s 就能显示，语境解释约 4s，之后生词**每秒长出一条**。
-译文到达后浮层底部会亮一个小转圈，直到讲解写完——否则中间那五六秒看起来就像已经完事了，
-人转头就走，正要出来的讲解白生成。浮层也因此加了 `max-height` 和内部滚动：
-五条讲解加起来能有大半屏。
-设置页可以整个关掉，关掉后 prompt 里连提都不提这两个字段。
-
-### 朗读
-
-浮层、侧栏、生词本、复习卡上的音标都可以点，点了念出来。用浏览器自带的
-`speechSynthesis`：不联网、不花 token、不需要额外权限，断网也能用。发音这种事没必要走模型。
-
-三处讲究：
-
-- **念的是词，不是音标。** TTS 不认 IPA，把 `/ˈskruːtəni/` 交给它只会得到一串斜杠和字母的
-  噪音。所以每个可点的音标都记着它描述的那个词：浮层顶部念整条选区，生词条目念那一条自己的词，
-  复习卡念 `snippet.text` 而不是卡面上显示的词元（卡面是 `leak`，音标配的是 `leaks`）。
-- **只打断自己发起的朗读。** content script 用的是宿主页面同一个语音引擎，
-  无条件 `cancel()` 会掐掉网页自己的朗读功能（不少阅读类站点有）。所以模块记着自己那条
-  utterance 的**对象引用**——认对象而不是认标志位，因为 `cancel()` 触发的 `onerror` 是异步到的，
-  那时标志位可能已经属于新的一条了，认标志位会把新的误清掉。
-- **不做点不动的假按钮。** 环境不支持语音合成时，音标就画成普通文字，不加虚线下划线、
-  不挂监听。
-
-音标本身长不出按钮的样子，所以可点的提示只有虚线下划线加一个 `title`——
-在一行注脚里塞个喇叭图标会把它顶成一行控件。
-
-代价是**没有音标的条目就没有朗读入口**：整句选区从来不给音标，多词生词条目
-（`tacit endorsement`、`in hindsight`）的音标也被 prompt 明确禁掉了——
-模型给这类条目的音标是把几个词的音标拼在一起，甚至干脆挂上其中一个词的（实测见
-[已验证 / 未验证](#已验证--未验证)）。这两处目前只能看不能听。
-
-讲解里的词**不会自动进复习队列**。队列的语义是「你主动划下的东西」，一句话带出 5 个词、
-一天读十篇，队列几天就废了。想复习其中某个词，把它单独划一下就是了——那时它是一个单词选区，
-按原来的规则自动入队。
-
-请求按所选服务的协议原生直连（见[模型服务](#模型服务)）。走 Anthropic 协议时，MiniMax 的兼容端点
-额外多一个自己的 `base_resp`——HTTP 200 但 `base_resp.status_code != 0` 也是失败（余额不足走这条路）。
-这些端点大多**不返回 CORS 头**，加上密钥不能进页面上下文，所以请求只能在 background 里发。
-
-## 复习
-
-划到的**单词和短语自动进复习队列**，整句只记录不排期（可以在生词本里手动捞进去）——
-否则队列会慢慢被长句淹没。同一个词元跨文章合并成**一张**卡，多条出处挂在它下面，
-复习时展示最近一次划到的语境；否则 leak / leaks / leaked 会变成三张卡轮流来烦你。
-
-排期用 [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs)（MIT，零依赖）。
-翻卡本身**不花 token**：正反面用的是划词时就存下来的译文与语境解释。卡片下方的
-「再给个例句 / 换个说法讲 / 考我一下」才会调 LLM。
-
-复习界面支持键盘流：空格翻面，`1`-`4` 评分。
-
-持久化用毫秒时间戳而不是 ts-fsrs 的 `Date`：`chrome.storage` 能存 `Date`，但导出成 JSON
-再导回来就变成了字符串，喂给算法会**静默**算出错误的间隔——不报错，只是复习计划悄悄乱掉。
-`test/review.test.ts` 里有一条 round-trip 用例专门盯着这个。
-
-## 界面埋点
-
-改界面以前全凭感觉：搜索框常年占着一整行值不值、「黑名单建议」到底有没有人点过，只能猜。
-现在首页（文章 / 复习 / 生词本三个标签页，App 的首页是同一份代码）上每个能点的东西都记一个数：
-
-- **记什么**：一张写死的事件表（`src/lib/uiUsage.ts` 的 `UI_EVENTS`，四十来项）里的名字，按本地日期分桶累加。
-  存下来的形状是 `{ since, days: { "2026-09-19": { "articles.detail": 3, … } } }`，留 90 天，过期的桶在下一次记数时滚掉。
-- **不记什么**：点的是哪篇文章、搜了什么词、几点几分点的，一概没有。表外的名字后台不收，所以存下来的东西有上限。
-- **为什么是一张表**：要回答「哪些极少用到」得知道全集——从没被点过的按钮在计数里根本不出现，
-  拿这张表去对才列得出那些零。埋点用了表外的名字类型检查过不去；反过来不成立——新加的按钮忘了挂埋点不会报错，
-  它只是不出现在报表里，加按钮时得记着把它登记进表。
-- **为什么按天**：改完界面之后要能比「改之前的三十天」和「改之后的七天」，只留一个总数做不了这件事。
-- **几处口径**：「批量管理」「详情」这类开关只记打开那一下；生词本的删除只记确认之后那一下；
-  搜索记「展开了」和「真的输入了词」两个数，差值就是点开又没搜的；复习的翻卡和评分不分鼠标键盘各记一次，
-  键盘（空格、`1`-`4`）按的另外叠记一个 `review.by-key`，占比看得出键盘流有没有人用；中键在新标签页打开原文也算打开。
-- **怎么看**：设置页「诊断日志」最下面的「首页按钮使用统计」，每个事件一行，近 7 天 / 近 30 天 / 90 天内，
-  次数多的在前，一次没用过的压淡排在后面；结论行先说统计了多久——装上才三天的话满屏的零什么都说明不了。
-  复制或下载诊断日志时这份计数在 `usage` 字段里一起带出去（日志 `schema` 因此升到 4）。
-- **传到同步服务器**：启用了设备同步的设备，每轮同步成功之后顺带把计数传到同一台服务器（`POST /v1/usage`，
-  用的是同步的 Token），在那边跨设备、跨用户汇总，管理员用 `admin usage` 看报表（见[后端说明](server/README.md#界面埋点)）。
-  传的内容就是上面那个形状里动过的那几天，外加设备号和平台（扩展还是 App）——手指和鼠标的用法得分开看。
-  没启用同步的设备什么都不往外发；这份计数从不进数据导出。没有单独的开关：它跟着「设备同步」走，
-  而启用同步的设备本来就把全部阅读记录放在那台服务器上，几个按钮的次数比那些东西不敏感得多。
-- **它不是同步记录**：计数器没法像记录那样「后写的赢」地合并，别的设备也用不着读它，所以不进同步日志、
-  不占 outbox，另走一个接口。每天传的是**当天的累计数**而不是增量，服务器留大的那个——重发、重试、
-  乱序到达都无害，不需要操作回执。最多十分钟传一回；没传成一小时后再试；服务器比客户端旧、没有这个接口（404）
-  就一天问一次。传不上去不算同步失败，设置页不会因此亮红灯。上传排在同步周期**之外**、没有人等它：
-  放在里面的话网络差时这一个请求能挂满 25 秒，这期间谁调同步拿到的都是这个卡着的周期，
-  包括打开文章前等的那一轮（见[换一台设备接着读](#换一台设备接着读)）。
-- 落盘直接改状态库里的那个键，不走普通的 storage 写入：那条路每写一次都会排一轮同步（info + pull + pull 三个请求），
-  点几下按钮不该换来几轮空转的请求。上传搭平时每分钟那一轮的车。
-- 「清空日志」**不**清它：清日志常是排查的第一步（清掉、复现、导出一份干净的），而这份计数要攒几个星期才看得出东西。
-  它随「清空全部记录」一起没。
-- 页面这头攒 5 秒发一批，页面隐藏或离开时把手里的先交掉：后台的一次写入是整库读改写，
-  复习时两三秒翻一张卡，没必要点一下写一次。代价是页面被强杀时会丢最后几下。
-
-
-## 诊断日志上传
-
-设置页「诊断日志」那几份——模型调用失败的现场（错误类型、HTTP 状态、模型的原始输出、选中的文本和上下文）、
-最近 50 次调用的耗时、最近 100 条翻译链路轨迹、App 阅读器的抓取记录、没接住的运行时错误——在启用了设备同步的设备上，
-每轮同步成功之后顺带传到同一台服务器（`POST /v1/logs`，用同步的 Token），管理员用 `admin logs` 看
-（见[后端说明](server/README.md#诊断日志)）。起因是翻译在别的机器上出错时，得让人去导出文件再发过来，现场常常已经被挤掉了。
-
-- **传什么**：日志条目原样上传，外加设备号、平台（扩展还是 App）和版本号——版本号一对就知道是不是新代码的问题。
-  模型配置只随失败条目带上模型名和输出上限；API Key 不在任何一份日志里。
-- **传多少**：本机只记「哪些已经传过」的指纹（`logUpload` 键），每轮只传新增的和改写过的——翻译轨迹会按 id 原地改写
-  （先记「没观察到画稳」、后补成功），服务器按 id 覆盖；别的几份只追加，服务器按内容去重，重发无害。
-  清空日志之后指纹跟着清空。
-- **什么时候**：和界面埋点同一趟车，排在同步周期**之外**、没人等它。扩展每分钟同步一次，出错后一分钟内就到服务器。
-  没传成十分钟后再试；服务器比客户端旧、没有这个接口（404）就一天问一次。传不上去不算同步失败。
-- **没有单独的开关**：跟着「设备同步」走。启用同步的设备本来就把全部阅读记录和划词放在那台服务器上，
-  诊断日志里的选中文本并不比那些更敏感；没启用同步的设备什么都不往外发。
-- **它不是同步记录**：别的设备用不着读它，不进同步日志、不占 outbox；服务器上 30 天过期，账号删除时随之删除。
-## 指标口径
-
-- **已读比例** = 已读段落字数 / `trackedWords`（可观测段落字数之和）。
-  分母不用 `totalWords`（Readability 正文全文字数），因为正文里可能有不被任何块级元素包住的
-  零散文本，那部分观察不到。两个数字都会记录，popup 里同时显示。
-- **阅读速度** = 已读字数 / 读到新内容的片段时长，单位「字/分」。中文按字，英文按词。
-  分母不用总专注时长：回看和停留会把它稀释成一个没有含义的数。
-- **预计还需** = 剩余可观测字数 ÷ 校准后的速度。速度分三层（一般速度 → 你近 30 天的速度 →
-  这一篇的节奏），逐层以上一层为先验做加权平均，见[预计阅读时间](#预计阅读时间)。
-- **回合** = 同一篇文章内间隔不超过 `episodeGap`（默认 5 分钟）的相邻 session 合并。
-  session 的边界是「输入信号中断」，量的是两次输入之间的间隔，不是注意力长度；切去查个东西
-  再回来、安静读一屏后被判走神，都会把一次连续投入切成一串片段，回合把它们接回去。
-  阈值怎么选：Halfaker 等人（2015）在七个系统上发现 inter-activity time 的对数直方图普遍双峰
-  ——within-session 模式在 ~1 分钟、between-session 在 ~1 天——切分点该放在两峰之间的谷。
-  本项目实测数据的谷在 5–30 分钟。**阈值是结果的一部分**（Kovanović 等人 2015 用 15 种
-  time-on-task 估计策略跑同一批数据，R² 平均相差 0.15），所以概览页把它写出来。
-- **概览**以回合为主指标（回合数、中位数、P90、最长），原始片段的分位数保留供对照；
-  另给结束原因的构成、切换频率（以切走/失焦结束的片段数 ÷ 专注小时数，Mark 等人量信息工作者
-  注意力用的就是这个口径：中位 40 秒、约 76 次/时）、以及读到新内容的时长占比。
-- 概览页的**解读只在数据支持时出现**：片段数 ≥ 回合数的 1.5 倍才说"被切碎"、一半以上片段
-  以切走结束才提切换频率、读到新内容的时长不足一半才提停留——一句在任何数据下都显示的解读
-  等于没有解读。
-- 任何基于输入信号的测量都测不到走神：Smallwood & Schooler 的实验室阅读任务里约 20% 的时间
-  在走神。所以这些数字的精度别高估，也不必为此再加一位小数。
-
-## 安卓 App
-
-手机上读文章、划词、复习，用的是**同一份 TypeScript**。`android/` 是一个三百来行 Java 的壳
-（一个 Activity、一个 WebView、一个 JS 桥），网页部分由 `npm run build:app` 从 `src/` 打包到
-`android/app/src/main/assets/www/`，三个页面：首页（= 扩展的 dashboard，文章 / 复习 / 生词本）、
-阅读器、设置（= 扩展的设置页）。扩展的页面、content script、background 里的消息处理在 App 里
-原样复用，靠 `src/app/shim.ts` 把 `chrome.storage` 接到 IndexedDB、把 `chrome.runtime.sendMessage`
-直接接到 `src/background/handle.ts` 的 `handle()` 上——没有 service worker，接线不同而已。
-
-阅读器顶栏「截」用 **PixelCopy** 截 WebView 的可见区，硬件加速下直接 `View.draw` 不可靠。
-框选复用扩展的覆盖层，裁出的 PNG 交给宿主 **ML Kit** 离线识别，再接现有翻译。
-系统返回键先收截图覆盖层，再收本文生词单子，最后才离开阅读器。
-
-### 文章从哪来
-
-- 浏览器里点「分享」→ Lectern：App 从分享的文本里挑出第一个网址，直接进阅读器。
-- 首页粘贴一个地址。
-- 文章列表、回顾页里的「打开原文」、正文里的链接，点了都进阅读器——`MainActivity` 把站外地址
-  一律改写成 `read.html?u=…`，App 里没有"开新标签页"这回事。
-- 书里的一节同样是 `read.html?u=…`，只是地址换成 `epub:<书的哈希>/<序号>`（见[书](#书)）。
-
-### 书
-
-EPUB 从三个地方进来：首页的「导入 EPUB」按钮、文件管理器里对着 .epub 点「打开方式」、
-别的应用把 .epub 分享过来。导入这件事的分工是：解压在宿主那边
-（`NativeBridge` 的 `epub*`，用平台自带的 `java.util.zip`——`ZipFile` 能随机存取，
-一本书三五百个条目不必先整包读进 WebView），认结构、洗正文、存图在网页那边
-（`src/books/`）。宿主先把文件拷进自己的缓存目录并算出 SHA-256，那个哈希就是这本书的
-id；导完就把拷贝删掉，正文和图片这时已经在页面的库里了。同一个文件再导一次不会重来一遍，
-直接打开，上次读到哪还在哪。
-
-**书只是一层目录。** 章的 id 形如 `epub:<书的哈希>/<spine 序号>`，对下面那一层来说
-它就是一个普通的 articleId：session 划分、段落停留、读完角标、跳回上次位置、划词翻译、
-截图翻译、FSRS 复习，一行都没有为书改过。书这一层只知道有哪些章、按什么顺序排、书名是什么；
-进度一律由章的记录现算，书本身不存进度，免得两份状态对不上。归属关系编码在 id 里而不是在
-`Article` 上另加字段，所以记录的形状、导入导出、同步协议都不必跟着改。
-
-正文走的是和网页文章同一个白名单（`src/app/sanitize.ts` 的存档模式）：EPUB 是用户从别处
-拿来的文件，阅读器页面又和其余页面同源，这一步不能省。图片存进文章存档共用的资源库，
-正文里只留 `fs-blob:<哈希>`，打开时才换成临时的 blob 地址；封面常是一张裹在 `<svg>` 里的图，
-导入时先把它提成 `<img>`，否则整个 svg 会被白名单丢掉。章内指向别的章的相对链接落不了地
-（白名单只放行 http(s) 和页内锚点），所以章末有「上一节 / 下一节 / 目录」。
-
-目录优先读 EPUB 3 的 nav，没有就退回 EPUB 2 的 NCX，都没有就用章里的第一个标题。
-一章读不出来时只有这一章缺一句说明，别的章照常导入。
-
-历史列表里书不逐节摆开——一本四十节的书能把整页刷满——而是折进书架那一行，
-记录本身还是一章一条。
-
-### 阅读器
-
-不在 WebView 里直接打开网页：手机上的网页各有各的排版、弹窗和侧栏，划词浮层也压不住站点的样式。
-App 让宿主把 HTML 抓回来，跑 `@mozilla/readability` 抽正文，再按**白名单**重建 HTML
-（`src/app/sanitize.ts`：只留排版标签，去掉脚本、事件属性、`javascript:` 链接、iframe / svg / 表单——
-阅读器页面和其余页面同源，页面里的脚本拥有全部记录和宿主桥，正文来自任意网站，这一步不能省），
-排成一栏正文。正文只抓一次，存在 `rh:<articleId>` 下，再打开秒开、断网也能看；
-「本文生词」的单子里有「重新抓取正文」。头部没说编码时看 `<meta charset>`，GBK 的站点不会解成问号。
-
-阅读追踪跑的是 `src/features/reading/track.ts`——和网页上一模一样的 session 划分、段落停留、读完角标、
-跳回上次位置、预计还需多久。三处不同都收在 `startTracking` 的参数里：文章的 id 按**跟完重定向的
-原文地址**归一化（分享出来的链接常带一跳；电脑上的扩展看到的是落地之后的地址，两边用同一个
-才会合到同一条记录。`m.` 子域这类同文异址仍然合不到一起）；焦点按"App 在前台就有焦点"处理（WebView 不发
-focus / blur）；可见性由宿主在 `onPause` / `onResume` 时通知。段落从阅读器自己的容器里取
-（`extractFromContainer`），指纹算法和网页上那条路径完全一致，`test/container.test.ts` 盯着这一点——
-不过 Readability 洗过的文本偶尔和原网页略有出入，跨设备的已读段落去重是尽力而为。
-
-划词在手机上是**长按选中、拖把手调整范围**，没有 mouseup 这一说。粗指针设备上改听
-`selectionchange`，选区停住 600ms 就当选完了；桌面上不能这么干（拖选中途停一下也会触发，
-半截选区就发出去了），所以桌面照旧只认 mouseup。点了浮层之后一秒内的 selectionchange 不算数，
-否则点「翻译这段」让选区塌掉的那一下会把刚确认的翻译掐断。系统自带的「复制 / 分享」工具条
-被 `ReaderWebView` 清空了菜单——它正好压在浮层的位置上。
-
-MiniMax 的端点没有 CORS 头，页面又是一个真实的 https origin（`appassets.androidplatform.net`），
-所以所有跨域请求由 `NativeBridge` 用 HttpURLConnection 代发，响应按 16KB 一块、base64 编码推回页面
-（一块的边界可能落在多字节字符中间，按文本传会出乱码），`src/app/native.ts` 把它包成带
-`ReadableStream` 的 `Response`——`llm.ts` 的流式解析原样工作，译文照样一个字段一个字段地出现。
-自己跟重定向，因为 HttpURLConnection 不跟 http ↔ https 之间的跳转。
-
-### 返回键与后台
-
-离开阅读器前要先结算最后一段、等 IndexedDB 的事务提交，否则这一段阅读就丢了——扩展里 service
-worker 活得比页面久，App 里没有这层保护。所以返回键先问网页（`__fsHost.beforeBack`），阅读器停掉
-追踪、`shim.flush()` 之后再让宿主回退。切到后台同理：`onPause` 通知网页不可见，session 当场结束。
-
-「本文生词」那张单子开着时，返回键先收单子——手机上「返回」关掉的是最上面那一层，不是整个页面。
-单子背后另铺了一层遮罩，点外面同样收起来；它还挡住穿透的滑动，否则手指落在单子外面一划，
-底下的正文跟着滚，收起来时已经不在原地了。
-
-朗读走 Android 的 TextToSpeech：WebView 没有 Web Speech API，`native.ts` 给 `speechSynthesis`
-垫了一个最小实现，`lib/speak.ts` 不用改。
-
-### 全屏阅读
-
-手机上打开一篇文章，屏幕上就只剩这篇文章：系统栏（状态栏、手势条）由宿主收起来
-（`Native.setFullscreen` → `WindowInsetsControllerCompat.hide`），顶栏那一排（返回、截、译、词）
-跟着滚动走——往下读就滑出去，往回滑一点就回来，滚到正文最上面一直露着。判断"在不在手机上"
-在 `src/app/read.ts` 里：装进 App 就算（这个 App 只装在手机上），浏览器里按 720px 那道线，
-于是 Storybook 那个 390px 的阅读器预览照着手机上真实的样子显示。
-
-**为什么是滚动而不是"点一下切换"**：正文里的单击和双击已经是点词 / 点句翻译，手指落在正文上
-最常做的两件事都在那儿；再叠一个"点空白处显示顶栏"，落偏一点就成了收顶栏，反过来也一样。
-往回滑本来就是"我要找上面的东西"，不和任何手势抢。同一个方向上累计滑够 24px 才收、16px 才露，
-换方向从零重新攒：读到一段停下来的那点抖动不该让顶栏翻来覆去。
-
-**为什么顶栏在最上面一直露着**：那儿有返回键。一篇文章刚打开时把它也收掉，人就只剩系统的
-返回手势，而"往回滑能把顶栏叫回来"这件事没人会告诉他。开「本文生词」那张单子同理——
-那是"我现在要界面"，顶栏跟着露出来。
-
-顶栏从 sticky 改成浮在正文上的 **fixed**：收起它只是往上挪一格，正文一个字都不动。sticky 做不到
-这一点，它收起来会让出那一格高度，正文整段往上跳，读到哪儿就丢了。代价是正文最上面那一屏
-要自己留出顶栏的高度——高度由 `fullscreen.ts` 量好写进 `--rbar-h`，不写死，顶栏的高度跟着
-安全区和字号走。
-
-系统栏收起后选的行为是 `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`：从屏幕边缘往里划，系统栏临时
-回来一会儿，读到一半想看一眼时间不用先退出阅读器。临时的那一层画在页面**上面**，不改 insets，
-所以顶栏自己留了一条 18px 的余量——全屏时 `--sa-top` 已经归零，不留的话顶栏会贴着屏幕上沿，
-也会被划出来的状态栏压住。
-
-**放回系统栏不只靠网页**。离开阅读器时页面会先还（`leave()` 里 `full.stop()`），但宿主在
-`onPageStarted` 里还兜了一道：只要新加载的不是 `read.html` 就把系统栏放回来。页面脚本万一挂在
-半路上，代价是用户剩在一个没有状态栏的首页上，这一层不能省。切去别的应用再回来同理——系统栏
-往往已经自己回来了，`onResume` 里照着"阅读器还开着没有"再收一次。
-
-### 铺满屏之后的那几条边
-
-`targetSdk` 36 意味着 Android 15 起窗口一律铺满整块屏：WebView 画到状态栏和手势条**底下**，
-`themes.xml` 里那两个 barColor 从此是空话。页面得自己知道让开多少，而 `env(safe-area-inset-*)`
-在 WebView 里认不认系统栏（还是只认刘海）没有定论，所以宿主自己量一遍。
-
-量的是**系统栏真正压在 WebView 上的那部分**，不是系统栏本身：Android 15 以下 DecorView 已经
-把 WebView 让开了，直接报系统栏的尺寸会让开两次，顶上白空一条。算式放在 `post` 里——insets 是在
-measure / layout **之前**派发的，那时视图的尺寸还是上一轮的。量出来的写进 `--inset-*`，
-`app.css` 里和 `env()` 取大的那个用；两条路都不通时是 0，也就是 Android 15 以前和扩展里的情形。
-页面首屏同步问一次 `Native.insets()`，之后转屏、分屏由宿主推过来。
-
-### 手指不是鼠标
-
-三件事都不是安卓独有的，但只在手机上才咬人：
-
-- **`:hover` 在触屏上会粘住**——手指抬起，按钮仍描着悬停的样子，直到点了别处才复原。
-  所有 `:hover` 一律关进 `@media (hover: hover)`，鼠标那边一个字没变。按下的反馈改由 `:active` 给，
-  同时把系统那块半透明蓝的 tap highlight 去掉——去掉和补上必须成对，只去掉按钮就成了死的。
-- **照鼠标做的东西够不着**：`button.mini` 连字带边 22px 高，而 Material 给触屏的下限是 48dp。
-  窄屏下把它、复习的四个评分键、队列切换、底部导航一并按拇指放大，输入框抬到 16px
-  （WebView 聚焦时才不会顺手把整页放大）。列表里的标题原本截成一行，改成两行——一行截完
-  常常只剩半个词，而在列表里认出一篇文章全靠它。
-- **长按到处都能选中**：在阅读器里长按顶栏，会连带把划词浮层弹出来。界面自身（顶栏、底部导航、
-  单子的头）设 `user-select: none`；正文和生词条目不动，那儿的长按选中正是这个 App 的功能。
-
-### 更新
-
-扩展有商店管升级，App 是自己装的 APK，不问一声就没人告诉它有新版本。所以 App 自己问：
-设置页末尾的「更新」里有一个「检查更新」，首页开 App 时也自动问一次（**一天最多一次**，
-同一处的开关能关掉）。有新版本时首页顶上出一条能划掉的横幅——不是弹窗：来这儿是为了读文章，
-「有新版本」永远不比手头这篇要紧。划掉等于「跳过这个版本」，下一个版本照常提示。
-
-问的是 GitHub 的 `releases/latest`，发出去的东西见[数据去哪了](#数据去哪了)。比较在本机做
-（`src/lib/update.ts`）：按段取整数比大小，所以 `0.3.10` 大于 `0.3.9`——字典序会说反。
-认不出的版本号读成 `0.0.0`，也就是**不提示更新**：宁可漏报，也不能误报着让人去装一个来路不明的包。
-
-只认 `lectern-vX.Y.Z.apk` 这一个附件名。同一次发布里可能还躺着 `-debug.apk`
-（仓库没配签名密钥时的产物），那个包是 runner 每次现生成的 debug 密钥签的，
-装不上任何已有的安装。这条规则让 Release 的**附件名成了接口**，改名字等于断掉老版本的升级路。
-
-下载不走 `NativeBridge` 那条 HTTP 代发的路：几兆的 APK 按 16KB 一块 base64 推回页面，
-是几百次 `evaluateJavascript` 加一次在 JS 里的重新拼装。宿主直接写进 `cacheDir/update/`，
-页面只收进度数字。下完核对字节数和 Release 上写的一致，然后经 `FileProvider` 把 `content://`
-地址交给系统安装器（`ACTION_VIEW` + APK 的 mime）——`file://` 从 Android 7 起会直接抛
-`FileUriExposedException`。Android 8 起「安装未知应用」是按应用授权的，没授权时先把用户送到
-那一页，回来再接着装；那一页多半回 `RESULT_CANCELED`，所以回来是重新问一次权限，不看结果码。
-
-第一次更新还要多绕一道：**Android 11 起，用户把那个开关拨开的一瞬间系统会 force-stop 掉刚被授权的
-应用**，也就是我们自己。等他返回时进程是新的，「刚才正等着装哪个包」已经没了——而这恰好是他
-第一次试这个功能的时刻，看到的会是「授权完回来，什么都没发生」。包一直躺在缓存目录里，
-所以把这一件事记进 `onSaveInstanceState`，重建时在 `registerForActivityResult` **之前**恢复：
-`ActivityResultRegistry` 在注册那一刻就把攒着的结果派发出去，那时回调里得已经能看见这个文件。
-
-**自动下载并安装**（默认开，设置页「更新」里能关）。上面那一套要人点三下：横幅 → 下载并安装 → 系统的确认框。
-现在首页问到新版本之后自己下，下好之后等人**离开 App** 再装，装完他下次打开就是新版：
-
-- **下**：只由首页发起（阅读器里人在读东西，不拿他的带宽），只在不按流量计费的网络上（`isActiveNetworkMetered`，问不到当计费）。
-  没下完人就走了也没关系，宿主那边照下不误。「下好了没有」不另记标记，宿主直接让系统去解析缓存里那个文件
-  （`getPackageArchiveInfo`）：下到一半的解析不出来，别人的包包名对不上，旧包 `versionCode` 不够大，三种都在这一步筛掉。
-  所以下好的包每次开首页都认得出来，而 GitHub 仍然一天只问一次。
-- **装**：Android 12 起，一个应用**更新它自己**、声明了 `UPDATE_PACKAGES_WITHOUT_USER_ACTION`、又被允许过「安装未知应用」时，
-  `PackageInstaller` 会话可以不弹确认框（`USER_ACTION_NOT_REQUIRED`）。系统照样核对签名——和装着的这个对不上的包装不上去，
-  所以「自动装」并没有比「人点一下确认」多信任任何东西。
-- **什么时候装**：人离开 App 五秒之后。装成的那一刻进程会被杀，只是切出去复制个词、几秒就回来的话不该撞上；
-  也不能拖太久——Android 11 起缓存进程过十秒左右会被冻结，定时器就不响了。**停在阅读器里时不装**：
-  任务栈会跟着进程一起清掉，锁屏再回来看到的会是首页而不是读到一半的那篇。等他从首页或设置页离开的那一次再装。
-- **静默不成的退路**：Android 12 以下、还没允许过「安装未知应用」、或者系统答了一句「这次得有人确认」
-  （`STATUS_PENDING_USER_ACTION`，有的定制系统一律如此）——会话丢掉，记下「这个装着的版本上静默不成」，
-  首页改出「新版本已下载 · 安装」，点一下走的是上面手按那条老路（包已经在了，不重下）。不在后台硬弹确认框：
-  Android 10 起后台起不了 Activity，而且人此刻根本不在这个 App 里。第一次更新因此总要点一次（要去授权），之后才是全自动。
-- **装失败**：原因记下来，设置页「更新」的状态里看得到——自动安装是在人不在的时候做的，这儿是唯一看得见原因的地方。
-  同一个版本不再自动试第二遍（下几兆、再失败一次，天天如此），包本身有毛病的直接删掉。
-- 首页横幅因此有三种说法：「已下载，离开 App 后自动安装 · 现在就装」「已下载 · 安装」「有新版本 · 去更新」。
-  划掉（「不用了」）等于跳过这个版本，已经武装的也一并撤销。
-
-「该悄悄下、该出横幅、还是该武装」全是分支，判定是纯函数（`src/lib/update.ts` 的 `planAutoUpdate`），有单测；
-原生那一半单测够不着，在 Android 15 的模拟器上用两个同签名、不同版本号的包实跑过：离开首页约六秒后无弹框装上新版、
-结果广播在新进程里收到并清掉缓存里的包；停在阅读器里离开不装，回首页再离开才装；撤掉「安装未知应用」后不走静默。
-
-**装着 debug 包时不给「下载并安装」**，换成一句说明。debug 签名和正式签名对不上，
-系统会拒掉覆盖安装，而它给的只有一句没头没尾的「应用未安装」——与其让人对着它猜，
-不如提前说清楚：导出数据、卸载、装正式包、再导入回来。宿主认自己是不是 debug 包靠
-`ApplicationInfo.FLAG_DEBUGGABLE`（`buildConfig` 关着，没有 `BuildConfig.DEBUG`）。
-
-## 数据与导出
-
-设置页可导出 JSON（`schema: 4`），两个用途：给另一台设备导入合并（下一节），以及日后接入
-ActivityWatch 之类的跨应用统计：
-
-```jsonc
-{
-  "schema": 4,
-  "exportedAt": 1725350400000,
-  "settings": { "idleTimeoutMs": 30000, "stallTimeoutMs": 90000, "...": "..." },
-  "articles":  [{ "id": "https://…", "totalWords": 0, "trackedWords": 0, "wordsRead": 0,
-                  "sessionCount": 0, "totalMs": 0, "maxSessionMs": 0, "...": "..." }],
-  "sessions":  [{ "id": "uuid", "articleId": "https://…", "startTs": 0, "endTs": 0,
-                  "wordsRead": 0, "endReason": "idle|stall|hidden|blur|unload|recovered" }],
-  "paragraphs": { "https://…": [{ "index": 0, "hash": "x1y2", "words": 0,
-                                  "firstSeenTs": 0, "dwellMs": 0 }] },
-  // 4 版新增：上次读到哪。手机上读到一半、回到电脑接着读，靠它
-  "positions": [{ "articleId": "https://…", "hash": "x1y2", "index": 0, "offset": 0,
-                  "paragraphCount": 0, "savedTs": 0 }],
-  "snippets":  [{ "id": "uuid", "articleId": "https://…", "text": "leaks", "kind": "word",
-                  "translation": "泄漏", "contextNote": "…", "lemma": "leak",
-                  "usage": "常和 abstraction 连用|null",
-                  "vocab": [{ "word": "scrutiny", "phonetic": "/ˈskruːtəni/", "pos": "noun",
-                              "meaning": "审视", "note": "常搭配 under scrutiny|null" }],
-                  "cardId": "uuid|null", "...": "..." }],
-  "cards":     [{ "id": "uuid", "key": "leak", "snippetIds": ["uuid"], "due": 0,
-                  "stability": 0, "difficulty": 0, "state": 0, "lastReview": null,
-                  "...": "..." }],
-  // 只导出"设没设过"，密钥本身不出现在文件里
-  "llm": { "baseUrl": "…", "model": "…", "maxTokens": 4096, "apiKeySet": true }
-}
-```
-
-阅读位置存在 `pos:<articleId>`，随文章一起被容量淘汰，也随「清空全部记录」一起消失。
-3 版不导出它（外部统计工具拿它没用），4 版导出——手机上读到一半回到电脑接着读，靠的就是这一条。
-
-### 导入与合并
-
-设置页的「导入并合并 JSON」把另一台设备（手机 App、另一台电脑上的扩展）的导出文件合并进来，
-3 版和 4 版的文件都认。手机上导出走系统的「下载」目录（或分享面板），电脑上导入；反过来
-电脑导出、手机在设置页选文件导入。规则全在 `src/lib/merge.ts`，两条硬要求：**幂等**
-（同一份文件导两次不多出任何东西）和**对称**（A 导给 B、B 再导回 A，两边收敛到同一份），
-否则来回几次就乱了。
-
-| 记录 | 认身份 | 两边都有时 |
-| --- | --- | --- |
-| session | `(articleId, startTs)`，与 `commitSession` 一致 | 结束更晚的赢，id 留本机的 |
-| 段落 | 指纹 | `firstSeenTs` 取最早的非零值；`dwellMs` 取**最大值**不相加——相加在重复导入时翻倍，而界面不消费它 |
-| 阅读位置 | articleId | `savedTs` 更晚的赢 |
-| 划词 | id | 已有的不动 |
-| 生词卡 | `key`（词元） | 合成**一张**：出处并集，对方的划词改挂本机的卡；FSRS 状态取**最近复习过**的那份（从没复习过的排最早），另一份的复习次数就丢了——两台设备各自复习过同一张卡时总得选一个 |
-| 文章卡 | articleId | 同生词卡 |
-| 回顾材料 | articleId | 生成时间更晚的赢 |
-| 文章记录 | id | 静态元信息取最近一次抽取的；触底、读完两个 sticky 标记取"或"；已读字数、片段数、时长、回合从合并后的明细**重算**，公式与 `commitSession` 相同；两边各读一半、合起来够阈值且触底的，在这里置位读完。回顾卡只在读完状态**在这次合并里翻转**时建——两边本来就都读完却都没有卡的老文章（正文没存）不建，同 `ensureArticleCard` 的道理 |
-
-设置与 LLM 配置**不合并**，每台设备各有各的。本机独有的记录一个字节都不动；导入之后个人阅读速度的
-摘要重算一次——对方的片段也是你读的。容量上限照旧生效。
-
-段落级的 `dwellMs` 从第一版就开始记录，第二阶段的跳读（skim）检测直接用它算速度即可，不必重新采集
-——但 0.3.0 之前的记录被重复累加过（见「已读内容的估计」），做分析时只取之后的数据。
-文章记录里的 `episodeCount` / `maxEpisodeMs` 也是 0.3.0 才有的，老记录没有这两个字段。
-
-文章按去掉 hash 与跟踪参数（`utm_*`、`fbclid` 等）的 URL 聚合。容量上限 5000 个 session /
-1000 篇文章，超出后按最近访问时间淘汰；文章的聚合数字每次都从 session 列表重算，所以被淘汰的
-旧 session 也会一并从聚合里消失。扩展声明了 `unlimitedStorage`（Chrome 下不产生安装警告），
-否则段落记录很容易撑爆 `storage.local` 默认的 10MB 配额而**静默丢数据**。
-
-同一个注意力片段可能被上报两次——后台先按最后一次心跳补记，随后 content script 又送来真正的
-结束消息。存储层按 `(articleId, startTs)` 认身份，覆盖而不是追加。这一层的存在是因为
-`tabs.onUpdated` 在点击目录锚点（`#section`）时也会触发 URL 变化而页面并未重新加载；
-后台只在新地址不再是同一篇文章时才补记，两道防护叠加。
-
-同一个 `tabs.onUpdated` 还会把新地址推给 content script（`page:url-changed`）。页内导航
-（SPA 路由、`history.pushState`）不触发 `pagehide`，页面自己察觉不到已经不在原来那篇上了：
-读完角标会一直挂在右下角，之后开的 session 也全记到旧文章名下。收到通知的页面按 `normalizeUrl`
-自己判是不是真换了一篇，是就原地重来一轮——旧的一轮走和离开页面同一条收尾路径（结算最后一段、
-摘掉全部监听、收掉角标），新的一轮按新地址重抽正文，效果等同刷新一次，只是不用真刷新。
-这一条**不跟**上面的补记共用条件——读完之后 session 早已因走神结束、`open` 记录已被删掉，
-而角标还挂着，那正是最该通知的时候。
-
-重来一轮的编排在 `core/page/host.ts`：它只认一组功能插件，每一轮让每个插件各起一份，不碰 chrome。
-两个坑都在这里堵：**收摊必须收干净**（监听漏一个，它就会和新那轮的同名监听一起听着同一个
-scroll，一段阅读记两遍），以及**抽正文那几秒里可能再换页**（最长重试到 4 秒，其间到达的通知
-只认最后一次，被顶掉的那几轮由 `AbortSignal` 就地作废，免得替旧那篇留下没人读过的孤儿卡）。
-
-还有一种「同一个文档、必须重来」的情形和地址无关：**从 bfcache 回来**。在文章页上点开一个
-链接、再按后退，浏览器把整页原样端回来——文档不重新加载，content script 不会再跑一次，而
-离开那一下的 `pagehide` 早把这一轮收摊了（结算最后一段、摘掉全部监听）。后台推来的
-`page:url-changed` 救不了：地址压根没变，按 `normalizeUrl` 判就是「还是这一篇」。所以
-`content/index.ts` 另听一个 `pageshow`，`persisted` 为真时请 `host.restored()` 无条件重起一轮
-（`pageshow` 头一次加载也发，不判 `persisted` 就会开张两次）。没有这一下，后退回来的那一页
-从此既不计时、划词也不翻译，只有刷新才能恢复。跳回上次位置那一跳不会跟着来第二次——
-`planRestore` 见页面已经不在顶部就不跳，而 bfcache 端回来的滚动位置原样保留。
-
-白名单外的页面上用户点过的「本页启用划词翻译」跟着一起回来：新起的一轮默认不挂，而 bfcache
-回来还是同一次加载，「只对本次加载有效」在这里的意思是它不该被这次重起悄悄关掉。
-要带过去的东西由插件自己说（`PagePlugin.carry`），宿主只管转交；换了一篇（`urlChanged`）不带。
-
-## 开发
-
-```bash
-npm run typecheck   # tsc --noEmit
-npm test            # node --test
-npm run build       # esbuild → dist/
-npm run watch       # 增量构建
-npm run ocr-check   # 本机 Tesseract 英文识别与耗时检查，不调用 MiniMax
-MINIMAX_API_KEY=... node --experimental-strip-types scripts/live-check.ts   # 打真实 API 看讲解质量
-npm run build:app   # esbuild → android/app/src/main/assets/www/（安卓 App 的网页部分）
-npm run check       # 类型检查、测试、两份构建一起跑
-cd android && ./gradlew assembleDebug   # APK；preBuild 会自己跑一遍 build:app
-```
-
-安卓壳是 Java 而不是 Kotlin：三百来行代码不值得多拉一个编译器和一套版本兼容表。
-构建用的组合是 JDK 17 + Gradle 8.13 + AGP 8.13.2，compileSdk 36。
-
-`scripts/live-check.ts` 不在 `npm test` 里（要 key、要钱、结果不确定），但**它直接调
-`src/lib/llm.ts`**，测的就是线上跑的那段代码。改过 prompt 就该跑一次——单元测试只能证明
-「模型照格式输出时我们解析得对」，证明不了「模型会照格式输出」。`--only=整句` 可以只跑一条。
-
-无框架，运行时依赖是 `@mozilla/readability`、`ts-fsrs` 和扩展 OCR 用的 `tesseract.js`。测试用 Node 内置 test runner +
-类型擦除，不需要额外的测试框架或转译步骤。
-
-界面是纸墨配色（暖纸底 + 赭石 accent），亮度两头都收着：纸不是白、墨不是黑，深色那套的底和字同理——
-正文对比度 10:1 上下，而不是白底黑字的 21:1。配色 token 集中在 `src/popup/popup.css` 的 `:root`，
-四个页面共用；划词浮层这类跑在网页 shadow root 里的卡片读不到它们，各自抄着同一组数字（`src/content/`），
-App 的窗口底色在安卓的 `res/values/colors.xml`，改配色要一并改。拉丁衬线 Source Serif 4 打包在 `dist/fonts/`（三个 woff2，共 68KB，
-构建时从 `@fontsource/source-serif-4` 复制），中文交给系统宋体——界面里的中文全部来自 LLM
-输出，子集必漏字，全量又是 10MB 起。浮层要用这些字体，所以 manifest 声明了
-`web_accessible_resources`；副作用是网页能探测到本扩展的存在。注意 `--experimental-strip-types` 是 strip-only 模式，
-**不支持构造器参数属性**（`constructor(readonly x: T)`），字段要显式声明。
-
-页面入口：`popup`（当前页状态）、`dashboard`（文章 / 复习 / 生词本）、`sidepanel`（本页生词）、
-`options`（设置）。App 的入口在 `src/app/`：`index`（首页 = dashboard）、`read`（阅读器）、
-`options`（= 扩展的设置页）；每个入口的第一个 import 都是 `boot.ts`，装 chrome 垫片和宿主桥。
-设置页的表单本体在 `options/form.ts`，两端共用；`options/index.ts` 只是扩展那一端的入口，多挂一个
-左侧分区目录（`options/nav.ts`）——App 把分区折成一行一个，那份列表自己就是目录，用不着它。
-两边共用的本体：`background/handle.ts`（后台消息处理的组装）、`core/page/host.ts` 加上各功能插件（页面上的那些事）。
-扩展额外把后台推来的换页通知和 bfcache 的 `pageshow` 转给宿主；App 的阅读器自己渲染正文，没有这两件事。
-
-### 功能插件
-
-页面上的功能各是一个插件，挂在同一个页面宿主上（`src/core/page/`）：
-
-- `features/reading`：专注记录。判断这一页是不是文章（问 LLM），是的话划 session、记段落、跳回上次位置。
-  本体是同目录的 `track.ts`，`page.ts` 只把它那个要等好几秒的起步包成宿主要的样子。
-- `features/translation`：划词翻译和截图翻译。挂不挂只看翻译自己的总开关和白名单。
-
-一页上记不记、翻不翻各判各的，谁关掉、谁出错都不牵连另一个。插件同步交出实例（`PagePlugin.start`），
-要等的在实例里自己等、等的期间由自己的 `state()` 说明在等什么，状态自己变了就调 `ctx.changed()`
-让界面当场重画；宿主把各家的 `state()` 拼成一份 `PageState` 给 popup 和 App 顶栏。
-插件之间**互不引用**，要共享的东西走宿主给的 `PageInfo`（眼下只有标题：专注记录抽出正文标题后写进去，
-翻译落库时现取）。`test/boundaries.test.ts` 扫 import 守着这条：`core` 不引用任何功能，功能之间不互相引用。
-后台也一样按功能分：每个功能交一张「消息类型 → 处理函数」的表（`features/reading/background.ts`、
-`features/translation/background.ts`；同步、设置、数据导入导出、模型连接、诊断日志这些不属于任何功能的在
-`core/background/handlers.ts`），`background/handle.ts` 把它们交给 `core/background/router.ts` 分发。
-发往后台的每种消息都得有人认领——漏了的话 `createRouter` 那一行编译不过，错误里的 `missing` 列出是哪几种；
-同一种消息两家都认则启动时当场报错。
-
-往后加功能就是在 `features/` 下再写一个插件：页面那一半在扩展（`content/index.ts`）和 App（`app/read.ts`）的宿主里
-各登记一行，后台那一半在 `background/handle.ts` 登记一行。
-
-每个功能自己的代码都在它的目录里：`features/reading/` 放追踪本体（`track.ts`、`paragraphs.ts`、`session.ts`、
-读完与续读两个角标）、文章判别和文章回顾；`features/translation/` 放划词与浮层（`selection.ts`、`popover.ts`…）、
-截图、翻译与追问的后台调用、划词记录与生词卡（`vocab.ts`）、翻译轨迹。模型连接的配置与用量在 `core/background/llm.ts`，
-几个功能共用。
-
-设置也按功能分了类型：`features/reading/settings.ts`（`ReadingSettings`）和 `features/translation/settings.ts`
-（`TranslationSettings`），各带自己的默认值；`types.ts` 的 `Settings` 由这两份拼成。存储格式没变，还是 `settings`
-键下扁平的一份（同步时逐项成记录），所以不涉及迁移。功能插件只拿自己那一份，读不到对方的阈值。
-
-还没按功能拆开的：`background/store.ts`（存储、导出导入、设置读写）、`sync/`、`lib/` 里的纯逻辑、首页和设置页，
-仍是共用的一份；`store.ts` 眼下还直接引用两个功能的存储键。
-
-### 持续集成与发布
-
-`.github/workflows/ci.yml`：每次推到 main 或开 PR 都跑 `npm run check`（类型检查、全部测试、扩展与 App
-的网页构建），再在另一台 runner 上装 JDK 17 + Android SDK 打一个 debug APK。扩展的 `dist/` 和 APK
-都挂在那次运行的 Artifacts 里，随手能下。
-
-`.github/workflows/release.yml`：打一个 `v*` 标签就发版：
-
-```bash
-npm version patch      # 改 package.json 的版本号并打标签；App 的 versionName / versionCode 跟着它算
-git push --follow-tags
-```
-
-工作流先核对标签和 package.json 的版本号一致（不一致就停），跑完整检查，把扩展打成
-`lectern-extension-vX.Y.Z.zip`、把 APK 一起挂到 GitHub Release 上。
-
-Release 发出去之后，另一个 job 调 `.github/workflows/store.yml`，把同一个 zip 传到 Chrome 应用商店并提交审核
-（`scripts/store-upload.ts`，商店 API V2 + 服务账号）。仓库里没配 `CWS_SERVICE_ACCOUNT_JSON`、`CWS_PUBLISHER_ID`
-这两个 Secret 时这一步自己跳过；配法和「上一版还在审、传不上去」时怎么补传，见
-[docs/chrome-web-store.md](docs/chrome-web-store.md#自动发布)。
-
-APK 默认是 **debug 签名**的：runner 每次生成的 debug 密钥都不一样，手机上装第二个版本得先卸载
-第一个。想让它能直接覆盖升级，生成一个签名密钥放进仓库的 Secrets（Settings → Secrets and variables → Actions）：
-
-```bash
-keytool -genkeypair -v -keystore lectern.jks -alias lectern -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 lectern.jks     # 这一串填进 ANDROID_KEYSTORE_BASE64
-```
-
-四个 Secret：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。
-都在时 Release 工作流改出正式签名的 `lectern-vX.Y.Z.apk`。密钥文件本身别进仓库，丢了就没法再给老安装升级。
-
-`lectern-vX.Y.Z.apk` 这个名字是**接口**，不是随手起的：App 的自动更新（见
-[更新](#更新)）在 Release 的附件里只认它，认不出就当这次发布没有能装的包，
-用户那边看到的是「已经是最新的」。改附件名 = 断掉所有老版本的升级路。同理，
-一次发布里没有正式签名的包时（没配上面四个 Secret），装着的 App 不会去拿那个 `-debug.apk`。
-
-本地也能出正式签名的包：把 `FS_KEYSTORE_FILE`、`FS_KEYSTORE_PASSWORD`、`FS_KEY_ALIAS`、`FS_KEY_PASSWORD`
-四个环境变量指向同一把密钥，`cd android && ./gradlew assembleRelease`，产物在
-`android/app/build/outputs/apk/release/app-release.apk`。`*.jks` 已在 `.gitignore` 里。
-
-## 已验证 / 未验证
-
-**已验证（自动化测试）**：session 状态机的全部划分逻辑（idle / stall / 切走 / 失焦 /
-静默上限随视口文字量放宽、被 `maxQuiet` 封顶、关闭自适应后退回固定阈值、没什么字时固定阈值照旧 /
-两种走神各自的恢复条件 / 半小时晃鼠标只产生一个 session / 只在翻屏时才有信号时不丢失阅读时间 / 重启后的阈值重置 / 碎片丢弃 /
-阈值热更新）；混合语言字数统计；URL 归一化与域名排除；分位数计算；段落可见性公式；
-**在 jsdom 里对真实 HTML 跑通 Readability 抽取**——包括剔除导航/侧栏/评论/页脚、
-映射回活动 DOM 节点、清理标记属性、嵌套块不重复计数；段落停留追踪器（阈值判定、按段落长度缩放的
-已读阈值与最短停留兜底、快照只发增量、扫过未读的段落不带已读时刻、视口文字量按露出比例加权、
-后台标签页不累计、停表前的最后一次结算、长段落、节流钳制、跨刷新播种去重）；统计层（回合合并的
-边界与跨文章隔离、结束原因构成、概览的窗口过滤与切换频率、每条解读的触发条件）；存储层的段落归并、跨 session 字数去重、
-补记与真实结束消息的乱序合并去重、并发写入串行化、导出与清空。
-
-新增部分：MiniMax 请求的组装与响应解析（header、URL 拼接、markdown 围栏剥离、
-`base_resp` 业务错误、`max_tokens` 截断与 JSON 未闭合的截断识别、超时与网络错误分类、多 text block 拼接、
-坏 JSON 的修补（没转义的半角引号、裸着的音标、值丢了开头的引号——译文那一格和生词里的词性各一条真日志原文、
-`noun` 不被当成半个 `null`、收尾引号也没有或隔着换行时不修、已有的转义不动、修不动的照旧报错）、
-解析失败的补救（空译文自动重发一次且两次的 token 都算上、头一次的现场带着 `recovered` 留下、两次都坏而译文闭合过就从
-闭合字段里拼一份并丢掉坏掉的生词、两次都坏又没有译文照旧报错并带着两次的用量、被截断不重发、浮层关了不重发；
-文章回顾同样重发一次）、打字机（第一帧就露一个字、平时一帧一个、一波在 0.7 秒内打完而不是越打越慢、按 DOM 顺序先上后下、改口退回公共前缀且始终是同一个文本节点、生词的词和意思打而音标按钮不打、emoji 不劈半、没有动画帧或减少动画或命中缓存时直接显示、被整块盖掉的不再打、切后台回来一帧最多按 100ms 算、最终结果接着打完才摘尾灯并通知、诊断等打完才开始数画稳）、长译文边流边显示（头十几个字先出、只往后长、闭合时完整、不按 token 推、停在半个转义上不推、
-生词里的字段不算）、后台翻译整条路（回复不等记账、用量和耗时一笔写完、自动重发的那次不另占一格耗时、解析失败照实记 token、
-有状态库时记账不进 outbox 也不催同步、白名单之外的键不给直写）、
-529 过载退避重试一次而 400 这类不重试、内容审核拒答（HTTP 500 的 `new_sensitive`、`base_resp` 的 1026 / 1027、流里报的）认成 `refused` 且不重发、普通的 500 照旧是 http、耗时切片——首字与总时长在假时钟下钉死（首字记在流中途
-而不是收尾时补一个）、译文闭合的时刻单独一个、失败也带着耗时、缺配置那次没有、重试过的数得出来）；
-耗时摘要的文案（中位不用均值、最慢那次带上是谁怎么坏的、没有译文时刻/没重试就不提）；
-诊断日志（只留最近几条、超长原文截尾、取消与缺配置不记、落盘失败不外溢、导出不含密钥、随清空一起清掉）；
-名单对话（规则整理：域名小写去 `*.`、网址去末尾 `/`、带参数片段账号的和单段的不收；挡国家后缀、已在名单里、被更宽的规则盖住、
-删不存在的、不认识的名单和动作，各说原因；重复的只留一条；只回话不提改动也行；删的是名单里原样那一条；套改动不碰别的条目；
-设置页名单框没动过换成存储里的、动过在手改上套；给模型的说明带名单现状和当前页、没有当前页就让它问；只带最近 8 句。
-后台：出清单不写、带命中篇数；确认时在最新名单上重核——别处刚加过的不重复加、坏规则和不存在的名单照样挡、别的设置不碰；
-模型失败说原因并进诊断日志；最后一句不是人说的不去问。对话框：带当前页问、每条默认勾上、只写勾上的、写了什么补进下一轮的记录、
-不改了什么都不写、没理解成把字放回输入框且下一轮不带那句、写入失败按钮放开能再点）；
-阅读情况条（四档：这次停够了的、以前读过而这次没停够的、露过面没停够的、没看过的；以前读过的不会被降成扫过；
-扫过不影响已读字数；换档和进出视口才叫重画、停在同一档不叫；屏幕上那一截按字数折算到视口顶那段滚过的部分和视口底那段露出的部分、
-没有正文在屏上时为空；相邻同档并成一截、没字的段落不占宽度；拼成走 CSS 变量的硬边渐变；档位没变不重拼、只挪短线；
-收起时连宿主摘掉；本机设置不进同步、推出去的每条都过得了服务器的校验）；
-打开页面时的文章判别（审核拒答说人话、现场带网址和标题、同一网址一小时内不再问而过了一小时或换一页照常问、别的失败不记住、断网隔 5 秒和 20 秒重发两次、重发成了之前那几次标 `recovered` 而一直断就三次都是人撞上的、没有 `storage.session` 照常判别）；
-App 自动更新的判定（问到新版本在不计费的网络上悄悄下；计费网络、关了开关、老宿主、这个版本失败过都退回横幅；
-包已躺着就武装、静默不成则等人点；跳过的版本不提不装；躺着的不是最新的就去下新的、下不了也不装旧的）；
-换设备接着读（别人屏幕上量的偏移不越过本机的段尾、同设备不受影响、负偏移和量不到高度时不动；
-电脑上读过之后手机打开先问服务器再跳、刚同步过不再多跑一轮、断网时照样立刻打开、退避期间不试、
-服务器慢时只等有限的一会儿且那一轮不会跑两遍；
-反方向：手机上读完关屏、电脑上要列表——立刻用本机的答、同时催一轮同步、拉到之后广播、再要列表时手机那篇排第一且带着关屏时结算的那段专注，
-空转和自己上传的回声不广播、刚同步过不再问服务器；写入撞上正在跑的一轮时补一轮、队列空着就不补；页面看不见之后写入当场同步且不经定时器，
-连着几笔写入最多多跑一轮；宿主的可见性通知先到同步引擎、再到页面；首页开着时新文章自己冒到最上面、没变就一个节点都不换、
-回到前台再取一次、不在文章栏时不取）；
-诊断日志上传（第一次五份全传且带设备、平台、版本，没新东西不发请求，只传新增的与改写过的翻译轨迹，没传成原样留着十分钟后再试、服务器没有接口一天问一次、从不抛错，清空日志后指纹跟着清；服务端内容键与 id 键、重发与改写的覆盖、坏时钟与超大条目丢掉计数不拒收、30 天过期、随账号删除、报表默认只列出事的那几种；经真的同步引擎和 PostgreSQL 端到端走一遍）；
-界面埋点（按本地日期分桶、表外的名字不收、过期的桶滚掉、存下来的坏数据当没有、报表里零也列且同次数按表序、
-七天窗含今天、页面这头攒批与离开时交掉、并发两批不互相盖、废名字不写盘、落盘失败不外溢、进诊断导出、
-「清空日志」不清而「清空全部记录」清；哪天动过哪天等着上传、传的过程中又涨了的那天留到下一回、
-没有待传的和没到点的不发、没传成原样留着一小时后再试、服务器没有接口一天问一次、上传从不抛错；
-经真的同步引擎走一遍：计数不进 outbox、点击和上传的记账都不另排同步、搭成功的那一轮上传且带 Token、
-旧服务器 404 不算同步失败、失败的那一轮不上传、上传卡在网络上时不拖住同步周期——下一次同步是全新的一轮）；首页文章栏（搜索收成一个键、点开拿焦点、Esc 与再点一下都清词收起、
-空着走开自己收而有词时不收、焦点落到搜索键上不抢着收、框收着却有词时自动打开、三个筛选键与搜索叠用、
-开关类按钮只记打开那一下、中键开原文也算、安卓首页有同一套控件）；
-翻译链路轨迹（真实时间戳过得了校验、只认已知字段并截尾限量、同 id 覆盖、最多 100 条、坏数据与写失败不外溢、
-随诊断日志一起导出与清掉；记录器的打点相对手势起点、每次定位后只采一帧、译文露出的那一帧、位移阈值半个像素、
-连续两帧稳定算渲染完成、两秒不稳定算超时、稳定前关掉仍按结果记、没有动画帧记 unobserved、
-没有 randomUUID 也能生成 id、save 抛错不外溢、真记录器生成的轨迹能原样落盘）；
-选区判定（长度边界、纯中文拦截、词/短语/句子划分、硬上限）；FSRS 桥接
-（round-trip 保真、JSON 序列化后仍能正确调度、评分单调性、到期队列与预测分桶）；
-入队与合并规则（整句不排期、同词元跨文章合一张卡、删除最后一条出处时连带删卡）；
-读完判定的四种组合（够比例不触底 / 触底不够比例 / 都满足 / 跨 session 累积）与 sticky 语义；
-读完角标（判定边界、挂载与重复挂载、两个按钮的回调、`markFinished` 的幂等与 no-op、
-页内换文章时连同追踪一起收摊）；页内换文章后重来一轮（收摊之后活动信号与可见性都只喂给新那轮、
-目录锚点与跟踪参数不算换页、抽正文期间连换两页只认最后一次、被顶掉的轮就地作废、起不来时
-popup 说得出原因、还在等 LLM 时就被收掉的等完也不再起来）；从 bfcache 回来（地址一模一样也重起一轮、
-用户点过的「本页启用划词翻译」跟着回来、换一篇就不带）；页面宿主（各插件状态拼成一份、被顶掉的那轮
-说「状态变了」不转、插件经 `PageInfo` 共享标题）；划词翻译各判各的（白名单里自动挂不给入口、白名单外点了才挂、
-运行中进出白名单、总开关关着不给也不挂而开关回来选择还在、文章记录黑名单不影响翻译、App 阅读器不看白名单、
-设置没读回来就收摊的读回来也不挂）；翻译白名单的种法（读过文章的站点、不种旧翻译黑名单里的、清空后不重种）
-与「本站始终开启」（不重复加、不带点的主机名记整个源）；插件边界（`core` 不引用功能、功能之间不互相引用）；
-密钥隔离（不出现在 settings、不出现在导出文件、清空数据时保留）。
-
-生词讲解：三种粒度各要哪几个字段（整句不要 usage、单词不要 vocab、关掉开关后 prompt 里
-一个字不提）；条目校验（缺词或缺意思丢掉、可选字段补 null、最多 5 条、不是数组当没有）；
-**只讲选区里的词**（段落里的词丢掉、被丢掉的不占那 5 个名额、大小写与弯引号不影响匹配、
-流式逐条推送时就挡掉）；
-流式解析（半条不推、`meaning` 里的右花括号不算对象结束、数组收尾后不再往下扫、
-**短语选区里生词的词性不会盖掉整条选区的词性**）；浮层渲染（逐条追加不重画、
-最终结果补上没赶上的那几条、比流式见过的少时整块重来、没有讲解时不留空块、
-译文到了才点亮「还在写」的尾灯）；
-落盘与老记录的字段补齐。
-
-浮层追问：prompt 组装（带上已给出的译文与语境解释、空字段不占位、问题排在最后、
-只带最近三轮历史、长答案只留梗概）；流式（增量是累积值、首尾空白去掉、取消归为 abort）；
-浮层交互（译文没到就没有入口、点开之后 asking 为真、发送时去掉两头空白、
-空问题不发、上一问没答完不让发第二问、答完能接着问、**输入法选词时的回车不算发送**、
-两个图标按钮都带 `aria-label` 与 `title`、
-缺配置时给「去设置」、收起浮层与重新划词都让追问那块整块作废）。
-
-朗读：念的是词而不是音标、空词不发声、连点两个词时后一个顶掉前一个、
-**只打断自己发起的那条**（网页在念时不替它 `cancel`）、念完交还所有权、
-被打断那条迟到的回调不会误清掉新的一条；「音标 · 词性」一行的渲染
-（音标可点、只有词性时不出可点区、两者皆空时让调用方摘掉容器、流式重填先清空、
-超长截断、环境不支持时画成普通文字）；浮层里点顶部音标念整条选区、
-点生词音标念那一条自己的词、收起浮层停掉朗读且没念过时不动网页的朗读。
-
-自动翻译上限：停在旧默认值 40 词的存量被抬到 200、抬过一次落标记后手填 40 不再被抬走、
-从没动过设置的人也落标记、自己调过的值不受影响、旧字符阈值换算夹在设置页上限内；
-**迁移会主动落盘**（content script 读的是原始 storage，不落盘就等于没迁）且只落一次。
-
-输出额度：停在旧默认值上的 `max_tokens` 与超时被抬到 4096 / 60s、抬额度不碰密钥、
-抬过一次落标记后手填 1024 不再被抬走、自己调过的值不受影响；回顾材料那两个常量
-**是下限不是封顶**（配置低于它就抬上来，高于它就按配置来）。
-
-阅读位置：锚点采集（取视口里最靠上的段落、上一段滚过去后交给下一段、候选集为空时返回 null、
-零高度段落不当锚点、停表后仍采得到）；跳转判定的每一条否决（关掉 / 没记录 / URL 带锚点 /
-页面已不在顶部 / 用户已自己滚 / 指纹与序号都对不上 / 停在最后一段 / 落点就在开头）与
-段落顺序变化时以指纹为准；位置的读写、覆盖、按文章隔离、随清空与容量淘汰一并消失；
-心跳去重（抖动算没动过、`savedTs` 不参与比较）；位置提示（文案、重复挂载、「回到顶部」的回调、
-可见时才开始倒计时、后台标签页里切回前台才起表、收掉之后不再复活）。
-
-预计阅读时间：没有证据时等于一般速度的预计时长、先验随文种变化、个人证据充分时向个人速度收敛
-且证据越多先验越淡、证据量不过先验权重不称"按你的速度"、本篇的节奏压过整体速度、坏数据被夹在
-一般速度的 1/4–4 倍之间、零字数与空证据的边界；速度摘要只统计读到新内容的片段、近 30 天够用就
-不看更早的、不够时退回全部历史并注明；文章级估计按整篇文种比例折算剩余、老记录没有 `expectedMs`
-时按英文均速、没有 `readingMs` 时退回总时长；文案的取整规则；存储层的摘要随 session 结算重算、
-`readingMs` 只算读到新内容的片段、`expectedMs` 老调用方不带时保留旧值、存量用户启动时补摘要且
-补过不再写、清空数据一并清掉；位置提示带上剩余时间那一句。
-
-跨设备合并：幂等（同一份导两次报告全零、数据不变）、对称（互相导入后收敛）、生词卡按词元合成一张且
-对方的划词改挂本机的卡、FSRS 取最近复习过的那份、session 按 (articleId, startTs) 认身份且结束更晚的赢、
-段落停留取最大不相加、两边各读一半合起来置位读完并建卡、回合按本机间隔重算、读完标记 sticky、
-阅读位置取更晚的、本机独有的记录不动、3 / 4 版文件都认而别的拒收、老记录补齐 usage / vocab；
-存储层的导入（导出再导入两边一致、导两次无变化、不碰设置与密钥、坏文件不写任何东西）。
-
-App 的接线：chrome 垫片（sendMessage 直达后台并带 tab id、后台抛错折成 ok:false、storage 的读写与
-onChanged、port 两头收发与单侧断开、getURL 的别名、换页、flush 等在途写入包括消息引发的写入）；
-正文白名单（脚本 / 样式 / iframe / svg / 表单整块丢掉、事件属性去掉、不认识的标签只留内容、
-链接补全并去掉 javascript:、图片只留网络与内嵌地址）；阅读器容器抽取与整页抽取得出同一批段落指纹；
-自动更新的版本比较与附件挑选（`0.3.10` 大于 `0.3.9` 而不是按字典序、位数不同时短的补 0、
-认不出的版本号读成 0.0.0 因而不提示更新、只认 `lectern-vX.Y.Z.apk` 而不拿 `-debug.apk`
-或扩展的 zip 当升级包、已经是最新时不提示、GitHub 的响应缺字段或整个不是那么回事时不炸）。
-
-截图翻译：裁剪的横纵比例、越界与取整、放大上限、深底反色；清洗的低置信度过滤、英文筛选、
-断行连词与空行段界；覆盖层的反向拖选、误触取消、指针捕获、滚动隔离、F5 默认行为、
-取消返回值、重复框选与迟到裁剪的资源清理；`translateImage` 的识别状态、确认闸、错误、取消与迟到结果；
-offscreen 消息过滤与初始化失败、后台截图错误、垫片有无截图能力；
-App 原生桥的 id 匹配、成功与失败回调、同步抛错、老宿主缺方法、坏 JSON、置信度换算。
-这些是自动化验证；PixelCopy 的实际画面、ML Kit 在真机的结果、触摸框选及系统返回键仍需装机检查。
-
-**已用真实 API 验证过**（不在自动化测试里，需要 key）：`src/lib/llm.ts` 对
-`https://api.minimaxi.com/anthropic/v1/messages` 的实际调用——词条返回音标/词性/词元、
-整句正确剔除这些字段、`assist` 例句生成正常。非流式单次约 3 秒。
-
-**生词讲解也已用真实 API 验证过**（`scripts/live-check.ts`，见「开发」）：
-
-- **格式**：十余次调用全部返回合规 JSON，字段分工完全照办——单词只给 `usage`、
-  整句只给 `vocab`、关掉开关后两样都不出现。
-- **挑词**：`Regulators have come under intense scrutiny for their tacit endorsement of a
-  practice that, in hindsight, was plainly untenable.` 这句挑出的是
-  scrutiny / tacit / endorsement / untenable（或 come under intense scrutiny、
-  tacit endorsement、in hindsight 这样的固定搭配），`the`/`for`/`that` 一个没列。
-- **`max_tokens` 实测够用，但默认值还是抬了**：最担心的是长选区把 1024 撑爆，
-  实测自动翻译上限那一档（200 词）用 671 个输出 token、逼近硬上限（1955 字符）的选区
-  只用 462 个——1024 从没被撞破过。第一个数字也是把确认阈值从 40 词抬到 200 词的依据。
-  尽管如此，默认值仍从 **1024 抬到了 4096**：`max_tokens` 是**上限不是花销**，
-  只有真生成出来的 token 才计费，压低它换不来省钱，只换来"输出被截断"这一种失败。
-  1024 只剩三成余量，没有理由留着。超时一并从 30s 抬到 60s——流式下超时是**整条流的
-  总时限**，上限松了而超时没松，只是把"被截断"换成了"超时"。
-- 一处**已修的 prompt 缺陷**：多词条目的音标是错的——`tacit endorsement` 给了两个音标拼在
-  一起，`in hindsight` 干脆挂上 `hindsight` 一个词的（还漏了个 n）。加了「多词条目的
-  `phonetic` 一律给 null，音标只给单个词」之后重跑确认：多词条目不再挂音标，
-  `untenable /ʌnˈtenəbl/` 这类单词照常有。
-- 一处**模型侧的偶发**：同一条 1955 字符的选区有一次返回了位置 120 处就不合法的 JSON
-  （错在译文字段内，与讲解字段无关），重跑没能复现。为此给解析失败的报错补上了出错处的原文，
-  真再遇到时能看出模型吐了什么。后来发现这层保护落了空：浮层只显示 200 字，SyntaxError
-  一句就占掉小半，原文前缀常在出错处之前就被截掉，而 background 又一行日志都没记。
-  现在完整原文与 stop_reason 会打进 service worker 的控制台（`chrome://extensions` →
-  扩展卡片上的「Service Worker」）；顶层对象没闭合的一律按截断报、提示调大 `max_tokens`，
-  不再只认 `stop_reason === "max_tokens"`——MiniMax 兼容层在这个字段上回什么并无保证，
-  而 `lastIndexOf("}")` 抠出的半截 JSON 报出的 SyntaxError 也看不出是截断。
-  顺带一提，超长选区上模型有时只翻译其中一句——
-  这是「选中即翻译」本来就不该处理的长度，与讲解无关。
-- **诊断日志攒够一批之后**（0.3.2 上导出的记录里 5 次失败）死因很集中：4 次解析失败，
-  其中 3 次是同一个原因——模型写中文时拿半角引号引术语又不转义（`…做"细致"的半透明效果…`、
-  `引入"静态分析"概念`），一处就废掉整份输出；第 4 次是 `"phonetic":/frɔːt/`，音标连引号一起省了
-  （prompt 里"含首尾斜杠"那句多半是诱因）。剩下 1 次是 HTTP 529 过载。三件事一起做了：
-  - `repairJson`：严格解析失败**之后**才跑，只修这两类**合法 JSON 里根本不可能出现**的写法。
-    判定收尾引号的规矩是「后面跳过空白是 `,` `}` `]` `:` 之一，或者已经到头」——这在合法 JSON 上
-    永远成立，所以它改不坏对的输出。裸换行**不修**：那既可能是漏了 `\n`，也可能是模型压根没在
-    写 JSON，分不开就别猜。顺带修掉一个误报——引号是奇数个时扫描会停在字符串里、把收尾的 `}`
-    吞掉，以前一律报成"被截断，请调大 `max_tokens`"，现在先修一遍再判。
-  - **prompt 两处收紧**：翻译与文章回顾都加上「字符串值里不要出现半角双引号，要引用就用「」」，
-    音标那条改成写出带引号的样子。修补只是兜底，能不坏最好。
-  - **529 / 429 退避 1.2 秒重试一次**，整个重试发生在用户设的超时**之内**。只重试一次是因为
-    用户正盯着浮层等，第二次还过载就该老实报错，而不是替他把 timeout 熬完。
-  四条坏输出都进了单元测试（回顾那条只留了出事的几项）——这类夹具编不出来，只有真日志里有。
-- **接着发现这份日志只答得出一半问题**：它只在**失败**时落盘，慢但成功的调用一点痕迹都不留。
-  于是"有时候有点慢"这件事在日志里完全不可见——除非慢到撞上超时，才留下一条 timeout。
-  加了一圈耗时记录：每次调用（**成功的也算**）留一条，滚动 50 条，跟失败日志一起从设置页导出。
-  一条里几个数字，因为"慢"不止一种：
-  - `firstTextMs` 模型什么时候开口（排队 / 网络），`firstFieldMs` 浮层什么时候真显示出译文
-    （**用户感知的等待是这个**，不是整条流跑完），`totalMs` 总时长，`attempts` 发了几次请求。
-  - 最后那个是被上面那次 529 重试逼出来的：重试过的调用要白搭 1.2 秒退避加一个来回，
-    只记总时长的话，它在日志里和"模型今天慢"长得一模一样。
-  - 设置页那行摘要用**中位数不用均值**：九次 1 秒配一次 60 秒超时，均值 6.9 秒，看上去像常年很慢。
-  失败也占一格（耗时挂在 `LlmError` 上，和 `raw` 同一套），不然只记成功会把分布看成一片岁月静好；
-  主动取消与缺配置两样都不记，和失败日志同一条口径。导出格式因此 `schema` 升到 2。
-- **0.3.14 上又攒了一批**（三天、62 次跑完的翻译、50 条耗时、100 条链路轨迹），这回两种问题都看得见了：
-  - **5 次翻译坏在模型自己写的 JSON 上（8%）**，没有一次是上一轮修过的那两类：3 次 `"translation":""`——别的字段
-    都在，唯独译文给了个空串；2 次是值丢了**开头**的引号（`"translation":忠实地…",`、生词里的 `"pos":noun phrase",`）；
-    1 次生词对象里混进一个没有键的裸 `null`。每次都要人重新划一遍，而日志里重划的那几次**全都成了**——是随机的手滑，
-    不是这段话翻不了。三层兜底，按代价从小到大：`repairJson` 加第三条规则，补上丢掉的开头引号（认法：冒号后面不是任何
-    合法的开头，而往后第一个 `"` 恰好能收尾、中间没有换行；`noun` 不会被当成写了一半的 `null`）；还是解析不了、或者
-    译文是空的，**自动重发一次**，重发期间浮层上已有的字段原样留着、新一轮的字段到了再盖上去，人看到的只是多等两三秒；
-    两次都坏而译文闭合过，就拿流式那套只认闭合字段的扫描拼一份结果（`salvageTranslation`，坏掉的那条生词丢掉）。
-    被截断的不重发，浮层已经关了的也不重发。文章回顾那条路同样重发一次——日志里那次把 `outline` 写成了一串不带方括号的
-    字符串，修不了，重来的那次是好的。**救回来的也留痕**：头一次失败的现场照样进失败日志，多一个 `recovered`
-    （`retry` / `salvage`）；不记的话，模型写坏 JSON 的频率就从这份日志里消失了。顺带修了一处对不上的账：
-    解析失败的调用 token 照样烧了，早先一律记成 0。
-  - **模型答完之后还要等一秒**。链路轨迹里 `requestMs − modelMs` 的中位数是 1.05 秒、最长 4.1 秒：译文早就流完了，
-    后台还在串着写三笔——记用量、记耗时、存划词——写完才回话，浮层的收尾跟着迟到。每一笔都是整库读改写：状态库是
-    IndexedDB 里的**一整个值**，几千条记录读出来、克隆、逐条比出变更、重建全部投影、再整个写回去，外加排一轮同步；
-    前两笔改的却是从不进同步的键。现在挡在回复前面的只剩存划词（回复里要带它的 id），用量和耗时合成一笔、回复之后再记
-    （`later`），而且走本机专用的直写（`updateLocalOnly`：只认白名单里那几个不同步的键，不克隆、不比对、不投影、不催同步），
-    失败现场、翻译轨迹、按钮计数也改走这条路；存划词前后的四次整库读取并成两次。追问、复习助手、文章判别、文章回顾
-    同样先回话再记账——文章判别早先让页面白等半秒才开始计时。链路轨迹里的 `accountingMs` / `diagnosticWriteMs`
-    从此是空的：它们量的那两笔已经不在回复的路上了。
-  - **长选区的译文要等整个字段闭合才显示**。日志里五百到一千字的选区，模型 0.7–1 秒就开口了，译文却要再流 2–4 秒
-    （最长 4.4 秒）才闭合，这期间浮层是空的。「只认闭合的字段」对音标、词性是对的，对译文不是：它是纯文本、只会往后长，
-    半截照样读得通。现在译文还在流的时候每长出 16 个字推一次（`openTranslation`），浮层本来就只接新长出来的那截、
-    流式期间也不挪；停在半个转义上（`\`、没凑够四位的 `\u`）的那一批不推。单词和短语的译文几个字就闭合，回调次数不变。
-    `firstFieldMs` 的含义跟着变成「译文第一次推给浮层」。
-  - 量过：真实 Chromium 里加载两版构建，本机库预装 5160 条记录（和生产规模相当），假的流式模型接口（0.6 秒开口、
-    每秒约 140 字）。模型答完到浮层收尾，单词 1359 → 517 毫秒、整句 1265 → 473 毫秒；三百来字的选区，译文开始可见
-    从请求发出后 2265 毫秒提前到 950 毫秒。剩下那四五百毫秒全在存划词这一笔上——根子是「整库一个值」，
-    要动得把状态库拆开存，是另一件事。
-  - 日志里另有 3 次文章判别的 `Failed to fetch`，其中两次隔了 14 秒，像是同一次断网（电脑刚唤醒）。没有加重试：
-    判别失败页面上有提示、刷新即重来，而断网时一秒后重发多半还是断的；再攒一批看频率。
-- **0.3.15 的诊断日志传到服务器之后**，一天里看得见的新东西：
-  - **文章判别 35 次里 14 次（40%）被 MiniMax 的内容审核拒了**：HTTP 500，`input new_sensitive (1026)`，一个 token
-    都没算。之前它就是一条普通的 HTTP 500，当前页状态里显示一串 JSON，看着像服务端故障，人会去刷新——刷新也一样，
-    14 次里多数两两成对、相隔 9 到 48 秒，像是同一页又判了一遍——但说不准：现场里 `request` 是空的，看不出是哪个网站。
-    现在拒答单独是一类（`refused`，翻译、追问撞上也一样认），页面上说人话，同一网址一小时内不再去问；
-    文章判别、历史复查、黑名单建议的失败现场都带上网址和标题（建议那条只带条数）。
-  - 断网的那几次攒够了：30 天里 9 次，扎堆出现，一堆里前后跨 2 到 25 秒。一秒后重发确实没用，所以改成隔 5 秒、
-    再隔 20 秒各发一次；重发成了的那几次照样留在失败日志里，标 `recovered: "retry"`，`request.retry` 是第几次重发。
-
-书（EPUB）：zip 里的路径解析（相对 `../`、百分号编码、跳出根只退到根）；
-container → OPF → spine 的读取（同一份文件在 spine 里出现两次只读一次、EPUB 2 的包没有 nav
-时退回 NCX 与 `meta` 指定的封面）；目录标题（同一篇文件的小节不覆盖章本身那一条、
-目录坏掉不让整本书打不开、章内标题退回 `h1` 再退回 `<title>`）；导入一本书
-（脚本连内容一起去掉、图片换成 `fs-blob:` 且全书只存一份、`svg` 裹着的封面提成一张图、
-包里没有的图算一张没保存、指向别的章的相对链接落地时被白名单去掉、一章读不出来时只有这一章缺、
-书名缺失退回文件名、spine 空则整个文件打不开）；章的 id 过 `normalizeUrl` 不变形、
-不被文章记录黑名单误伤；**书的记录一条都不进同步**——文章、片段、段落、位置、正文、
-文章回顾卡与它的复习事件全拦在 outbox 之外，两边都遇到过的词那张卡照常同步但只报网页那个出处。
-
-同步队列里的坏记录：服务器一批里有一条过不了校验就整批 400，所以推送前先在本机用同一份
-`validateRecord` 过一遍——过不了的留在队列里不发、其余照常上传，挂在坏文章名下的记录跟着等；
-记录补全之后下一轮自己连同名下的一起上去；同一条坏记录反复改只留最后一条操作，不越积越多；
-本机没料到的拒绝，状态里带的是服务器说的具体原因，不只是 `INVALID_REQUEST` 这个大类。
-状态按阅读材料说：哪篇卡住了、卡在哪、名下连带了几个专注时段和段落；单篇的同步处境
-（已同步 / 等下一轮 / 上不去 / 只在本机）连同它的专注时段、划过的词，在首页文章卡片的「详情」里看。
-划词在协议里不挂在文章名下（删文章留词是有意的），但给人看的时候归到它被划的那一篇。
-老导出文件导进来的文章缺着后来才有的字段（导入只看 `id` 和 `lastSeenTs`）：入队前按「没读过」补齐；
-早先已经原样排进队列的，推送前就地补好、换一个操作 ID，连同名下的记录一起放行。
-
-**未验证**：没有在真实浏览器里加载运行过。以下依赖真实环境的部分只做了静态检查
-（构建产物是合法 IIFE、manifest 结构正确、权限与所用 API 匹配）：
-service worker 的生命周期与休眠恢复、`chrome.storage.session` 的实际行为、
-popup 的实时刷新、在真实网站上的抽取成功率。
-
-**跳回上次位置也没在真实浏览器里跑过**，而它恰好最依赖真实环境：Chrome 自己的滚动恢复
-和这一跳谁先谁后、`scrollIntoView` 在把正文放进内部滚动容器的站点上的表现（那里的偏移修正
-用的是 `window.scrollBy`，修不动）、以及三次复查够不够抵消懒加载的位移。
-
-**朗读也没在真实浏览器里出过声**：单元测试打的是桩，真实环境里要看的是另外几件事——
-系统里有没有英语语音（`getVoices()` 冷启动时可能是空的，这里靠只设 `lang` 让浏览器自己挑，
-不去等 `voiceschanged`）、以及 Chrome 上 `cancel()` 之后紧接着 `speak()` 偶尔会被吞掉的老毛病
-（真出现的话把 `speak` 推迟一拍即可，没有预先写进去）。
-
-划词部分同样未在真实浏览器验证：浮层在各类网站上的定位与样式隔离（流式期间不挪这件事，只在无头 Chrome 里
-用真实的 Popover 按流式节奏量过桌面、手机尺寸各 15 个场景；追问生成期间不挪，量过桌面三种视口 36 个场景）、
-追问那一块（输入框真能不能拿到焦点、输入法选词时的回车、长选区上答案会不会掉出折线、
-手机上打字期间浮层稳不稳）、
-浮层里拖选文字（真用鼠标拖、拖出浮层的边再松手、在截断的原文上拖选；无头 Chrome 里只用
-`setBaseAndExtent` 摆过选区，确认过 `getComposedRanges` 认得出浮层里的范围）、
-`sidePanel.open()` 的用户手势要求（已按同步调用栈的约束写，但没实跑）、
-以及 background 的 fetch 是否真能靠 host permission 绕过该端点缺失的 CORS 头——
-这一条是**最需要先试的**，如果被 CORS 拦住，浮层会显示网络错误。
-建议先在几篇常读的文章上跑一天再看数据。
-
-**手机到电脑这条路在真实环境里量过两头，没量过整条**（见[换一台设备接着读](#换一台设备接着读)）：扩展那头在真实 Chromium
-（无头、加载 `dist/`、本机假同步服务器、另一个 Node 进程用同一份引擎扮手机）里跑过——一直开着、没刷新过的首页，
-在另一个首页标签打开的那一下就冒出了手机上那篇（服务器在开页后 8 毫秒收到拉取，不是等每分钟那一轮），
-弹窗的历史在后台定时那一轮之后自己补上；手机那头在 Android 15 模拟器上真按电源键量过，新旧两个包各两遍。
-没量过的：真机（各家系统的省电策略比模拟器凶，关屏之后进程和网络被掐得更早是可能的；系统从按键到 `onPause`
-自己还要 0.7 秒上下，这一段不归我们管）、真实网络（生产上一个请求 250 毫秒上下，到最后一段专注落库要三个来回）、
-从最近任务里划掉 App（进程直接被杀，网页没有机会跑，最后一段要等下次打开 App 才上传——位置不受影响，它读着的时候就在传）。
-
-**安卓 App 没有在真机上跑过**，只做到 `gradlew assembleDebug` 通过（含 ML Kit）、网页部分的单元测试通过。
-
-**EPUB 那条路同样没在真机上试过**：宿主的解压与分块回传、系统文件选择器与「打开方式」这两个入口、
-几百节的书导入要多久、正文与图片进了 IndexedDB 之后占多少空间。认结构、洗正文、存图的逻辑
-在 node 里用 jsdom 测过（见上），没测的是它们与 WebView、`java.util.zip` 之间那一段。
-截图翻译在真机上的 PixelCopy 画面、ML Kit 的识别结果、手指框选与系统返回键都还没验证。
-WebView 里的每一件事都还是纸上的：长按选区能不能按预期触发浮层、`ReaderWebView` 清空菜单之后
-系统工具条是不是真的不画了、HttpURLConnection 分块经 `evaluateJavascript` 推回页面的吞吐够不够
-流式翻译用、换页前 `flush()` 等到的 IndexedDB 事务是否真的提交了、`onPause` 时 session 有没有结上、
-从浏览器分享进来、设置页的文件选择器、TTS、深色模式（Android 13 之前靠 `FORCE_DARK_AUTO`）。
-全屏阅读也一样只在 Chromium 里按手机尺寸看过：真机上要看的是收起系统栏之后 insets 是不是真的
-归零、边缘划出来的临时状态栏压不压得住顶栏、以及 Android 15 以前（DecorView 还给 WebView 让位的
-那些版本）收起系统栏时正文会不会跳一下。
-装到手机上先读一篇、划几个词、导出到电脑导入一次——这一圈跑通了再看别的。
-
-**多家模型服务这部分的验证程度**：两种协议的请求和响应解析都有测试（`test/llmWire.test.ts`，对面是假的）；
-在真实 Chromium 里加载扩展，对着本机起的假服务把两种协议的连接测试和流式翻译各走通了一遍；
-用假密钥探过 OpenAI、Anthropic、MiniMax 三个域名、DeepSeek、智谱的真实地址，都回 401（地址和鉴权头的格式对方认得），
-Google 的兼容端点回 400「请提供有效的 API Key」。**没有哪一家用真密钥跑通过成功的请求**——
-MiniMax 之外的服务实际回什么、输出格式稳不稳，要等有人用真 Key 试。
-
-**传 Chrome 应用商店那一步对真的商店跑通过一次**（2026-10-10，手动触发 `store.yml` 传 v0.3.18）：
-上传回 `uploadState: SUCCEEDED`，提交回 `state: PENDING_REVIEW`。没遇到过、只对着假的商店测过的是另外几条路：
-商店先回「处理中」再去追问、拒收时的报错（`test/storeUpload.test.ts`），以及由打标签自动触发（那次是手动触发的，走的是同一个工作流）。
-
-## 当前不做的事
-
-- 不用 LLM 做图片识别：MiniMax 收图但实测 4–8 秒、一次流式 22 秒，框选查字等不起。
-- 不做「右键图片直接识别整张图」，先看框选够不够用。
-- 不做网站拦截或限时——这是记录工具，不是管束工具。
-- 不提供托管账号或公共同步服务。设备同步连接用户自己的后端，账号与设备 Token 由部署者管理。
-- 复习不做批量预生成题目——翻卡零成本是刻意的设计，要 LLM 时按按钮。
-- 讲解里的生词不自动进复习队列，也不给「加入复习」按钮。队列的语义是「你主动划下的东西」，
-  一句话带出 5 个词、一天读十篇，队列几天就废了。
-- 不做跨应用统计，先留 JSON 导出接口。
-- 移动端只做安卓 App，不做移动浏览器扩展：移动端 Chrome 从不支持扩展。App 里也不做"直接打开网页"
-  的浏览模式，只做阅读器——手机上的网页各有各的排版和弹窗，浮层压不住。
-- App 里不抓需要登录才能看的页面，也不抓靠 JavaScript 渲染出正文的页面（宿主只拿原始 HTML）。
-  遇到这类站点阅读器会说"没能认出正文"。
-- SPA 内部换文章会重新抽一次正文（见上面的 `page:url-changed`），代价是那几秒里不计时——
-  新那一轮和刚打开一个页面时一样，要等 Readability 认出正文。站点若在加载之后用
-  `replaceState` 把地址规范化一遍（补上 slug 之类），归一化之后不相等就会被当成换了一篇，
-  白重来一轮；`normalizeUrl` 只去掉 hash 和已知的跟踪参数，管不住这类改写。
-  好在重来那一轮认的就是规范化之后的地址，记的账仍是对的。
-- 懒加载后才插入的段落不纳入观察，只统计首次抽取时存在的正文。
-- 第二阶段：段落级跳读检测（`dwellMs` 换算速度远高于正常阅读速度时标记 skimmed）、统计图。
+Model compatibility, site extraction, OCR accuracy and system speech voices vary. Focus/progress metrics estimate activity rather than understanding. Storybook verifies web interfaces with simulated services; native installation, real credentials and production sync require separate environment checks. Lectern does not currently add OAuth sign-in, cloud-hosted model keys, or synchronization of local EPUB content.

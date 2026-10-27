@@ -19,7 +19,7 @@ test("几张表没有重复登记", () => {
 
 test("同一种消息两家都认：当场报错，说清是谁和谁", () => {
   const dup: HandlerMap = { "sw:ping": () => ({ ok: "dup" }) };
-  assert.throws(() => createRouter({ ...all, extra: dup }), /sw:ping 被 core 和 extra 重复登记/);
+  assert.throws(() => createRouter({ ...all, extra: dup }), /Message sw:ping is registered by core and extra more than once/);
 });
 
 test("按类型转给认领的那一家，发消息的一方原样带过去", async () => {

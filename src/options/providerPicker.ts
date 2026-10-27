@@ -42,7 +42,7 @@ function group(label: string, presets: readonly ProviderPreset[]): HTMLOptGroupE
 
 export function setupProviderPicker(els: PickerElements): ProviderPicker {
   let current = "";
-  els.search.placeholder = `搜索 ${PROVIDERS.length} 家，例如 openai、deepseek、智谱`;
+  els.search.placeholder = `Search ${PROVIDERS.length} providers, such as OpenAI or DeepSeek`;
 
   /** 按搜索框里的字重画列表。当前选中的那家要是被筛掉了，列表里就没有高亮——选择本身不变。 */
   const render = (): void => {
@@ -51,12 +51,12 @@ export function setupProviderPicker(els: PickerElements): ProviderPicker {
     els.list.replaceChildren();
     if (query) {
       const hits = [...pinned, ...others];
-      if (hits.length) els.list.append(group(`匹配的 ${hits.length} 家`, hits));
+      if (hits.length) els.list.append(group(`Matches: ${hits.length} providers`, hits));
     } else {
-      els.list.append(group("常用", pinned), group("全部（按名称）", others));
+      els.list.append(group("Popular", pinned), group("All providers (by name)", others));
     }
     // 搜不到的时候正是要用它的时候，所以不管筛成什么样它都在
-    els.list.append(option(CUSTOM_PROVIDER, "自定义地址…"));
+    els.list.append(option(CUSTOM_PROVIDER, "Custom endpoint…"));
     els.list.value = current;
     if (els.list.value !== current) els.list.selectedIndex = -1;
   };
@@ -66,7 +66,7 @@ export function setupProviderPicker(els: PickerElements): ProviderPicker {
     const preset = findProvider(id);
     els.protocol.disabled = preset !== undefined;
     els.models.replaceChildren(...(preset?.models ?? []).map((m) => option(m, "")));
-    els.model.placeholder = preset?.models[0] ? `例如 ${preset.models[0]}` : "模型名";
+    els.model.placeholder = preset?.models[0] ? `For example, ${preset.models[0]}` : "Model name";
     els.doc.hidden = !preset?.doc;
     if (preset?.doc) els.doc.href = preset.doc;
     return preset;

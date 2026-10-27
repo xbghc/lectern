@@ -71,6 +71,6 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
 /** 这个功能的网址名单，交给名单对话（core/background/ruleChat.ts）。meaning 是写给模型看的。 */
 export const READING_URL_LISTS: readonly UrlRuleList[] = [{
   key: "articleExcludedUrls" satisfies keyof ReadingSettings,
-  label: "文章记录黑名单",
-  meaning: "命中的页面不做文章判别、不记录专注时间。只管以后，已有的阅读记录不会删；不影响划词翻译。",
+  label: "Reading blocklist",
+  meaning: "Skip article classification and focus tracking on matching pages. Existing records are kept and translation remains available.",
 }];

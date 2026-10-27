@@ -153,7 +153,7 @@ if (watch) {
     if (!file) return;
     if (!/\.(html|css|json)$/.test(file)) return;
     copyStatic();
-    console.log(`[lectern] 已同步静态资源（${file}）`);
+    console.log(`[lectern] Static assets updated (${file})`);
   });
   console.log("[lectern] watching…");
 } else {

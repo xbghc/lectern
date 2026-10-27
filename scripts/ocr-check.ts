@@ -23,8 +23,8 @@ try {
     paragraph.lines.map((line) => ({ text: line.text, confidence: line.confidence })))));
   const recognized = performance.now();
   console.log(text);
-  console.log(`初始化耗时：${(initialized - start).toFixed(0)} ms`);
-  console.log(`识别耗时：${(recognized - initialized).toFixed(0)} ms`);
+  console.log(`Initialization time: ${(initialized - start).toFixed(0)} ms`);
+  console.log(`Recognition time: ${(recognized - initialized).toFixed(0)} ms`);
   if (!text.includes("tacit endorsement")) process.exitCode = 1;
 } finally {
   await worker.terminate();

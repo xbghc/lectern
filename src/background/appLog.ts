@@ -39,7 +39,7 @@ const local = (): chrome.storage.StorageArea => localStorage();
 
 /** 超长的截掉尾部并留个标记。同 llmLog.ts 的 clip，那边限的是模型输出。 */
 export function clip(s: string, max: number): string {
-  return s.length > max ? `${s.slice(0, max)}…[已截断，原长 ${s.length}]` : s;
+  return s.length > max ? `${s.slice(0, max)}…[truncated; original length: ${s.length}]` : s;
 }
 
 async function read<T>(key: string): Promise<T[]> {

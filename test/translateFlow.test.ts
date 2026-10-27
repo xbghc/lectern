@@ -96,7 +96,7 @@ test("空译文自动重发成了：人看到的是成功，日志里留一条�
   const log = await getLlmLog();
   assert.equal(log.length, 1);
   assert.deepEqual([log[0]!.recovered, log[0]!.kind, log[0]!.raw], ["retry", "parse", EMPTY]);
-  assert.match(log[0]!.message, /没有返回 translation/);
+  assert.match(log[0]!.message, /did not return a translation/);
   const timings = await getLlmTimings();
   assert.equal(timings.length, 1, "重发的那次不另占一格");
   assert.deepEqual([timings[0]!.failedKind, timings[0]!.attempts, timings[0]!.inputTokens, timings[0]!.outputTokens], [null, 2, 600, 160]);
@@ -107,7 +107,7 @@ test("空译文自动重发成了：人看到的是成功，日志里留一条�
 test("两次都坏：照旧报错，但烧掉的 token 照实记——早先解析失败一律记成 0", async () => {
   serve(EMPTY);
   const reply = await streamTranslate(req(), () => {}).done;
-  assert.ok(!reply.ok && /没有返回 translation/.test(reply.error));
+  assert.ok(!reply.ok && /did not return a translation/.test(reply.error));
   await bookkeepingSettled();
   const usage = await getUsage();
   assert.deepEqual([usage.requests, usage.errors, usage.inputTokens, usage.outputTokens], [1, 1, 600, 160]);
@@ -138,7 +138,7 @@ test("有状态库时：记账走本机专用的直写，不进 outbox、不催�
     assert.equal((state.data["llmTiming"] as unknown[]).length, 1);
     assert.ok(state.outbox.length >= 1 && state.outbox.every((op) => op.record.type === "snippet" || op.record.type === "card"), JSON.stringify(state.outbox.map((op) => op.record.type)));
     // 白名单之外的键不给直写：那样改出来的东西进不了 outbox，别的设备永远看不到
-    await assert.rejects(updateLocalOnly(["snippets"], () => ({ snippets: [] })), /不是本机专用/);
+    await assert.rejects(updateLocalOnly(["snippets"], () => ({ snippets: [] })), /not a device-local storage key/);
   } finally {
     onLocalMutation(() => {});
     installStorage(undefined as never);

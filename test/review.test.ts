@@ -41,7 +41,7 @@ test("wordCountOf 空串为 0", () => {
 test("太短的选区不翻译", () => {
   const v = judgeSelection("a", LIMITS);
   assert.equal(v.ok, false);
-  assert.equal(v.reason, "选区太短");
+  assert.equal(v.reason, "The selection is too short");
 });
 
 test("纯中文选区不翻译", () => {
@@ -79,7 +79,7 @@ test("超过硬上限直接拒绝，与设置无关", () => {
   const huge = "x".repeat(HARD_MAX_CHARS + 1);
   const v = judgeSelection(huge, { minSelectionChars: 2, maxAutoSelectionWords: 999_999 });
   assert.equal(v.ok, false);
-  assert.equal(v.reason, "选区过长");
+  assert.equal(v.reason, "The selection is too long");
 });
 
 test("cardKey 用词元合并同一个词的不同形态", () => {

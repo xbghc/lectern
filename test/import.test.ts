@@ -106,8 +106,8 @@ test("空的电脑导入手机的导出：再导出时两边一致", async () =>
   const res = await store.importBundle(bundle);
   assert.equal(res.ok, true);
   if (!res.ok) return;
-  assert.match(res.message, /文章新增 1/);
-  assert.match(res.message, /划词新增 1/);
+  assert.match(res.message, /Articles added: 1/);
+  assert.match(res.message, /Translations added: 1/);
 
   const again = await store.exportAll();
   const strip = (b: ExportBundle) => {
@@ -128,7 +128,7 @@ test("同一份文件导两次，第二次什么都没变", async () => {
   const res = await store.importBundle(bundle);
   assert.equal(res.ok, true);
   if (!res.ok) return;
-  assert.equal(res.message, "没有新内容，本机已经有这些记录了");
+  assert.equal(res.message, "No new data. These records are already on your device.");
   const after = await area.get(null);
   delete before["speed"];
   delete after["speed"]; // updatedTs 是当下时刻

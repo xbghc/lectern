@@ -14,7 +14,7 @@ let backend: OcrBackend | null = null;
 export function setOcrBackend(b: OcrBackend | null): void { backend = b; }
 
 export async function recognize(png: string): Promise<OcrReply> {
-  return backend ? await backend.recognize(png) : { ok: false, error: "这个宿主不支持截图翻译" };
+  return backend ? await backend.recognize(png) : { ok: false, error: "Screenshot translation is unavailable in this app version" };
 }
 
 export async function warm(): Promise<void> { await backend?.warm(); }

@@ -15,14 +15,14 @@ permissions:
 
 jobs:
   release:
-    name: 打包并发布
+    name: Package and release
     runs-on: ubuntu-latest
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: 标签要和 package.json 的版本号一致
+      - name: Verify tag matches package.json version
         run: |
           WANT="v$(node -p "require('./package.json').version")"
           if [ "$GITHUB_REF_NAME" != "$WANT" ]; then
@@ -37,7 +37,7 @@ jobs:
       - run: npm ci
       - run: npm run check
 
-      - name: 打包扩展
+      - name: Package extension
         run: (cd dist && zip -qr "../lectern-extension-${GITHUB_REF_NAME}.zip" .)
 
       - uses: actions/setup-java@v6
@@ -51,7 +51,7 @@ jobs:
       # Gradle 的商业使用条款——那是另一个性质的决定，不该顺手做掉。
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: 正式签名的 APK
+      - name: Release-signed APK
         if: env.HAS_KEYSTORE == 'true'
         working-directory: android
         env:
@@ -65,14 +65,14 @@ jobs:
           ./gradlew assembleRelease --console=plain
           cp app/build/outputs/apk/release/app-release.apk "../lectern-${GITHUB_REF_NAME}.apk"
 
-      - name: debug 签名的 APK
+      - name: Debug-signed APK
         if: env.HAS_KEYSTORE != 'true'
         working-directory: android
         run: |
           ./gradlew assembleDebug --console=plain
           cp app/build/outputs/apk/debug/app-debug.apk "../lectern-${GITHUB_REF_NAME}-debug.apk"
 
-      - name: 创建 Release
+      - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -83,7 +83,7 @@ jobs:
   # 单独一个 job：商店那头失败（多半是上一版还在审）不影响上面已经发出去的 Release 和 APK，
   # 之后在 Actions 页面对这个标签手动重跑 Chrome Web Store 工作流即可。
   store:
-    name: Chrome 应用商店
+    name: Chrome Web Store
     needs: release
     permissions:
       contents: read

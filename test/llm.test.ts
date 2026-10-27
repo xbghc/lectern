@@ -180,7 +180,7 @@ test("修不动的照旧报错，不把坏输出硬解释成对的", () => {
   // 字符串里的裸换行：可能是模型忘了写 \n，也可能它压根没在写 JSON，分不开就别猜
   assert.throws(
     () => extractJson('{"translation": "第一行\n第二行"}'),
-    (e: unknown) => e instanceof LlmError && e.kind === "parse" && /JSON 解析失败/.test(e.message),
+    (e: unknown) => e instanceof LlmError && e.kind === "parse" && /Could not parse JSON/.test(e.message),
   );
 });
 
@@ -288,20 +288,20 @@ test("追问 prompt 带上已给出的译文和语境解释——模型不该把
 test("空的语境解释 / 段落不占位", () => {
   const p = buildAskPrompt({ ...ASK, contextNote: "", context: "", articleTitle: "" });
   assert.equal(p.includes("语境解释"), false);
-  assert.equal(p.includes("段落"), false);
+  assert.equal(p.includes("Paragraphs"), false);
   assert.equal(p.includes("出处"), false);
 });
 
 test("历史只带最近几轮，超出的丢掉", () => {
   const history = Array.from({ length: ASK_HISTORY_TURNS + 2 }, (_, i) => ({
-    question: `第${i}问`,
+    question: `第${i}Ask`,
     answer: `第${i}答`,
   }));
   const p = buildAskPrompt({ ...ASK, history });
   // 前两轮被挤掉，最后三轮留着
   assert.equal(p.includes("第0问"), false);
   assert.equal(p.includes("第1问"), false);
-  for (let i = 2; i < history.length; i++) assert.ok(p.includes(`第${i}问`), `第${i}问 应当带上`);
+  for (let i = 2; i < history.length; i++) assert.ok(p.includes(`第${i}Ask`), `第${i}问 应当带上`);
 });
 
 test("历史里的长答案只留梗概，不整段抄回去", () => {
@@ -366,7 +366,7 @@ test("填了 key 但还没同意把内容发给模型服务：不发请求，报
         return okResponse("x");
       }) as unknown as typeof fetch,
     }),
-    (e: unknown) => e instanceof LlmError && e.kind === "config" && e.message.includes("设置页"),
+    (e: unknown) => e instanceof LlmError && e.kind === "config" && e.message.includes("Settings"),
   );
   assert.equal(called, false);
 });
@@ -506,7 +506,7 @@ test("内容审核拒答认成 refused，不是一条看着像服务端故障的
     }),
     (e: unknown) =>
       e instanceof LlmError && e.kind === "refused" && e.status === 500
-      && e.message === "模型服务商的内容审核拒绝了这段内容（input new_sensitive (1026)）",
+      && e.message === "The model provider's content filter rejected this text (input new_sensitive (1026))",
   );
   assert.equal(calls, 1);
 });
@@ -533,7 +533,7 @@ test("普通的 HTTP 500 还是 http，错误体原样带出", async () => {
     callMessages(CFG, "s", "u", {
       fetch: (async () => new Response('{"error":{"message":"internal error"}}', { status: 500 })) as unknown as typeof fetch,
     }),
-    (e: unknown) => e instanceof LlmError && e.kind === "http" && e.message === 'HTTP 500：{"error":{"message":"internal error"}}',
+    (e: unknown) => e instanceof LlmError && e.kind === "http" && e.message === 'HTTP 500: {"error":{"message":"internal error"}}',
   );
 });
 
@@ -754,6 +754,6 @@ test("JSON 解析失败时把出错的原文带出来", () => {
   // 闭合了但内容不合法（字符串里的裸换行）：走的是 SyntaxError 那条分支，原文同样要带上
   assert.throws(
     () => extractJson('{"translation": "第一行\n第二行"}'),
-    (e: unknown) => e instanceof LlmError && e.kind === "parse" && /JSON 解析失败/.test(e.message) && e.message.includes("第一行"),
+    (e: unknown) => e instanceof LlmError && e.kind === "parse" && /Could not parse JSON/.test(e.message) && e.message.includes("第一行"),
   );
 });

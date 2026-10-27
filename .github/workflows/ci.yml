@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   web:
-    name: 类型检查 · 测试 · 构建
+    name: Typecheck · Test · Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -31,7 +31,7 @@ jobs:
       - run: npm ci
       - run: npm run check
 
-      - name: 保存扩展产物
+      - name: Upload extension artifacts
         uses: actions/upload-artifact@v7
         with:
           name: extension-dist
@@ -39,7 +39,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    name: 安卓 APK
+    name: Android APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -69,7 +69,7 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --console=plain
 
-      - name: 保存 APK
+      - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
           name: app-debug-apk

@@ -18,14 +18,14 @@ export function samplePage(text: string): string {
 export function parseDecision(raw: unknown): ArticleDecision {
   const value = raw as Partial<ArticleDecision> | null;
   if (!value || typeof value.isArticle !== "boolean" || typeof value.reason !== "string") {
-    throw new Error("模型没有返回有效的文章判断");
+    throw new Error("The model returned an invalid article classification");
   }
   return { isArticle: value.isArticle, reason: value.reason.slice(0, 300) };
 }
 
 export function parseSuggestions(raw: unknown, urls: string[]): BlacklistSuggestion[] {
   const list = (raw as { suggestions?: unknown } | null)?.suggestions;
-  if (!Array.isArray(list)) throw new Error("模型没有返回有效的网址建议");
+  if (!Array.isArray(list)) throw new Error("The model returned invalid URL suggestions");
   const seen = new Set<string>();
   return list.flatMap((item: unknown) => {
     const s = item as Partial<BlacklistSuggestion> | null;

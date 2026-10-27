@@ -98,7 +98,7 @@ async function fetchAndExtract(url: string): Promise<CachedArticle> {
     const res = await fetch(url, { headers: { Accept: ACCEPT } });
     log.status = res.status;
     log.contentType = res.headers.get("content-type");
-    if (!res.ok) throw new Error(`网页返回了 HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`The page returned HTTP ${res.status}`);
     const bytes = new Uint8Array(await res.arrayBuffer());
     log.bytes = bytes.length;
     log.bom = hasBom(bytes);
@@ -143,7 +143,7 @@ function showStatus(text: string, retry?: () => void): void {
   const p = el("p", "status", text);
   box.append(p);
   if (retry) {
-    const btn = el("button", "mini", "重试");
+    const btn = el("button", "mini", "Retry");
     btn.addEventListener("click", retry);
     p.append(el("br"), btn);
   }
@@ -207,13 +207,13 @@ function renderMeta(url: string): void {
   // 截和词要等追踪器起来才有东西可做；在那之前点了没反应，和坏了分不出来
   $<HTMLButtonElement>("shot").disabled = !page || st?.screenshot !== "available";
   $<HTMLButtonElement>("words").disabled = !page;
-  here.title = st?.translateHere === "on" ? "本页划词翻译已开启" : "启用本页划词翻译";
+  here.title = st?.translateHere === "on" ? "Text translation is enabled on this page" : "Enable text translation on this page";
   const parts = [sourceLabel || hostnameOf(url)];
   if (st?.tracked) {
     const tracked = st.trackedWords ?? 0;
     const read = st.wordsRead ?? 0;
     const pct = tracked > 0 ? Math.min(100, Math.round((read / tracked) * 100)) : 0;
-    parts.push(`已读 ${pct}%`);
+    parts.push(`Read ${pct}%`);
     const progress = bookContext ? bookProgress(bookContext.book, [...bookContext.records.filter(a => a.id !== bookContext!.articleId), {
       id: bookContext.articleId, trackedWords: tracked, wordsRead: read,
       finished: bookContext.records.find(a => a.id === bookContext!.articleId)?.finished ?? false,
@@ -221,9 +221,9 @@ function renderMeta(url: string): void {
     $("rprogress").textContent = `${progress}%`;
     $("rprogress-fill").style.width = `${progress}%`;
     const est = st.estimate;
-    if (est && est.words > 0) parts.push("还需" + formatEstimate(est.ms));
-    else if (tracked > 0 && read >= tracked) parts.push("已读完");
-    if (st.activeSince) parts.push("计时中");
+    if (est && est.words > 0) parts.push("Remaining: " + formatEstimate(est.ms));
+    else if (tracked > 0 && read >= tracked) parts.push("Finished");
+    if (st.activeSince) parts.push("Tracking");
   } else if (st?.reason) {
     parts.push(st.reason);
   }
@@ -242,7 +242,7 @@ function renderWords(list: Snippet[]): void {
   const box = $("sheet-list");
   box.textContent = "";
   if (list.length === 0) {
-    box.append(el("div", "empty", "这篇还没有翻译记录。单击英文单词翻译该词，双击翻译当前句子。"));
+    box.append(el("div", "empty", "No translations for this article yet. Tap a word to explain it, or double-tap to explain the sentence."));
     return;
   }
   for (const s of list) {
@@ -321,8 +321,8 @@ async function main(): Promise<void> {
   /** 这一页是书里的一章还是一个网址。 */
   const chapter = parseChapterId(url);
   if (!/^https?:\/\//i.test(url) && !chapter) {
-    $("rtitle").textContent = "没有文章";
-    showStatus("地址不对。从首页粘贴一个网页地址，或者从浏览器把网页分享到这个 App。");
+    $("rtitle").textContent = "No article";
+    showStatus("Invalid URL. Paste a page URL on the home screen, or share a page from your browser to Lectern.");
     return;
   }
   $("rmeta").textContent = hostnameOf(url);
@@ -336,11 +336,11 @@ async function main(): Promise<void> {
     // 书的正文导入时就存好了，这儿不联网也不重抓：找不到只能是这本书被删了或没导完
     book = await getBook(chapter.bookId);
     if (!cached?.book || !book) {
-      $("rtitle").textContent = "这一章不在本机";
-      showStatus("这本书没有导入完整，或者已经被删掉了。回首页重新导入这个 EPUB 就能接着读。");
+      $("rtitle").textContent = "This chapter is not on your device";
+      showStatus("The book was not fully imported or has been deleted. Import the EPUB again from your bookshelf to continue.");
       return;
     }
-    sourceLabel = `${book.title} · 第 ${chapter.index + 1}/${book.chapters.length} 节`;
+    sourceLabel = `${book.title} · Chapter ${chapter.index + 1}/${book.chapters.length}`;
     $("rmeta").textContent = sourceLabel;
   }
   let archiveError: unknown;
@@ -360,12 +360,12 @@ async function main(): Promise<void> {
   }
   if (archiveError && !cached) {
     $("rtitle").textContent = hostnameOf(url);
-    showStatus(`文章已存档，但尚未下载到此设备：${archiveError instanceof Error ? archiveError.message : String(archiveError)}`, () => location.reload());
+    showStatus(`This article is archived but has not been downloaded to this device: ${archiveError instanceof Error ? archiveError.message : String(archiveError)}`, () => location.reload());
     return;
   }
   if (!chapter && !archived && !archiveError && (!cached || refresh)) {
     $("rtitle").textContent = hostnameOf(url);
-    showStatus(refresh ? "正在重新抓取正文…" : "正在抓取正文…");
+    showStatus(refresh ? "Fetching the article again…" : "Fetching article…");
     try {
       cached = await fetchAndExtract(url);
       await localStorage().set({ [key]: cached });
@@ -377,7 +377,7 @@ async function main(): Promise<void> {
       } else {
         $("rtitle").textContent = hostnameOf(url);
         showStatus(
-          inApp() ? `抓不到这一页：${msg}` : `抓不到这一页：${msg}（在普通浏览器里调试时跨域请求会被拦，得装进 App 里试）`,
+          inApp() ? `Could not fetch this page: ${msg}` : `Could not fetch this page: ${msg} (Cross-origin requests may be blocked in a browser preview. Try the installed app.)`,
           // 不带 refresh=1 重来：带着它的话，有缓存也不会用
           () => location.replace(readerUrl(url)),
         );
@@ -403,14 +403,14 @@ async function main(): Promise<void> {
     link.href = pageUrl;
     byline.append(link);
   }
-  byline.append(el("span", undefined, new Date(cached.savedTs).toLocaleDateString("zh-CN")));
+  byline.append(el("span", undefined, new Date(cached.savedTs).toLocaleDateString("en-US")));
   // 洗过的 HTML，见 sanitize.ts；正文来自任意网站，这一步不能省
   box.innerHTML = "";
   if (refetchFailure) {
-    const note = el("p", "notice", `重新抓取失败：${refetchFailure}。下面是上次下载的版本。`);
-    const again = el("button", "mini", "再试一次");
+    const note = el("p", "notice", `Could not refresh the article: ${refetchFailure}. Showing the last downloaded version below.`);
+    const again = el("button", "mini", "Try again");
     again.addEventListener("click", () => location.replace(readerUrl(url) + "&refresh=1"));
-    const dismiss = el("button", "mini", "知道了");
+    const dismiss = el("button", "mini", "Dismiss");
     dismiss.addEventListener("click", () => note.remove());
     note.append(el("br"), again, dismiss);
     box.append(note);
@@ -423,16 +423,16 @@ async function main(): Promise<void> {
     window.addEventListener("pagehide", resources.release, { once: true });
   }
   if (cached.archiveManifest) {
-    const status = el("span", undefined, "插件存档 · 正在准备图片…");
+    const status = el("span", undefined, "Saved article · Preparing images…");
     byline.append(status);
     const hydration = hydrateArchiveImages(body, cached.archiveManifest);
     box.append(body);
     const resources = await hydration;
     window.addEventListener("pagehide", resources.release, { once: true });
     status.textContent = resources.missing > 0
-      ? `插件存档 · ${resources.missing} 项资源未保存或未下载`
-      : "插件存档 · 可离线阅读";
-    if (archiveError) status.textContent += " · 当前显示此前下载的版本";
+      ? `Saved article · ${resources.missing} resources have not been saved or downloaded`
+      : "Saved article · Available offline";
+    if (archiveError) status.textContent += " · Showing the previously downloaded version";
   }
   box.append(body);
 
@@ -447,11 +447,11 @@ async function main(): Promise<void> {
       btn.addEventListener("click", () => void go(readerUrl(chapterId(current.id, to)) + (returnPane ? `&from=${returnPane}` : "")));
       nav.append(btn);
     };
-    if (chapter.index > 0) jump(chapter.index - 1, "‹ 上一节");
-    const toc = el("button", "mini", "目录");
+    if (chapter.index > 0) jump(chapter.index - 1, "‹ Previous chapter");
+    const toc = el("button", "mini", "Contents");
     toc.addEventListener("click", () => contents.showModal());
     nav.append(toc);
-    if (chapter.index + 1 < current.chapters.length) jump(chapter.index + 1, "下一节 ›");
+    if (chapter.index + 1 < current.chapters.length) jump(chapter.index + 1, "Next chapter ›");
     box.append(nav);
   }
 
@@ -481,7 +481,7 @@ async function main(): Promise<void> {
     catch (err) {
       const box = $("sheet-list");
       box.textContent = "";
-      box.append(el("div", "empty", `读不出本文生词：${reasonOf(err)}。收起再点一次「词」重试。`));
+      box.append(el("div", "empty", `Could not load words for this article: ${reasonOf(err)}. Close this panel and open Article vocabulary to retry.`));
     }
     setSheet(true);
   });
@@ -498,5 +498,5 @@ async function main(): Promise<void> {
 }
 
 void main().catch((err: unknown) => {
-  showStatus(`阅读器出错了：${err instanceof Error ? err.message : String(err)}`);
+  showStatus(`Reader error: ${err instanceof Error ? err.message : String(err)}`);
 });

@@ -119,7 +119,7 @@ async function overview(): Promise<Overview> {
 
 export const readingHandlers = {
   "archive:save": (msg, sender) => {
-    if (sender.url && new URL(sender.url).protocol !== "chrome-extension:" && normalizeUrl(sender.url) !== msg.payload.articleId) throw new Error("只能保存当前页面的文章");
+    if (sender.url && new URL(sender.url).protocol !== "chrome-extension:" && normalizeUrl(sender.url) !== msg.payload.articleId) throw new Error("Only the current page's article can be saved");
     return saveArchive(msg.payload);
   },
   "article:local-state": async (msg) => {

@@ -1,27 +1,27 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <title>阅读</title>
+    <title>Reading</title>
     <link rel="stylesheet" href="popup.css" />
     <link rel="stylesheet" href="app.css" />
   </head>
   <body class="reader">
     <header class="rbar">
-      <button id="back" class="iconbtn" aria-label="返回"><span data-icon="back"></span></button>
-      <div class="rinfo"><div id="rtitle" class="rtitle">正在打开…</div><div id="rmeta" class="rmeta"></div></div>
-      <button id="reader-font" class="iconbtn" aria-label="调整阅读字号" disabled><span data-icon="type"></span></button>
-      <button id="reader-bookmark" class="iconbtn" aria-label="添加阅读书签" aria-pressed="false" disabled><span data-icon="bookmark"></span></button>
+      <button id="back" class="iconbtn" aria-label="Back"><span data-icon="back"></span></button>
+      <div class="rinfo"><div id="rtitle" class="rtitle">Opening…</div><div id="rmeta" class="rmeta"></div></div>
+      <button id="reader-font" class="iconbtn" aria-label="Adjust text size" disabled><span data-icon="type"></span></button>
+      <button id="reader-bookmark" class="iconbtn" aria-label="Add reading bookmark" aria-pressed="false" disabled><span data-icon="bookmark"></span></button>
     </header>
     <div id="reader-feedback" class="reader-feedback" role="status" aria-live="polite"></div>
-    <main id="article" class="article"><p class="status">正在抓取正文…</p></main>
+    <main id="article" class="article"><p class="status">Fetching article…</p></main>
 
-    <footer class="reader-progress"><div><button id="reader-toc" type="button"><span data-icon="list"></span>阅读工具</button><span id="rprogress">0%</span></div><div class="progress"><span id="rprogress-fill"></span></div></footer>
-    <dialog id="reader-contents" class="reader-contents" aria-labelledby="contents-title"><div class="reader-dialog-heading"><h2 id="contents-title">阅读工具</h2><button id="contents-close" class="iconbtn" aria-label="关闭目录">×</button></div>
+    <footer class="reader-progress"><div><button id="reader-toc" type="button"><span data-icon="list"></span>Reading tools</button><span id="rprogress">0%</span></div><div class="progress"><span id="rprogress-fill"></span></div></footer>
+    <dialog id="reader-contents" class="reader-contents" aria-labelledby="contents-title"><div class="reader-dialog-heading"><h2 id="contents-title">Reading tools</h2><button id="contents-close" class="iconbtn" aria-label="Close table of contents">×</button></div>
       <button id="bookmark-jump" class="mini" hidden></button><div id="chapter-list"></div>
-      <div class="reader-tool-actions"><button id="words" class="mini words" disabled>本文生词 <span id="words-n" class="n"></span></button><button id="shot" class="mini" disabled>截图翻译</button><button id="translate-here" class="mini">启用本页翻译</button></div>
+      <div class="reader-tool-actions"><button id="words" class="mini words" disabled>Words from this article <span id="words-n" class="n"></span></button><button id="shot" class="mini" disabled>Screenshot translation</button><button id="translate-here" class="mini">Enable translation on this page</button></div>
     </dialog>
     <!-- 单子背后的一层：点它就收起来 -->
     <div id="sheet-backdrop" class="sheet-backdrop" hidden></div>
@@ -29,10 +29,10 @@
     <!-- 本文生词：从底部拉起的一张单子，和扩展的侧边栏是同一份内容 -->
     <section id="sheet" class="sheet" hidden>
       <div class="sheet-head">
-        <span>本文生词</span>
+        <span>Words from this article</span>
         <span class="grow"></span>
-        <button id="refetch" class="mini">重新抓取正文</button>
-        <button id="sheet-close" class="mini">收起</button>
+        <button id="refetch" class="mini">Fetch article again</button>
+        <button id="sheet-close" class="mini">Collapse</button>
       </div>
       <div id="sheet-list"></div>
     </section>

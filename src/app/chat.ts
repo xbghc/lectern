@@ -28,7 +28,7 @@ const say = (message: string): void => { status.textContent = message; };
 const save = (): Promise<void> => {
   if (!ready) return writes;
   const snapshot = readChatThreads(threads.filter(t => t.messages.length || t.draft));
-  writes = writes.then(() => chrome.storage.local.set({ [CHAT_STORAGE_KEY]: snapshot })).catch(() => { say("对话暂时无法保存到本机，请稍后重试。"); });
+  writes = writes.then(() => chrome.storage.local.set({ [CHAT_STORAGE_KEY]: snapshot })).catch(() => { say("Could not save this conversation on your device. Try again later."); });
   return writes;
 };
 function controls(): void {
@@ -40,9 +40,9 @@ function controls(): void {
 }
 function scrollEnd(): void { main.scrollTop = main.scrollHeight; }
 function appendMessage(message: ChatMessage): HTMLElement {
-  const text = el("div", { class: "chat-message-body" }, [message.text || (message.incomplete ? "正在思考…" : "")]);
+  const text = el("div", { class: "chat-message-body" }, [message.text || (message.incomplete ? "Thinking…" : "")]);
   const content = el("div", {}, [...(message.role === "assistant" ? [el("span", { class: "chat-author" }, ["Lectern"])] : []), text]);
-  if (message.incomplete && message.text) content.append(el("small", { class: "chat-incomplete" }, ["未完成"]));
+  if (message.incomplete && message.text) content.append(el("small", { class: "chat-incomplete" }, ["Incomplete"]));
   $("chat-messages").append(el("div", { class: `chat-message is-${message.role}` }, [
     ...(message.role === "assistant" ? [el("span", { class: "chat-avatar" }, [icon("spark")])] : []), content,
   ]));
@@ -50,25 +50,25 @@ function appendMessage(message: ChatMessage): HTMLElement {
 }
 function paint(): void {
   $("chat-words").replaceChildren(...current.words.map(word => el("span", {}, [word])));
-  if (!current.words.length) $("chat-words").append(el("span", {}, ["先选择练习的词"]));
+  if (!current.words.length) $("chat-words").append(el("span", {}, ["Choose words to practice"]));
   const messages = $("chat-messages"); messages.replaceChildren();
   if (current.messages.length) current.messages.forEach(appendMessage);
-  else messages.append(el("div", { class: "phone-chat-welcome" }, [el("span", {}, [icon("chat")]), el("h2", {}, ["把读过的词，用起来。"]),
-    el("p", {}, [snippets.length ? "从生词本带上语境，练一句表达，或展开一段对话。" : "还没有可练习的生词。先在阅读时翻译并收藏一个词。"])]));
+  else messages.append(el("div", { class: "phone-chat-welcome" }, [el("span", {}, [icon("chat")]), el("h2", {}, ["Put your reading into words."]),
+    el("p", {}, [snippets.length ? "Bring context from your vocabulary. Practice a sentence or start a conversation." : "No words to practice yet. Translate and save a word while reading first."])]));
   const starters = current.messages.length
-    ? [["讲解这个词", "请结合原文语境，讲解这些词的用法。"], ["换个词练习", "请从选中的词中换一个来练习，给我一道造句题，先不要给答案。"]]
-    : [["情景对话", "用这些生词，和我进行一段情景对话。先问我一个问题。"], ["造句练习", "请用选中的生词出一道造句练习，等我回答后再反馈。"], ["语境讲解", "请结合我读过的原文语境，讲解这些生词。"]];
+    ? [["Explain this word", "Explain how these words are used in their original context."], ["Practice another word", "Choose another selected word and ask me to write a sentence. Wait before giving the answer."]]
+    : [["Role-play", "Start a role-play using these words. Ask me one question first."], ["Sentence practice", "Give me a sentence exercise using the selected words. Wait for my answer before giving feedback."], ["Explain in context", "Explain these words using the original passages I read."]];
   $("chat-starters").replaceChildren(...starters.map(([label, question]) => {
     const button = el("button", { type: "button" }, [label!, icon("arrow")]);
     button.onclick = () => start(question!); return button;
   }));
   input.value = current.draft;
-  if (current.snippetIds.some(id => !snippets.some(s => s.id === id))) say("本次练习中的词已从生词本删除，请更换后继续。");
+  if (current.snippetIds.some(id => !snippets.some(s => s.id === id))) say("A word in this conversation was deleted. Choose another word to continue.");
   controls();
 }
 function newThread(ids = snippets.slice(0, 3).map(s => s.id)): void {
   cancel?.();
-  current = { id: crypto.randomUUID(), title: "生词对话", snippetIds: ids,
+  current = { id: crypto.randomUUID(), title: "Vocabulary chat", snippetIds: ids,
     words: ids.map(id => snippets.find(s => s.id === id)!.text), messages: [], draft: "", updatedTs: Date.now() };
   // Empty "new conversation" taps must not evict actual history.
   threads = [current, ...threads.filter(t => t.messages.length || t.draft)].slice(0, 21);
@@ -85,7 +85,7 @@ function turns(): AskTurn[] {
 function start(question: string): void {
   question = question.trim();
   if (!ready || cancel || !question || question.length > 1000 || !current.snippetIds.length) return;
-  if (current.snippetIds.some(id => !snippets.some(s => s.id === id))) { say("请重新选择练习的词。"); return; }
+  if (current.snippetIds.some(id => !snippets.some(s => s.id === id))) { say("Choose your practice words again."); return; }
   tracker.track("chat.send");
   const thread = current;
   const request = { snippetIds: [...thread.snippetIds], question, history: turns() };
@@ -105,13 +105,13 @@ function start(question: string): void {
     else {
       if (!thread.draft) thread.draft = question;
       input.value = thread.draft;
-      if (!reply.text) reply.text = "本次未生成回复。";
+      if (!reply.text) reply.text = "No reply was generated.";
     }
     const pinned = main.scrollHeight - main.scrollTop - main.clientHeight < 80;
     paint(); say(error); $("chat-config").hidden = !needsConfig;
     if (pinned) scrollEnd(); void save();
   };
-  cancel = () => finish("已停止生成，可以修改消息后重新发送。"); controls();
+  cancel = () => finish("Generation stopped. Edit your message and send it again."); controls();
   try {
     port = chrome.runtime.connect({ name: PORT_TRANSLATE });
     port.onMessage.addListener((message: TranslatePortOut) => {
@@ -125,9 +125,9 @@ function start(question: string): void {
         else finish(message.res.error, message.res.needsConfig);
       }
     });
-    port.onDisconnect.addListener(() => { if (!settled) finish("连接中断，请检查模型连接后重试。"); });
+    port.onDisconnect.addListener(() => { if (!settled) finish("Connection interrupted. Check your model connection and try again."); });
     port.postMessage({ type: "vocab-chat", req: request });
-  } catch (error) { finish(`无法发送：${reasonOf(error)}`); }
+  } catch (error) { finish(`Could not send: ${reasonOf(error)}`); }
 }
 function paintPicker(): void {
   const query = $<HTMLInputElement>("picker-search").value.trim().toLocaleLowerCase();
@@ -138,25 +138,25 @@ function paintPicker(): void {
       el("span", {}, [el("strong", {}, [s.text]), el("small", {}, [s.translation])]), el("i", {}, checked ? [icon("check")] : []),
     ]);
     button.onclick = () => {
-      if (checked && selected.length === 1) { $("picker-count").textContent = "至少保留 1 个词。"; return; }
-      if (!checked && selected.length >= 3) { $("picker-count").textContent = "一次最多选择 3 个词。"; return; }
+      if (checked && selected.length === 1) { $("picker-count").textContent = "Keep at least one word selected."; return; }
+      if (!checked && selected.length >= 3) { $("picker-count").textContent = "Select up to three words at a time."; return; }
       selected = checked ? selected.filter(id => id !== s.id) : [...selected, s.id];
       paintPicker();
       [...$("picker-list").querySelectorAll("button")][list.findIndex(w => w.id === s.id)]?.focus({ preventScroll: true });
     };
     return button;
   }));
-  if (!list.length) $("picker-list").textContent = snippets.length ? "没有匹配的生词。" : "生词本还没有词条。";
-  $("picker-count").textContent = `已选 ${selected.length} / 3`;
+  if (!list.length) $("picker-list").textContent = snippets.length ? "No matching words." : "Your vocabulary is empty.";
+  $("picker-count").textContent = `Selected: ${selected.length} / 3`;
 }
 function showHistory(): void {
   $("chat-history-list").replaceChildren(...threads.filter(t => t.messages.length || t.draft).map(t => {
     const row = el("div", { class: "chat-history-row" });
-    const open = el("button", { type: "button", class: "phone-chat-history-item" }, [icon("chat"), el("div", {}, [el("h2", {}, [t.title]), el("p", {}, [t.words.join(" · ")]), el("small", {}, [new Date(t.updatedTs).toLocaleDateString("zh-CN")])]), icon("chevron")]);
+    const open = el("button", { type: "button", class: "phone-chat-history-item" }, [icon("chat"), el("div", {}, [el("h2", {}, [t.title]), el("p", {}, [t.words.join(" · ")]), el("small", {}, [new Date(t.updatedTs).toLocaleDateString("en-US")])]), icon("chevron")]);
     open.onclick = () => { cancel?.(); current = t; say(""); history.close(); paint(); scrollEnd(); };
-    const remove = el("button", { type: "button", class: "mini danger", "aria-label": `删除对话：${t.title}` }, ["删除"]);
+    const remove = el("button", { type: "button", class: "mini danger", "aria-label": `Delete conversation: ${t.title}` }, ["Delete"]);
     remove.onclick = () => {
-      if (!confirm(`删除「${t.title}」及其中的消息？`)) return;
+      if (!confirm(`Delete “${t.title}” and all its messages?`)) return;
       tracker.track("chat.delete");
       if (current === t) cancel?.();
       threads = threads.filter(item => item !== t);
@@ -165,7 +165,7 @@ function showHistory(): void {
     };
     row.append(open, remove); return row;
   }));
-  if (!$("chat-history-list").hasChildNodes()) $("chat-history-list").append(el("p", { class: "empty" }, ["还没有对话记录，从一个生词开始练习。"]));
+  if (!$("chat-history-list").hasChildNodes()) $("chat-history-list").append(el("p", { class: "empty" }, ["No conversations yet. Start practicing with a word."]));
   if (!history.open) history.showModal();
 }
 
@@ -184,11 +184,11 @@ $("chat-select").onclick = async () => {
     snippets = fresh.snippets.filter(s => s.kind !== "sentence");
     selected = current.snippetIds.filter(id => snippets.some(s => s.id === id));
     $<HTMLInputElement>("picker-search").value = ""; paintPicker(); picker.showModal();
-  } catch (error) { say(`无法读取生词：${reasonOf(error)}`); }
+  } catch (error) { say(`Could not load vocabulary: ${reasonOf(error)}`); }
 };
 $("picker-search").addEventListener("input", paintPicker);
 $("picker-close").onclick = () => {
-  if (!selected.length && snippets.length) { $("picker-count").textContent = "请选择至少 1 个词。"; return; }
+  if (!selected.length && snippets.length) { $("picker-count").textContent = "Select at least one word."; return; }
   current.snippetIds = [...selected]; current.words = selected.map(id => snippets.find(s => s.id === id)!.text);
   picker.close(); say(""); paint(); void save();
 };
@@ -220,7 +220,7 @@ async function init(): Promise<void> {
   snippets = words.snippets.filter(s => s.kind !== "sentence");
   threads = readChatThreads(saved[CHAT_STORAGE_KEY]); ready = true; input.disabled = false;
   for (const thread of threads) for (const message of thread.messages) {
-    if (message.incomplete && !message.text) message.text = "上次回复未完成，可重新发送消息。";
+    if (message.incomplete && !message.text) message.text = "The previous reply was interrupted. You can send your message again.";
   }
   const id = new URLSearchParams(location.search).get("word");
   if (id && snippets.some(s => s.id === id)) newThread([id]);
@@ -228,7 +228,7 @@ async function init(): Promise<void> {
   else newThread();
 }
 void init().catch(error => {
-  say(`无法读取生词或对话：${reasonOf(error)}`);
-  const retry = el("button", { type: "button", class: "mini" }, ["重试"]);
+  say(`Could not load vocabulary or conversations: ${reasonOf(error)}`);
+  const retry = el("button", { type: "button", class: "mini" }, ["Retry"]);
   retry.onclick = () => location.reload(); status.append(retry);
 });

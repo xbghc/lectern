@@ -39,7 +39,7 @@ export function createRouter<M extends Record<string, HandlerMap>>(
   for (const [feature, map] of Object.entries(maps as Record<string, HandlerMap>)) {
     for (const [type, fn] of Object.entries(map)) {
       const taken = owner.get(type);
-      if (taken !== undefined) throw new Error(`消息 ${type} 被 ${taken} 和 ${feature} 重复登记`);
+      if (taken !== undefined) throw new Error(`Message ${type} is registered by ${taken} and ${feature} more than once`);
       owner.set(type, feature);
       table.set(type, fn as (msg: unknown, sender: Sender) => unknown);
     }

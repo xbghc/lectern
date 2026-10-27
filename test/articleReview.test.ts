@@ -60,7 +60,7 @@ test("默认上限是 30K 字符", () => {
 /* ---------- prompt ---------- */
 
 test("完整正文的 prompt 不提截断", () => {
-  const p = buildReviewPrompt({ title: "T", url: "https://a.com/x", text: "正文", fullChars: 2 });
+  const p = buildReviewPrompt({ title: "T", url: "https://a.com/x", text: "Article text", fullChars: 2 });
   assert.match(p, /标题：T/);
   assert.match(p, /https:\/\/a\.com\/x/);
   assert.ok(!p.includes("截掉"), "没截断就不该提截断，凭空的免责声明会干扰输出");
@@ -112,7 +112,7 @@ test("只有 outline 没有 questions 仍然可用", () => {
 
 test("生成成功时带回材料和用量", async () => {
   const { review, usage } = await generateArticleReview(
-    { title: "T", url: "u", text: "正文", fullChars: 2 },
+    { title: "T", url: "u", text: "Article text", fullChars: 2 },
     CFG,
     1_700_000_000_000,
     { fetch: (async () => okResponse(GOOD)) as unknown as typeof fetch },

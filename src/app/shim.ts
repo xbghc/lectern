@@ -78,7 +78,7 @@ export function idbBackend(dbName = "lectern", storeName = "kv"): KvBackend {
         if (!req.result.objectStoreNames.contains(storeName)) req.result.createObjectStore(storeName);
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error ?? new Error("indexedDB.open 失败"));
+      req.onerror = () => reject(req.error ?? new Error("Could not open IndexedDB"));
     });
     return opening;
   };
@@ -88,8 +88,8 @@ export function idbBackend(dbName = "lectern", storeName = "kv"): KvBackend {
       const tx = db.transaction(storeName, mode);
       const out = body(tx.objectStore(storeName));
       tx.oncomplete = () => resolve(out);
-      tx.onerror = () => reject(tx.error ?? new Error("IndexedDB 事务失败"));
-      tx.onabort = () => reject(tx.error ?? new Error("IndexedDB 事务被中止"));
+      tx.onerror = () => reject(tx.error ?? new Error("IndexedDB transaction failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
     });
   };
   const one = (keys: string | string[]): string[] => (Array.isArray(keys) ? keys : [keys]);
@@ -146,7 +146,7 @@ function pipe<T>(): { post: (m: T) => void; listeners: Set<(m: T) => void> } {
           try {
             fn(m);
           } catch (err) {
-            console.warn("[lectern] port listener 抛错", err);
+            console.warn("[lectern] Port listener failed", err);
           }
         }
       });
@@ -234,7 +234,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
       try {
         fn(changes, areaName);
       } catch (err) {
-        console.warn("[lectern] storage.onChanged listener 抛错", err);
+        console.warn("[lectern] Storage change listener failed", err);
       }
     }
   };
@@ -288,7 +288,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
             .then(() => opts.handle(msg, SENDER))
             .catch((err: unknown) => {
               // 和 background/index.ts 一样：写入失败（多半是配额）不能无声无息
-              console.warn("[lectern] 消息处理失败", msg, err);
+              console.warn("[lectern] Message handler failed", msg, err);
               return { ok: false, error: String(err) };
             }),
         ),
@@ -307,7 +307,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
     },
     tabs: {
       captureVisibleTab: async (): Promise<string> => {
-        if (!opts.capture) throw new Error("宿主不支持截图");
+        if (!opts.capture) throw new Error("Screen capture is unavailable in this app version");
         return await opts.capture();
       },
       create: async (info: { url?: string }): Promise<{ id: number }> => {
@@ -316,7 +316,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
       },
       query: async () => [],
       sendMessage: async () => {
-        throw new Error("App 里没有标签页");
+        throw new Error("Browser tabs are unavailable in the app");
       },
       onUpdated: noop(),
       onRemoved: noop(),
@@ -325,7 +325,7 @@ export function installChromeShim(opts: ShimOptions): ChromeShim {
     windows: { getCurrent: async () => ({ id: 1 }) },
     sidePanel: {
       open: async () => {
-        throw new Error("App 里没有侧边栏");
+        throw new Error("The browser side panel is unavailable in the app");
       },
     },
   };

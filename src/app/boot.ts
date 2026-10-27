@@ -47,7 +47,7 @@ export async function go(url: string): Promise<void> {
     await navigation.beforeLeave();
     await shim.flush();
   } catch (err) {
-    console.warn("[lectern] 换页前的收尾出错，照常换页", err);
+    console.warn("[lectern] Cleanup before navigation failed; continuing navigation", err);
   }
   location.href = url;
   // 真换了页这条定时器跟着旧页一起没；没换成（同一个地址、只差一个锚点）就得把锁放开，
@@ -79,7 +79,7 @@ if (bridge?.ocrStart) setOcrBackend({
   async recognize(png) {
     try {
       const text = cleanOcrLines(await recognizeNative(png));
-      return text ? { ok: true, text } : { ok: false, error: "图里没认出英文" };
+      return text ? { ok: true, text } : { ok: false, error: "No English text was detected in the image" };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -98,7 +98,7 @@ window.addEventListener("error", (e) => {
   void recordAppError({
     ts: Date.now(),
     kind: "error",
-    message: e.message || String(e.error ?? "未知错误"),
+    message: e.message || String(e.error ?? "Unknown error"),
     at: e.filename ? `${e.filename}:${e.lineno}:${e.colno}` : null,
     stack: e.error instanceof Error ? (e.error.stack ?? null) : null,
   });

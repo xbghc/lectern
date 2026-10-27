@@ -90,7 +90,7 @@ export function ensureArticleReview(articleId: string, regenerate = false): Prom
       }
 
       const text = await getArticleText(articleId);
-      if (!text) return { ok: false, noText: true, error: "这篇文章的正文没有存下来" };
+      if (!text) return { ok: false, noText: true, error: "The text of this article was not saved" };
 
       const article = (await getArticles())[articleId];
       const config = await getLlmConfig();

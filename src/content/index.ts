@@ -17,7 +17,7 @@ import { captureCurrentArticle } from "../archive/capture.ts";
  * popup 每次询问都现算，而不是回放一份缓存快照——
  * 否则读进度只在 session 开始/结束时更新，读到一半打开 popup 会看到旧数字。
  */
-let provideState: () => PageState = () => ({ tracked: false, reason: "初始化中" });
+let provideState: () => PageState = () => ({ tracked: false, reason: "Initializing" });
 /** 三个截图入口共用这条接线；只让顶层 HTML 文档响应。 */
 let screenshot: () => void = () => undefined;
 /** popup 的「本页启用划词翻译」。插件还没挂上时点到就是空操作——那时 popup 也拿不到按钮。 */
@@ -56,7 +56,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 function main(): void {
   if (window.top !== window) return; // 只跟踪顶层文档
   if (document.contentType && document.contentType !== "text/html") {
-    provideState = () => ({ tracked: false, reason: "非 HTML 文档" });
+    provideState = () => ({ tracked: false, reason: "Not an HTML document" });
     return;
   }
   const host = createPageHost({

@@ -33,17 +33,17 @@ export async function setupReaderControls(options: {
   window.addEventListener('pagehide', () => clearTimeout(feedbackTimer), { once: true });
   const paint = (): void => {
     doc.documentElement.style.setProperty('--reader-font-size', `${size}px`);
-    sizeButton.setAttribute('aria-label', `调整阅读字号，当前 ${size}px`);
-    sizeButton.title = `字号 ${size}px`;
+    sizeButton.setAttribute('aria-label', `Change reading font size; currently ${size}px`);
+    sizeButton.title = `Font size: ${size}px`;
     markButton.setAttribute('aria-pressed', String(!!mark));
-    markButton.setAttribute('aria-label', mark ? '移除阅读书签' : '添加阅读书签');
+    markButton.setAttribute('aria-label', mark ? "Remove reading bookmark" : "Add reading bookmark");
     markButton.classList.toggle('bookmarked', !!mark);
     jump.hidden = !mark;
-    if (mark) jump.textContent = `回到书签位置 · ${Math.round(mark.ratio * 100)}%`;
+    if (mark) jump.textContent = `Go to bookmark · ${Math.round(mark.ratio * 100)}%`;
   };
   // Optional preferences must not prevent the article and its tracker from opening.
   const saved = await chrome.storage.local.get([FONT_KEY, key]).catch(() => {
-    say('暂时无法读取阅读偏好，使用默认字号。');
+    say("Could not load reading preferences. Using the default font size.");
     return {} as Record<string, unknown>;
   });
   size = fontSize(saved[FONT_KEY]);
@@ -57,8 +57,8 @@ export async function setupReaderControls(options: {
     const before = anchor?.getBoundingClientRect().top;
     size = SIZES[(SIZES.indexOf(size) + 1) % SIZES.length]!; paint();
     if (anchor && before !== undefined) requestAnimationFrame(() => window.scrollBy({ top: anchor.getBoundingClientRect().top - before, behavior: 'instant' }));
-    say(`阅读字号 ${size}px`);
-    void chrome.storage.local.set({ [FONT_KEY]: size }).catch(() => say('字号已调整，但未能保存到本机。'));
+    say(`Reading font size: ${size}px`);
+    void chrome.storage.local.set({ [FONT_KEY]: size }).catch(() => say("Font size changed, but could not be saved on this device."));
   });
   markButton.addEventListener('click', () => {
     if (busy) return;
@@ -68,8 +68,8 @@ export async function setupReaderControls(options: {
     const next: Bookmark | null = mark ? null : { ratio: scrollRatio(window.scrollY, doc.documentElement.scrollHeight, window.innerHeight), savedTs: Date.now(),
       ...(index >= 0 ? { paragraph: index, offset: paragraphs[index]!.getBoundingClientRect().top } : {}) };
     void (next ? chrome.storage.local.set({ [key]: next }) : chrome.storage.local.remove(key)).then(() => {
-      mark = next; paint(); say(mark ? '已添加阅读书签' : '已移除阅读书签');
-    }).catch(() => say('书签未能保存，请重试。')).finally(() => { busy = false; markButton.disabled = false; });
+      mark = next; paint(); say(mark ? "Reading bookmark added" : "Reading bookmark removed");
+    }).catch(() => say("Could not save the bookmark. Try again.")).finally(() => { busy = false; markButton.disabled = false; });
   });
   jump.addEventListener('click', () => {
     if (!mark) return;
@@ -83,7 +83,7 @@ export async function setupReaderControls(options: {
   if (book) {
     doc.getElementById('contents-title')!.textContent = book.title;
     const toc = doc.getElementById('reader-toc')!;
-    toc.replaceChildren(icon('list'), document.createTextNode(`第 ${(chapter ?? 0) + 1} / ${book.chapters.length} 章`));
+    toc.replaceChildren(icon('list'), document.createTextNode(`Chapter ${(chapter ?? 0) + 1} / ${book.chapters.length}`));
     for (const item of book.chapters) {
       const button = doc.createElement('button'); button.type = 'button'; button.className = 'reader-chapter';
       const number = doc.createElement('span'); number.textContent = String(item.index + 1).padStart(2, '0');

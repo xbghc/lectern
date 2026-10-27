@@ -83,10 +83,10 @@ export async function checkForUpdate(): Promise<Update | null> {
     headers: { Accept: "application/vnd.github+json" },
   });
   if (res.status === 403 || res.status === 429) {
-    throw new Error("GitHub 暂时不让问了（匿名请求每小时 60 次），过会儿再试");
+    throw new Error("GitHub's anonymous request limit has been reached. Try again later.");
   }
-  if (res.status === 404) throw new Error("这个仓库还没有发布过版本");
-  if (!res.ok) throw new Error(`GitHub 返回 ${res.status}`);
+  if (res.status === 404) throw new Error("This repository has no releases yet");
+  if (!res.ok) throw new Error(`GitHub returned ${res.status}`);
   const json: unknown = await res.json();
   return readUpdate(json, currentVersion());
 }

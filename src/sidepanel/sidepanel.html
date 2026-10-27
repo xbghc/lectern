@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>本页生词</title>
+    <title>Words on this page</title>
     <link rel="stylesheet" href="popup.css" />
     <style>
       body { width: auto; padding: 12px 14px 40px; }
@@ -20,7 +20,7 @@
       .item .tr { margin-top: 5px; font-size: 14px; }
       .item .n { color: var(--fg-soft); font-size: 12.5px; line-height: 1.75; margin-top: 5px; }
       .item .u { color: var(--fg-soft); font-size: 12.5px; line-height: 1.75; margin-top: 5px; }
-      .item .u::before { content: "用法 · "; color: var(--muted); font-size: 11px; }
+      .item .u::before { content: "Usage · "; color: var(--muted); font-size: 11px; }
       .item .vocab { margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); }
       .item .v + .v { margin-top: 6px; }
       .item .vw { font-weight: 600; font-size: 13px; }
@@ -42,12 +42,12 @@
     </style>
   </head>
   <body>
-    <h1>本页生词</h1>
+    <h1>Words on this page</h1>
     <p id="where"></p>
     <div id="list"></div>
     <div class="foot">
-      <button id="open-dash">打开完整面板</button>
-      <button id="refresh">刷新</button>
+      <button id="open-dash">Open full workspace</button>
+      <button id="refresh">Refresh</button>
     </div>
     <script src="sidepanel.js"></script>
   </body>

@@ -137,7 +137,7 @@ test("幂等：同一份文件导两次，第二次什么都不变、报告全�
     reviewsAdded: 0,
     positionsUpdated: 0,
   });
-  assert.equal(describeReport(second.report), "没有新内容，本机已经有这些记录了");
+  assert.equal(describeReport(second.report), "No new data. These records are already on your device.");
 });
 
 test("对称：两边互相导入之后收敛到同一份记录", () => {
@@ -358,8 +358,8 @@ test("parseBundle：3 与 4 都认，别的拒收，缺字段的条目丢掉", (
   assert.equal(d4.positions[A]!.hash, "h1");
 
   assert.throws(() => parseBundle({ ...v3, schema: 5 }), /schema 5/);
-  assert.throws(() => parseBundle("nope"), /不是有效/);
-  assert.throws(() => parseBundle(null), /不是有效/);
+  assert.throws(() => parseBundle("nope"), /not a valid/);
+  assert.throws(() => parseBundle(null), /not a valid/);
 });
 
 test("老记录没有 usage / vocab 字段，合并时补齐", () => {

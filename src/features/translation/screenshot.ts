@@ -9,7 +9,7 @@ export type CropFn = (frame: ImageBitmap, rect: DOMRect, viewport: Size) => Prom
  */
 async function screenshotFrame(dataUrl: string, crop?: CropFn) {
   const base64 = dataUrl.match(/^data:image\/[^;,]+;base64,(.*)$/s)?.[1];
-  if (!base64) throw new Error("截图格式无效");
+  if (!base64) throw new Error("Invalid screenshot format");
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
   const frame = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
   return {
@@ -18,12 +18,12 @@ async function screenshotFrame(dataUrl: string, crop?: CropFn) {
       if (crop) return crop(frame, rect, viewport);
       return (async () => {
         const src = sourceRect(rect, viewport, frame);
-        if (!src) throw new Error("框选范围无效，请重新框选");
+        if (!src) throw new Error("Invalid selection. Select the area again.");
         const { sx, sy, sw, sh } = src;
         const scale = outputScale(sw, sh, frame.width / viewport.width);
         const canvas = new OffscreenCanvas(Math.ceil(sw * scale), Math.ceil(sh * scale));
         const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("无法处理截图");
+        if (!ctx) throw new Error("Could not process the screenshot");
         ctx.drawImage(frame, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
         const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
         if (shouldInvert(meanLuminance(pixels.data))) {
@@ -104,12 +104,12 @@ export function selectRegion(dataUrl: string, opts?: { crop?: CropFn }): Promise
       const canvas = document.createElement("canvas");
       canvas.width = frame.width; canvas.height = frame.height;
       const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("无法显示截图");
+      if (!ctx) throw new Error("Could not display the screenshot");
       ctx.drawImage(frame, 0, 0);
       const shade = document.createElement("div"); shade.className = "shade";
       const region = document.createElement("div"); region.className = "region"; region.hidden = true;
       const hint = document.createElement("div"); hint.className = "hint";
-      hint.textContent = "拖动框选要翻译的文字，Esc 取消";
+      hint.textContent = "Drag to select text to translate. Press Esc to cancel.";
       overlay.append(canvas, shade, region, hint);
       root.append(style, overlay);
       document.documentElement.append(host);

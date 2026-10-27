@@ -23,14 +23,14 @@ test("archive capture uses loaded responsive and lazy images and strips active c
 
 test("archive capture rejects pages with no readable article", () => {
   const doc = new JSDOM("<html><body><form><input></form></body></html>", { url: "https://example.com" }).window.document;
-  assert.throws(() => extractArchive(doc, doc.URL), /正文/);
+  assert.throws(() => extractArchive(doc, doc.URL), /article text/);
 });
 
 test("image rewriting decodes HTML entities, deduplicates resources, and never keeps missing external URLs", () => {
   const html = '<a href="https://img.test/a?x=1&amp;y=2">link</a><img src="https://img.test/a?x=1&amp;y=2" alt="A"><img src="https://img.test/missing">';
   const rewritten = rewriteArchiveImages(html, new Map([["https://img.test/a?x=1&y=2", hash]]));
   assert.match(rewritten, new RegExp(`src="fs-blob:${hash}"`));
-  assert.match(rewritten, /图片未保存/);
+  assert.match(rewritten, /Image not saved/);
   assert.doesNotMatch(rewritten, /img\.test\/missing/);
   assert.match(rewritten, /<a href="https:\/\/img\.test\/a\?x=1&amp;y=2">/);
 });
@@ -56,7 +56,7 @@ test("resource downloads stop at a size limit even with no length header", async
     start(controller) { controller.enqueue(new Uint8Array(4)); controller.enqueue(new Uint8Array(4)); },
     cancel() { cancelled = true; },
   }));
-  await assert.rejects(readArchiveBytes(response, 6), /大小限制/);
+  await assert.rejects(readArchiveBytes(response, 6), /size limit/);
   assert.equal(cancelled, true);
   assert.deepEqual(await readArchiveBytes(new Response(new Uint8Array([1, 2, 3])), 3), new Uint8Array([1, 2, 3]));
 });

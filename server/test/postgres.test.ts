@@ -219,7 +219,7 @@ test('PostgreSQL atomic sync, user isolation, concurrency, restart and archive r
       assert.deepEqual(report.platforms.map(platform => [platform.platform, platform.users, platform.devices, platform.deviceDays]), [['app', 1, 1, 1], ['extension', 2, 2, 3]]);
       const extension = report.platforms.find(platform => platform.platform === 'extension')!;
       // The same device name under another account is another device.
-      assert.deepEqual(extension.events[0], { name: 'articles.detail', label: '文章 · 展开详情', last7: 5, last30: 9, total: 16, users: 2, devices: 2 });
+      assert.deepEqual(extension.events[0], { name: 'articles.detail', label: "Articles · Detail", last7: 5, last30: 9, total: 16, users: 2, devices: 2 });
       assert.deepEqual(extension.events[1]!.name, 'articles.search.open');
       assert.ok(extension.events.length > 40 && extension.events.slice(2).every(line => line.total === 0), 'controls nobody used are listed, in page order');
       assert.ok(extension.unused.includes('articles.blacklist.suggest') && !extension.unused.includes('articles.detail'));

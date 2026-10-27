@@ -20,10 +20,10 @@ export interface MaterialSync {
   /** state 为 blocked 时：卡在哪。 */
   reasons:string[];
 }
-const LABEL:Record<RecordType,string>={article:"文章记录",session:"专注时段",paragraph:"段落",position:"阅读位置",snippet:"划词",card:"复习卡",
-  reviewEvent:"复习记录",articleReview:"文章回顾",articleCard:"文章回顾卡",setting:"设置",articleText:"正文",archive:"离线存档"};
+const LABEL:Record<RecordType,string>={article:"Article records",session:"Focus sessions",paragraph:"Paragraphs",position:"Reading positions",snippet:"Translations",card:"Review cards",
+  reviewEvent:"Review history",articleReview:"Article review",articleCard:"Article review cards",setting:"Settings",articleText:"Article text",archive:"Offline archives"};
 /** 校验函数和服务器共用，报的是英文；给人看之前把最常见的那一句说成人话。 */
-const humanize=(reason:string):string=>reason.startsWith("Invalid article: ")?`文章记录的 ${reason.slice(17).split(", ").join("、")} 字段缺失或不合规`:reason;
+const humanize=(reason:string):string=>reason.startsWith("Invalid article: ")?`Article fields ${reason.slice(17).split(", ").join(", ")} are missing or invalid`:reason;
 /**
  * 一条记录归哪篇阅读材料。
  *
@@ -44,8 +44,8 @@ let running:Promise<SyncStatus>|null=null;
 let timer:ReturnType<typeof setTimeout>|undefined;
 export function normalizeServerUrl(value:string):string {
   const url=new URL(value.trim());
-  if(url.username||url.password||url.search||url.hash)throw new Error("服务器地址不能包含凭证、查询参数或片段");
-  if(url.protocol!=="https:" && !(url.protocol==="http:" && ["localhost","127.0.0.1","[::1]"].includes(url.hostname))) throw new Error("同步服务器需要 HTTPS；本机开发可使用 HTTP localhost");
+  if(url.username||url.password||url.search||url.hash)throw new Error("The server URL must not contain credentials, a query or a fragment");
+  if(url.protocol!=="https:" && !(url.protocol==="http:" && ["localhost","127.0.0.1","[::1]"].includes(url.hostname))) throw new Error("Sync servers require HTTPS. HTTP localhost is allowed for local development.");
   return url.href.replace(/\/+$/,"");
 }
 async function request(config:SyncConfig,path:string,init:RequestInit={}):Promise<Response> {
@@ -54,14 +54,14 @@ async function request(config:SyncConfig,path:string,init:RequestInit={}):Promis
   if(!response.ok) {
     // error 只是大类（INVALID_REQUEST），message 才说得出是哪一条校验没过；两个都带上
     let detail="";try { const body=await response.json(); detail=[body.error,body.message].filter((v):v is string=>typeof v==="string"&&v.length>0).join(" · ").slice(0,250); }catch{}
-    const error=new Error(response.status===401?"同步 Token 无效或已被吊销":`同步请求失败（${response.status}）${detail?`：${detail}`:""}`) as Error&{status?:number};error.status=response.status;throw error;
+    const error=new Error(response.status===401?"The sync token is invalid or has been revoked":`Sync request failed (${response.status})${detail?`: ${detail}`:""}`) as Error&{status?:number};error.status=response.status;throw error;
   }
   return response;
 }
 export async function syncRequest(path:string,init:RequestInit={}):Promise<Response> {
   const {config}=await syncDriver().read();
-  if(!config.enabled||!config.token||!config.userId)throw new Error("请先在设置中启用同步");
-  if(!path.startsWith("/v1/")||path.includes(".."))throw new Error("无效同步路径");
+  if(!config.enabled||!config.token||!config.userId)throw new Error("Enable sync in settings first");
+  if(!path.startsWith("/v1/")||path.includes(".."))throw new Error("Invalid sync path");
   return request(config,path,init);
 }
 export async function syncStatus():Promise<SyncStatus> {
@@ -83,7 +83,7 @@ export async function syncStatus():Promise<SyncStatus> {
  * 文章发不出去时，挂在它名下的记录也先不发，免得另一台设备上出现没有文章的片段和段落。
  * 看的是这篇文章排在**最后**的那条操作——前面坏过、后来好了，名下的记录就放行。
  */
-const DEPENDENT="所属文章的记录无法同步";
+const DEPENDENT="The parent article cannot be synced";
 type Blocked={op:SyncOperation;reason:string};
 function triage(outbox:SyncOperation[],verdicts:Map<string,string|null>):{ready:SyncOperation[];blocked:Blocked[];superseded:string[]} {
   const verdictOf=(op:SyncOperation):string|null=>{
@@ -111,12 +111,12 @@ function triage(outbox:SyncOperation[],verdicts:Map<string,string|null>):{ready:
 }
 const tally=(ops:SyncOperation[]):[string,number][]=>{
   const counts=new Map<string,number>();
-  for(const op of ops) {const label=LABEL[op.record?.type as RecordType]??"记录";counts.set(label,(counts.get(label)??0)+1);}
+  for(const op of ops) {const label=LABEL[op.record?.type as RecordType]??"Records";counts.set(label,(counts.get(label)??0)+1);}
   return [...counts];
 };
 /** 说成了人话的那句里已经带着是哪种记录；原样的英文才在前面标一下种类。 */
-const explain=(b:Blocked):string=>{const plain=humanize(b.reason);return plain!==b.reason?plain:`${LABEL[b.op.record?.type as RecordType]??"记录"}：${plain}`;};
-const spell=(counts:[string,number][]):string=>counts.map(([label,n])=>`${n} 个${label}`).join("、");
+const explain=(b:Blocked):string=>{const plain=humanize(b.reason);return plain!==b.reason?plain:`${LABEL[b.op.record?.type as RecordType]??"Records"}: ${plain}`;};
+const spell=(counts:[string,number][]):string=>counts.map(([label,n])=>`${label}: ${n}`).join(", ");
 /**
  * 按阅读材料说：哪篇卡住了、卡在哪、名下连带了什么。不挂在任何文章名下的（复习卡、设置）
  * 才按「种类：原因」归堆。要修的是自己有毛病的那些，被文章连累的只报种类和个数。
@@ -126,19 +126,19 @@ function describe(stuck:Blocked[]):{reasons:string[];materials:number} {
   for(const item of stuck) {
     const id=materialOf(item.op.record);
     if(id!==null) {byMaterial.set(id,[...(byMaterial.get(id)??[]),item]);continue;}
-    const key=`${LABEL[item.op.record?.type as RecordType]??"记录"}：${humanize(item.reason)}`,group=loose.get(key);
+    const key=`${LABEL[item.op.record?.type as RecordType]??"Records"}: ${humanize(item.reason)}`,group=loose.get(key);
     if(group)group.count++;else loose.set(key,{count:1,sample:String(item.op.record?.id).slice(0,160)});
   }
   const reasons:string[]=[];
   for(const [id,items] of [...byMaterial].slice(0,5)) {
     const own=items.filter(b=>b.reason!==DEPENDENT),dragged=items.filter(b=>b.reason===DEPENDENT);
     const title=String(object(items.find(b=>b.op.record?.type==="article")?.op.record?.value).title||"").slice(0,60);
-    const why=[...new Set(own.map(explain))].join("；");
-    reasons.push(`${title?`《${title}》`:""}${id.slice(0,160)}：${why||"名下有记录无法上传"}`+(dragged.length?`；名下 ${spell(tally(dragged.map(b=>b.op)))}一起留在本机`:""));
+    const why=[...new Set(own.map(explain))].join("; ");
+    reasons.push(`${title?`“${title}” `:""}${id.slice(0,160)}: ${why||"Some related records could not be uploaded"}`+(dragged.length?`; related records: ${spell(tally(dragged.map(b=>b.op)))} also kept on this device`:""));
   }
-  if(byMaterial.size>5)reasons.push(`另有 ${byMaterial.size-5} 篇阅读材料`);
-  for(const [key,group] of [...loose].slice(0,3))reasons.push(`${key} ×${group.count}（如 ${group.sample}）`);
-  if(loose.size>3)reasons.push(`另有 ${loose.size-3} 类原因`);
+  if(byMaterial.size>5)reasons.push(`Also ${byMaterial.size-5} reading items`);
+  for(const [key,group] of [...loose].slice(0,3))reasons.push(`${key} ×${group.count} (such as ${group.sample})`);
+  if(loose.size>3)reasons.push(`Also ${loose.size-3} types of issue`);
   return {reasons,materials:byMaterial.size};
 }
 /** 单篇阅读材料的同步处境，给文章详情用。每次现算：队列平时很短，展开一篇文章才问一次。 */
@@ -158,9 +158,9 @@ export async function materialSync(articleId:string):Promise<MaterialSync> {
 export async function testSync(baseUrl:string,token?:string):Promise<{serverId:string;userId:string;protocol:number}> {
   const {config}=await syncDriver().read();const url=normalizeServerUrl(baseUrl);
   const secret=token?.trim() || (url===config.baseUrl?config.token:"");
-  if(!secret)throw new Error("请输入同步 Token");
+  if(!secret)throw new Error("Enter your sync token");
   const info=await (await request({...config,baseUrl:url,token:secret},"/v1/info")).json();
-  if(info.protocol!==PROTOCOL_VERSION||typeof info.serverId!=="string"||typeof info.userId!=="string")throw new Error("服务器同步协议不兼容");
+  if(info.protocol!==PROTOCOL_VERSION||typeof info.serverId!=="string"||typeof info.userId!=="string")throw new Error("The server's sync protocol is incompatible");
   return info;
 }
 export async function configureSync(baseUrl:string,token:string|undefined,enabled:boolean):Promise<SyncStatus> {
@@ -172,7 +172,7 @@ export async function configureSync(baseUrl:string,token:string|undefined,enable
   const secret=token?.trim()||(url===before.config.baseUrl?before.config.token:"");
   const info=await testSync(url,secret);
   await syncDriver().update(s=>{
-    if(s.config.userId && (s.config.userId!==info.userId||s.config.serverId!==info.serverId))throw new Error("本机数据已绑定另一个账号或服务器。请先导出备份，再清除此设备的数据后连接新账号。");
+    if(s.config.userId && (s.config.userId!==info.userId||s.config.serverId!==info.serverId))throw new Error("Local data is linked to another account or server. Export a backup, then clear this device's data before connecting a different account.");
     s.config={baseUrl:url,token:secret,enabled,userId:info.userId,serverId:info.serverId};s.error=null;s.failures=0;s.retryAt=0;
   });
   if(enabled)scheduleSync(100);return syncStatus();
@@ -184,11 +184,11 @@ export async function disconnectSync():Promise<SyncStatus> {
 async function cycle():Promise<SyncStatus> {
   const initial=await syncDriver().read(); if(!initial.config.enabled)return syncStatus();
   const config=initial.config;
-  const check=async()=>{const s=await syncDriver().read();if(!s.config.enabled||JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("同步配置已改变，本轮已停止");};
+  const check=async()=>{const s=await syncDriver().read();if(!s.config.enabled||JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");};
   let succeeded=false;
   try {
     const info=await (await request(config,"/v1/info")).json();
-    if(info.protocol!==PROTOCOL_VERSION||info.userId!==config.userId||info.serverId!==config.serverId)throw new Error("服务器身份或协议已变化，请检查同步设置");
+    if(info.protocol!==PROTOCOL_VERSION||info.userId!==config.userId||info.serverId!==config.serverId)throw new Error("The server identity or protocol changed. Check your sync settings.");
     const stateBeforePull=await syncDriver().read();
     if(!stateBeforePull.initializedRemote && stateBeforePull.cursor===0) {
       for(let page=0;page<100;page++) {
@@ -202,28 +202,28 @@ async function cycle():Promise<SyncStatus> {
         }
         if(!Array.isArray(result.records)||typeof result.token!=="string"||!Number.isSafeInteger(result.head)||result.head<0||!Number.isSafeInteger(result.cursor)||result.cursor<0||typeof result.hasMore!=="boolean"
           || (progress&&(result.token!==progress.token||result.head!==progress.head||result.cursor<progress.cursor))
-          || (result.hasMore&&result.cursor===(progress?.cursor??0)))throw new Error("无效的初始同步快照");
+          || (result.hasMore&&result.cursor===(progress?.cursor??0)))throw new Error("Invalid initial sync snapshot");
         await check();const altered=await applyRemote(syncDriver(),result.records.map(validateRecord),0,config);
         await syncDriver().update(s=>{
-          if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("同步配置已改变，本轮已停止");
+          if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");
           if(result.hasMore)s.snapshot={token:result.token,head:result.head,cursor:result.cursor};
           else {s.cursor=result.head;s.initializedRemote=true;delete s.snapshot;}
         });
         await notifyProjection(altered);
         if(!result.hasMore)break;
       }
-      if(!(await syncDriver().read()).initializedRemote)throw new Error("初始下载已保存进度，稍后继续");
+      if(!(await syncDriver().read()).initializedRemote)throw new Error("Initial download progress saved. It will continue later.");
     }
     const pull=async()=>{
       for(let page=0;page<100;page++) {
         await check();const before=await syncDriver().read();
         const result=await (await request(config,`/v1/sync/pull?cursor=${before.cursor}&limit=200`)).json();
-        if(!Array.isArray(result.records)||!Number.isSafeInteger(result.cursor)||result.cursor<before.cursor||typeof result.hasMore!=="boolean")throw new Error("无效的同步分页响应");
-        if(result.hasMore && result.cursor===before.cursor)throw new Error("同步游标没有前进");
+        if(!Array.isArray(result.records)||!Number.isSafeInteger(result.cursor)||result.cursor<before.cursor||typeof result.hasMore!=="boolean")throw new Error("Invalid paginated sync response");
+        if(result.hasMore && result.cursor===before.cursor)throw new Error("The sync cursor did not advance");
         await check();await notifyProjection(await applyRemote(syncDriver(),result.records.map(validateRecord),result.cursor,config));
         if(!result.hasMore)return;
       }
-      throw new Error("本轮下载已达批次上限，稍后继续");
+      throw new Error("The download batch limit was reached. Sync will continue later.");
     };
     await pull();
     // 这一轮往服务器上放过东西，结尾才需要再下载一次；没放过，开头那次已经是最新的
@@ -231,14 +231,14 @@ async function cycle():Promise<SyncStatus> {
     const {flushArchives}=await import("../archive/background.ts");
     await flushArchives();
     // 老版本留下的残缺文章先补齐再分拣；补不了的才轮到 triage 把它留下。补齐之后同一条记录的几次改动折成一条再发
-    if(await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("同步配置已改变，本轮已停止");const repaired=repairOutbox(s);foldOutbox(s);return repaired;}))await notifyProjection();
+    if(await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");const repaired=repairOutbox(s);foldOutbox(s);return repaired;}))await notifyProjection();
     const verdicts=new Map<string,string|null>();let stuck:Blocked[]=[];
     for(let batch=0;batch<100;batch++) {
       await check();const state=await syncDriver().read();
       const plan=triage(state.outbox,verdicts);stuck=plan.blocked;
       if(plan.superseded.length) {
         const drop=new Set(plan.superseded);
-        await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("同步配置已改变，本轮已停止");s.outbox=s.outbox.filter(op=>!drop.has(op.opId));});
+        await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");s.outbox=s.outbox.filter(op=>!drop.has(op.opId));});
       }
       if(!plan.ready.length)break;
       const operations=[];let bytes=0;
@@ -249,20 +249,20 @@ async function cycle():Promise<SyncStatus> {
       }
       const result=await (await request(config,"/v1/sync/push",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({deviceId:state.deviceId,operations})})).json();
       const ids=new Set(operations.map(op=>op.opId));
-      if(!Array.isArray(result.accepted)||!result.accepted.length||result.accepted.some((id:unknown)=>typeof id!=="string"||!ids.has(id)))throw new Error("无效的同步确认响应");
+      if(!Array.isArray(result.accepted)||!result.accepted.length||result.accepted.some((id:unknown)=>typeof id!=="string"||!ids.has(id)))throw new Error("Invalid sync acknowledgment");
       await check();const accepted=new Set<string>(result.accepted);
-      await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("同步配置已改变，本轮已停止");s.outbox=s.outbox.filter(op=>!accepted.has(op.opId));});
+      await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");s.outbox=s.outbox.filter(op=>!accepted.has(op.opId));});
       uploaded=true;
     }
     if(uploaded)await pull();
     await check();
     const blocked=stuck.length?{count:stuck.length,...describe(stuck)}:undefined;
-    await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("同步配置已改变，本轮已停止");s.lastSuccess=Date.now();s.error=null;s.failures=0;s.retryAt=0;s.blocked=blocked;});
+    await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");s.lastSuccess=Date.now();s.error=null;s.failures=0;s.retryAt=0;s.blocked=blocked;});
     succeeded=true;
   } catch(error) {
     await syncDriver().update(s=>{
       if(JSON.stringify(s.config)!==JSON.stringify(config))return;
-      s.error=error instanceof Error?error.message:"同步失败";s.failures++;
+      s.error=error instanceof Error?error.message:"Sync failed";s.failures++;
       s.retryAt=Date.now()+Math.min(15*60_000,5_000*2**Math.min(s.failures,8));
       if((error as {status?:number}).status===401)s.config.enabled=false;
     });

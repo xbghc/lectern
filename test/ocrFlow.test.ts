@@ -71,8 +71,8 @@ beforeEach(() => {
     recognize: (png, s) => { recognized.push(png); signal = s; return new Promise((r) => { reply = r; }); },
     translate: async (req, partial) => {
       requests.push(req);
-      partial({ translation: "译文", phonetic: null, pos: null, contextNote: null, usage: null, vocab: [] });
-      return { ok: true, cached: false, snippet: { ...req, id: "snippet", createdTs: 0, translation: "译文", contextNote: "",
+      partial({ translation: "Translation", phonetic: null, pos: null, contextNote: null, usage: null, vocab: [] });
+      return { ok: true, cached: false, snippet: { ...req, id: "snippet", createdTs: 0, translation: "Translation", contextNote: "",
         phonetic: null, pos: null, lemma: null, usage: null, vocab: [], cardId: null } };
     },
     ask: async () => ({ ok: true, text: "追问答案" }), warm: () => {}, openOptions: () => {},
@@ -90,7 +90,7 @@ test("未 start 的 OCR 只挂关闭组，识别后使用同一骨架并保留�
   assert.deepEqual(recognized, ["png"]);
   assert.equal(count("mouseup"), 0); assert.equal(count("keyup"), 0);
   for (const type of ["mousedown", "scroll", "keydown"]) assert.equal(count(type), 1);
-  assert.match(root()!.querySelector(".term")!.textContent!, /正在识别图中文字/);
+  assert.match(root()!.querySelector(".term")!.textContent!, /Recognizing text in the image/);
   const tr = root()!.querySelector(".tr");
   reply({ ok: true, text: "  hello\nworld  " }); await pending;
   assert.deepEqual(requests, [{ articleId: "article", url: "https://app.example.com/inbox", articleTitle: "页面标题",
@@ -112,16 +112,16 @@ test("长文本先确认，按钮点击后才翻译", async () => {
   const pending = translator.translateImage("png", rect);
   reply({ ok: true, text: "one two three" }); await pending;
   assert.equal(requests.length, 0);
-  assert.match(root()!.textContent!, /识别出 3 个词，较长，确认后再翻译/);
+  assert.match(root()!.textContent!, /Recognized 3 words. Confirm to translate this longer passage/);
   root()!.querySelector<HTMLElement>('[data-act="go"]')!.click(); await tick();
   assert.equal(requests.length, 1); assert.equal(requests[0]!.context, "one two three");
 });
 
 for (const [answer, error] of [
   [{ ok: false, error: "识别器失败" }, "识别器失败"],
-  [{ ok: true, text: "只有中文" }, "没认出英文"],
-  [{ ok: true, text: "" }, "没认出英文"],
-  [{ ok: true, text: "a".repeat(2001) }, "识别文字过长"],
+  [{ ok: true, text: "只有中文" }, "No English text"],
+  [{ ok: true, text: "" }, "No English text"],
+  [{ ok: true, text: "a".repeat(2001) }, "Too much text was detected"],
 ] as const) test(`识别错误：${error}`, async () => {
   const pending = translator.translateImage("png", rect); reply(answer); await pending;
   assert.ok(root()!.textContent!.includes(error)); assert.equal(requests.length, 0);

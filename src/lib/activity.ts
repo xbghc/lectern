@@ -20,11 +20,11 @@ export interface ReadingActivity {
 }
 
 /** Local calendar days, including DST. A midnight-spanning session contributes only its overlap. */
-export function activityDays(now: number): ActivityDay[] {
+export function activityDays(now: number, count = 7): ActivityDay[] {
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-  return Array.from({ length: 7 }, (_, i) => {
-    const start = new Date(today); start.setDate(start.getDate() + i - 6);
+  return Array.from({ length: count }, (_, i) => {
+    const start = new Date(today); start.setDate(start.getDate() + i - count + 1);
     const end = new Date(start); end.setDate(end.getDate() + 1);
     return { startTs: start.getTime(), endTs: end.getTime(), totalMs: 0, count: 0 };
   });
@@ -51,8 +51,8 @@ export function readingActivity(saved: readonly ActivitySession[], now: number, 
     longestMs: Math.max(0, ...todaySessions.map(s => s.endTs - s.startTs)), sessions: todaySessions };
 }
 
-export function recentActivity(sessions: readonly Session[], now: number): ActivitySession[] {
-  const start = activityDays(now)[0]!.startTs;
+export function recentActivity(sessions: readonly Session[], now: number, days = 7): ActivitySession[] {
+  const start = activityDays(now, days)[0]!.startTs;
   return sessions.filter(s => s.endTs > start && s.startTs <= now).map(({ id, articleId, url, title, startTs, endTs }) =>
     ({ id, articleId, url, title, startTs, endTs }));
 }

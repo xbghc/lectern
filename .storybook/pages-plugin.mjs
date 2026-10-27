@@ -9,6 +9,7 @@ export const pages = {
   sidepanel: ['src/sidepanel/sidepanel.html', 'src/sidepanel/index.ts'],
   app: ['src/app/index.html', 'src/app/index.ts'],
   reader: ['src/app/read.html', 'src/app/read.ts'],
+  chat: ['src/app/chat.html', 'src/app/chat.ts'],
   appOptions: ['src/options/options.html', 'src/app/options.ts'],
 };
 const root = resolve(import.meta.dirname, '..');

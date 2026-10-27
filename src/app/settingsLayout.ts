@@ -1,5 +1,3 @@
-import { readingActivity, type ActivitySession } from "../lib/activity.ts";
-import { duration, minutes } from "../ui/activity.ts";
 import { sectionName } from "../options/nav.ts";
 
 /** Keep the shared settings controls and handlers, but give the app a compact section index. */
@@ -17,20 +15,6 @@ export function setupSettingsLayout(): void {
     intro.before(privacy);
     privacy.append(summary, intro);
   }
-  const record = document.createElement("section"); record.className = "phone-reading-record";
-  const recordTitle = document.createElement("h2"); recordTitle.textContent = "阅读记录";
-  const values = document.createElement("div"); values.className = "reading-record-values";
-  const all = document.createElement("a"); all.id = "settings-statistics"; all.href = "index.html#stats"; all.textContent = "查看完整统计 ›";
-  record.append(recordTitle, values, all);
-  const privacy = document.querySelector(".settings-privacy"); (privacy ?? title)?.after(record);
-  void chrome.runtime.sendMessage({ type: "stats:activity" }).then((data: { sessions: ActivitySession[] }) => {
-    if (!record.isConnected) return;
-    const activity = readingActivity(data.sessions, Date.now());
-    for (const [label, value] of [["今日专注", `${minutes(activity.today.totalMs)} 分钟`], ["今日片段", `${activity.today.count} 段`], ["近七天累计", duration(activity.totalMs)]]) {
-      const item = document.createElement("span"); item.textContent = label!;
-      const number = document.createElement("strong"); number.textContent = value!; item.append(number); values.append(item);
-    }
-  }).catch(() => { values.textContent = "记录暂时无法读取，可进入完整统计重试。"; });
   const descriptions: Record<string, string> = {
     "设备同步": "服务器连接、同步状态与离线记录",
     "划词翻译": "翻译开关、选区与词汇讲解",
@@ -65,6 +49,7 @@ export function setupSettingsLayout(): void {
       requestAnimationFrame(() => section.scrollIntoView({ block: "start" }));
     }
     if (name === "设备同步" && location.hash === "#sync") section.open = true;
+    if (llm && location.hash === "#model") section.open = true;
     fieldset.setAttribute("aria-label", heading.textContent);
     // 扩展里收在标题旁「i」后面的说明：按钮跟着 legend 一起没了。这里换成分区开头的一行「这是什么」，
     // 点开才铺出来——手机上三段说明先占掉半屏，要填的那两个框就被挤到下面去了

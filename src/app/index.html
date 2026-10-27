@@ -13,14 +13,14 @@
   <body class="dash app">
     <a class="skip-link" href="#main">跳到主要内容</a>
     <header class="app-sidebar reading-header">
-      <div class="app-heading"><span class="phone-header-kicker">LECTERN</span><h1 id="app-page-title">阅读</h1></div>
+      <div class="app-heading"><button id="reading-back" class="icon-btn" aria-label="返回阅读首页" hidden><span data-icon="back"></span></button><div><span class="phone-header-kicker">LECTERN</span><h1 id="app-page-title">阅读</h1></div></div>
       <nav aria-label="主导航">
         <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>阅读</span></button>
-        <button data-tab="books" class="tab"><span data-icon="shelf"></span><span>书架</span></button>
         <button data-tab="words" class="tab"><span data-icon="words"></span><span>生词</span><span id="nav-word-count" class="nav-count"></span></button>
+        <a id="to-options" href="options.html" class="phone-nav-link"><span data-icon="settings"></span><span>设置</span></a>
       </nav>
     </header>
-    <div class="workspace-bar"><div class="breadcrumb"><span id="workspace-title">阅读</span></div><button id="workspace-search" class="icon-btn" aria-label="搜索文章"><span data-icon="search"></span></button><a id="to-options" href="#" class="icon-btn" aria-label="打开阅读设置"><span data-icon="settings"></span></a></div>
+    <div class="workspace-bar"><div class="breadcrumb"><span id="workspace-title">阅读</span></div><button id="workspace-search" class="icon-btn" aria-label="搜索文章"><span data-icon="search"></span></button><button id="reading-statistics" class="icon-btn" aria-label="查看阅读统计"><span data-icon="chart"></span></button><a id="words-chat" href="chat.html" class="icon-btn phone-chat-entry" aria-label="与 AI 对话学词" data-track="chat.open" hidden><span data-icon="chat"></span></a></div>
     <main id="main" class="dashboard-main">
 
 
@@ -30,7 +30,7 @@
       <div id="reading-metrics" hidden></div>
       <div class="reading-layout"><div class="reading-main">
       <div id="continue-reading"></div>
-      <section id="home-shelf" class="phone-home-shelf" hidden><div class="section-heading"><h2>书架</h2><button id="show-books" class="text-btn">全部 <span data-icon="arrow"></span></button></div><div id="home-books" class="phone-shelf-strip"></div></section>
+      <section id="home-shelf" class="phone-home-shelf" hidden><div class="section-heading"><h2>书架</h2><button id="show-books" class="text-btn"><span id="home-books-count"></span>全部 <span data-icon="arrow"></span></button></div><div id="home-books" class="phone-shelf-strip"></div></section>
       <div class="section-heading queue-heading"><h2>接下来读</h2><button id="add-article" class="icon-btn" aria-label="添加文章"><span data-icon="plus"></span></button></div>
       <details id="article-tools" class="queue-tools"><summary>全部文章与管理</summary>
       <div class="article-controls">
@@ -102,7 +102,7 @@
       <div id="words" class="list"></div>
     </section>
 
-    <section id="pane-stats" class="pane" hidden><a href="options.html" class="text-btn">‹ 返回设置</a><div id="statistics"></div></section>
+    <section id="pane-stats" class="pane" hidden><div id="statistics"></div></section>
     <section id="pane-books" class="pane" hidden><p class="book-local-label">本机书籍 · 正文与章节进度仅存在本机</p>      <!-- 书：从手机里挑一个 EPUB，解包之后每一章都是一篇阅读材料 -->
       <div id="book-row" class="addrow" hidden>
         <button id="import-book" type="button" class="primary">导入 EPUB</button>

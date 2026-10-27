@@ -7,7 +7,7 @@ import { join } from "node:path";
  *   node build.mjs          → dist/                           浏览器扩展
  *   node build.mjs --app    → android/app/src/main/assets/www  安卓 App 的网页部分
  *
- * App 的三个页面（首页 / 阅读器 / 设置）各自的入口在 src/app/ 下，第一件事都是装上
+ * App 的页面（首页 / 阅读器 / 设置 / 生词对话）各自的入口在 src/app/ 下，第一件事都是装上
  * chrome.* 的垫片（src/app/boot.ts），之后引用的就是扩展那几个页面自己的代码。
  *
  * 只打包拉丁字形（约 60KB）。中文不打包：界面里的中文全部来自 LLM 输出，
@@ -85,6 +85,7 @@ function copyStaticApp() {
     ["src/app/app.css", "app.css"],
     ["src/app/index.html", "index.html"],
     ["src/app/read.html", "read.html"],
+    ["src/app/chat.html", "chat.html"],
   ]) {
     copyFileSync(from, join(OUT, to));
   }
@@ -102,6 +103,7 @@ const options = app
       entryPoints: {
         index: "src/app/index.ts",
         read: "src/app/read.ts",
+        chat: "src/app/chat.ts",
         options: "src/app/options.ts",
       },
       outdir: OUT,

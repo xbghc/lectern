@@ -45,7 +45,7 @@ document.addEventListener('click', event => {
   if (anchor?.startsWith('#')) document.getElementById(anchor.slice(1))?.scrollIntoView();
   if (target?.closest?.('#refetch')) { event.preventDefault(); event.stopImmediatePropagation(); }
 }, true);
-document.addEventListener('submit', event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);
+document.addEventListener('submit', event => { if ((event.target as HTMLElement)?.id === 'chat-form') return; event.preventDefault(); event.stopImmediatePropagation(); }, true);
 
 export const shim = installChromeShim({
   storage, version: '0.3.5', navigate: url => console.info('[Storybook navigation]', url),
@@ -102,7 +102,14 @@ export const shim = installChromeShim({
   connect(_name, port) {
     port.onMessage.addListener((raw: unknown) => {
       const msg = raw as { type: string };
-      if (msg.type === 'ask') port.postMessage({ type: 'ask-done', res: { ok: true, text: '这里强调阅读后的主动回想。' } });
+      if (msg.type === 'vocab-chat') {
+        if (options.state === 'error') port.postMessage({ type: 'vocab-chat-done', res: { ok: false, error: '连接超时（预览模拟），可以修改消息后重试。', needsConfig: true } });
+        else {
+          const text = '我们先用 consolidate 练习一个真实的场景。\n\nWhat helps you consolidate what you learn from a book?\n\n用一两句英语回答，试着说明你的方法。';
+          port.postMessage({ type: 'vocab-chat-partial', text: text.slice(0, 32) });
+          if (options.state !== 'loading') setTimeout(() => port.postMessage({ type: 'vocab-chat-done', res: { ok: true, text } }), 80);
+        }
+      } else if (msg.type === 'ask') port.postMessage({ type: 'ask-done', res: { ok: true, text: '这里强调阅读后的主动回想。' } });
       else port.postMessage({ type: 'done', res: { ok: true, cached: true, snippet: seed.snippets[0]! } });
     });
   },
@@ -134,6 +141,9 @@ if (options.page === 'reader' && options.state === 'empty') void storage.remove(
 window.addEventListener('DOMContentLoaded', () => {
   const tab = options.tab === 'articleReview' ? 'review' : options.tab;
   document.querySelector<HTMLButtonElement>(`[data-tab="${tab}"]`)?.click();
+  if (options.page === 'app' && tab === 'books') document.getElementById('show-books')?.click();
+  if (options.page === 'app' && tab === 'stats') document.getElementById('reading-statistics')?.click();
+  if (options.page === 'chat' && tab === 'conversation') setTimeout(() => document.querySelector<HTMLButtonElement>('#chat-starters button')?.click(), 100);
   if (options.page === 'app' && ['review', 'articleReview'].includes(options.tab)) document.getElementById('words-review')?.click();
   if (options.tab === 'classification') {
     const tools = document.getElementById('article-tools') as HTMLDetailsElement | null;

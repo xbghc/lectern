@@ -264,7 +264,9 @@ async function renderBooks(): Promise<void> {
   if (turn !== bookRender) { for (const url of urls) URL.revokeObjectURL(url); return; }
   bookList.replaceChildren(fragment);
   $("home-books").replaceChildren(homeFragment);
-  $("home-shelf").hidden = books.length === 0;
+  $("home-books-count").textContent = `${books.length} 本 · `;
+  $("home-shelf").hidden = false;
+  if (!books.length) $("home-books").textContent = "还没有书籍，打开书架导入 EPUB。";
   for (const url of coverUrls) URL.revokeObjectURL(url);
   coverUrls = urls;
   bookSection.hidden = books.length === 0;

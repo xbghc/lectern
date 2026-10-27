@@ -8,18 +8,22 @@
     <link rel="stylesheet" href="popup.css" />
     <link rel="stylesheet" href="app.css" />
   </head>
-  <body class="reader">
-    <header class="rbar">
+  <body class="reader chrome-hidden">
+    <button id="reader-toggle" class="reader-toggle" aria-controls="reader-toolbar" aria-expanded="false">Show reading tools</button>
+    <header id="reader-toolbar" class="rbar">
       <button id="back" class="iconbtn" aria-label="Back"><span data-icon="back"></span></button>
       <div class="rinfo"><div id="rtitle" class="rtitle">Opening…</div><div id="rmeta" class="rmeta"></div></div>
       <button id="reader-font" class="iconbtn" aria-label="Adjust text size" disabled><span data-icon="type"></span></button>
       <button id="reader-bookmark" class="iconbtn" aria-label="Add reading bookmark" aria-pressed="false" disabled><span data-icon="bookmark"></span></button>
+      <button id="reader-toc" class="iconbtn" aria-label="Open reading tools" title="Reading tools"><span data-icon="list"></span></button>
     </header>
     <div id="reader-feedback" class="reader-feedback" role="status" aria-live="polite"></div>
     <main id="article" class="article"><p class="status">Fetching article…</p></main>
 
-    <footer class="reader-progress"><div><button id="reader-toc" type="button"><span data-icon="list"></span>Reading tools</button><span id="rprogress">0%</span></div><div class="progress"><span id="rprogress-fill"></span></div></footer>
+    <div id="reader-progress" class="reader-progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="rprogress-fill"></span></div>
     <dialog id="reader-contents" class="reader-contents" aria-labelledby="contents-title"><div class="reader-dialog-heading"><h2 id="contents-title">Reading tools</h2><button id="contents-close" class="iconbtn" aria-label="Close table of contents">×</button></div>
+      <div class="reader-details"><span id="reader-location">Reading progress</span><span id="rprogress">0%</span></div>
+      <div id="reader-source" class="reader-source"></div>
       <button id="bookmark-jump" class="mini" hidden></button><div id="chapter-list"></div>
       <div class="reader-tool-actions"><button id="words" class="mini words" disabled>Words from this article <span id="words-n" class="n"></span></button><button id="shot" class="mini" disabled>Screenshot translation</button><button id="translate-here" class="mini">Enable translation on this page</button></div>
     </dialog>

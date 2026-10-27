@@ -9,7 +9,7 @@ import { startTracking, type TrackController, type TrackOptions } from "./track.
  * 包成宿主要的「同步交出实例」，等的期间由 state() 说明在等什么。
  */
 
-export type ReadingOptions = Pick<TrackOptions, "focus" | "extract" | "approvedArticle">;
+export type ReadingOptions = Pick<TrackOptions, "focus" | "extract" | "approvedArticle" | "overlays">;
 
 export interface ReadingFeature extends PageFeature {
   /** 宿主通知可见性变化（App 切到后台再回来）。扩展里 visibilitychange 事件自己会驱动，不必调。 */

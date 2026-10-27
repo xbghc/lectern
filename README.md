@@ -74,7 +74,7 @@ Focus requires a visible page and a focused window. Idle and stall timeouts dist
 
 Paragraphs count as read after a configurable fraction of their estimated reading time in view, with a minimum dwell time. Estimates use 238 words/minute for English and 400 characters/minute for CJK text. The default fraction is 50%; briefly scrolling past text is not enough.
 
-The optional top progress strip sizes segments by text length. Dark segments were read this visit, blue-gray segments were read before, pale segments were briefly visible and empty segments are unseen. The current viewport is highlighted. This display preference is local to the device.
+The extension's optional top progress strip sizes segments by text length. Dark segments were read this visit, blue-gray segments were read before, pale segments were briefly visible and empty segments are unseen. The current viewport is highlighted. This display preference is local to the device. The Android reader uses a faint progress line at the bottom edge instead.
 
 An article is finished only when its read percentage reaches the configured threshold **and** its final paragraph has been visible. Completion can also be changed manually. Article review, when enabled, saves the body text and generates an outline and three recall questions at the threshold, ready for the completion card. This automatic model call consumes tokens.
 
@@ -82,7 +82,7 @@ Reading rounds combine nearby sessions on the same article; the overview display
 
 ### Resume reading
 
-Lectern remembers the last paragraph and restores it when you reopen the article. URL anchors, browser-restored positions and scrolling during extraction take priority. A notice offers **Back to top** after restoration. Synced article positions can continue on another device, although changed page structure may prevent an exact match.
+Lectern remembers the last paragraph and restores it when you reopen the article. URL anchors, browser-restored positions and scrolling during extraction take priority. In the extension, a notice offers **Back to top** after restoration. The Android reader restores the position without a notice. Synced article positions can continue on another device, although changed page structure may prevent an exact match.
 
 ### Statistics
 
@@ -116,7 +116,11 @@ The latest 20 practices, up to 20 rounds each, and drafts stay on this device. H
 
 Add a URL, share one from a browser, or open an article saved by the extension. A fetched article is cleaned for the reader; sites requiring login, complex interaction or anti-bot checks may not extract correctly. A browser-saved archive is preferable when the desktop browser already has access. The reader does not execute source-site scripts.
 
-Reader controls include font size, device-local bookmarks, a chapter outline and bottom progress. Changing font size preserves the visible paragraph. Translation and outline panels return you to your position when closed. Font size and bookmarks do not sync.
+On phones, reading shows only the article and a faint 2px progress line at the very bottom of the screen. System bars and reading tools start hidden; scrolling up or returning to the beginning does not reveal them. Tap the margins beside the article to show or hide tools. Text and paragraph spacing keep their word and sentence translation gestures. Keyboard and screen-reader users have a separate **Show reading tools** button.
+
+Reader controls include font size, device-local bookmarks and a chapter outline. Chapter navigation, the exact progress percentage and source details live inside the tools. Scrolling 24px in either direction, closing the outline or pressing Back hides the tools again without shifting the text. Changing font size preserves the visible paragraph. Translation panels remain available on demand. Font size and bookmarks do not sync.
+
+The Android reader does not show the extension's top progress strip, position notice or completion card. Position restoration, reading records and the review queue continue to work.
 
 Import EPUB files from the bookshelf or open them with Lectern from a file manager. Chapter HTML uses the same sanitizer as saved articles; images are stored locally by content hash. Books, their images and chapter progress remain on this device and are excluded from sync and JSON exports. Import the original EPUB again on another device; its chapter progress starts fresh. Vocabulary and cards derived from books are independent and can sync.
 

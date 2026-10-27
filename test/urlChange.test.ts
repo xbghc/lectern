@@ -187,6 +187,44 @@ test("收摊之后原地再起一轮：角标收掉、旧那篇不再收到任�
   }
 });
 
+test("App 隐藏附加界面仍恢复阅读位置、记录进度并上报读完", async () => {
+  sent = [];
+  mock.timers.enable({ apis: ["setInterval", "Date"], now: 1_700_000_000_000 });
+  const extracted = extractFromContainer(doc.getElementById("art")!, "渡口")!;
+  const anchor = extracted.paragraphs[1]!;
+  let restored = false;
+  Object.defineProperty(anchor.el, "scrollIntoView", { configurable: true, value: () => { restored = true; } });
+  const scroll = mock.method(dom.window, "scrollBy", () => {});
+  const sendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
+  const messages = mock.method(chrome.runtime, "sendMessage", async (msg: { type?: string }) => {
+    if (msg.type === "article:local-state") return {
+      [`pos:${FIRST}`]: { articleId: FIRST, hash: anchor.hash, index: 1, offset: 0, paragraphCount: paras.length, savedTs: Date.now() - 1000 },
+    };
+    return sendMessage(msg);
+  });
+  let ctl: Awaited<ReturnType<typeof startTracking>> | undefined;
+  try {
+    ctl = await startTracking({ url: FIRST, focus: "assume", approvedArticle: true, overlays: false, extract: () => extracted });
+    assert.equal(restored, true);
+    assert.equal(doc.querySelector("#lectern-focusbar, #lectern-position, #lectern-finish"), null);
+    ctl.setVisible(true);
+    ioCb(paras.map(target => ({ target, isIntersecting: true })));
+    await run(6_000);
+    assert.ok(ctl.state().wordsRead! > 0);
+    assert.equal(sent.some(m => m.type === "article:finished"), true);
+    assert.equal(sent.some(m => m.type === "article:text"), true);
+    assert.equal(doc.querySelector("#lectern-focusbar, #lectern-position, #lectern-finish"), null);
+    ctl.stop();
+    assert.equal(sent.some(m => m.type === "session:end"), true);
+  } finally {
+    ctl?.stop();
+    delete (anchor.el as Partial<HTMLElement>).scrollIntoView;
+    messages.mock.restore();
+    scroll.mock.restore();
+    mock.timers.reset();
+  }
+});
+
 test("非文章页：不留设置监听，也不挂任何页面监听", async () => {
   classifyAsArticle = false;
   settingsListeners = 0;

@@ -42,6 +42,8 @@ const EXTRACT_RETRY_MS = [0, 1_500, 4_000];
 const RESTORE_RECHECK_MS = [250, 750, 1_500];
 
 export interface TrackOptions {
+  /** App 自己呈现进度；关闭扩展的情况条、位置提示和读完角标，追踪和回顾记录照常。 */
+  overlays?: boolean;
   /** User-saved content has already been explicitly selected for reading; works offline. */
   approvedArticle?: boolean;
   /**
@@ -216,7 +218,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   let barDone = false;
   const drawBar = (): void => {
     barFrame = null;
-    if (barDone || !settings.focusBarEnabled) focusBar.hide();
+    if (barDone || opts.overlays === false || !settings.focusBarEnabled) focusBar.hide();
     else focusBar.show(tracker.marks(), tracker.viewportSpan());
   };
   const scheduleBar = (): void => {
@@ -341,7 +343,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
           // 这时候弹出来点进去是死路。不置 cardDone，下一拍再试。
           if (!res?.marked) return;
           cardDone = true;
-          finishCard.show();
+          if (opts.overlays !== false) finishCard.show();
         })
         .catch(() => undefined)
         .finally(done_);
@@ -642,8 +644,10 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
     const p = { ...plan, offset: clampOffset(plan.offset, target.getBoundingClientRect().height) };
     scrollToAnchor(target, p.offset);
     // 跳回来的那一刻顺便说一句还要读多久：「现在读还是待会儿读」最需要的就是这个数
-    const left = estimateNow();
-    positionCard.show(p.index + 1, p.total, left.words > 0 ? "Remaining: " + formatEstimate(left.ms) : undefined);
+    if (opts.overlays !== false) {
+      const left = estimateNow();
+      positionCard.show(p.index + 1, p.total, left.words > 0 ? "Remaining: " + formatEstimate(left.ms) : undefined);
+    }
 
     // 图片撑开、广告位插入都会把落点顶走，跳完再盯一会儿。
     // 用户一动手就收手：把正在读的画面抽走是最恼人的一种交互。

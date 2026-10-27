@@ -3,6 +3,9 @@ import { sectionName } from "../options/nav.ts";
 /** Keep the shared settings controls and handlers, but give the app a compact section index. */
 export function setupSettingsLayout(): void {
   document.body.classList.add("mobile-settings");
+  // App 使用自己的贴底进度线，扩展顶部情况条的开关在这里没有作用。
+  const extensionProgress = document.getElementById("focusBarEnabled")?.closest<HTMLElement>(".field");
+  if (extensionProgress) extensionProgress.hidden = true;
   document.querySelector(".settings-back")?.remove();
   const title = document.querySelector("h1");
   if (title) title.textContent = "Settings";

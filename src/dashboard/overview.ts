@@ -3,6 +3,8 @@ import { readingActivity, type ActivitySession } from '../lib/activity.ts';
 import { overviewInsights, wordsPerMinute } from '../lib/stats.ts';
 import { estimateArticle, formatEstimate } from '../lib/readingTime.ts';
 import { hostnameOf } from '../lib/url.ts';
+import { readingResume } from '../books/progress.ts';
+import type { Book } from '../books/types.ts';
 import { parseChapterId } from '../books/types.ts';
 import { el } from '../popup/dom.ts';
 import type { UiEvent } from '../lib/uiUsage.ts';
@@ -21,8 +23,22 @@ function metric(label: string, value: string, note: string, name: IconName): HTM
     el('strong', { class: 'metric-value' }, [value]), el('span', { class: 'metric-note' }, [note])]);
 }
 let homeRequest = 0;
-export async function renderReadingHome(articles: Article[], speed: SpeedSummary | null, navigate: (pane: 'review' | 'words' | 'stats', queue?: 'words' | 'articles') => void): Promise<void> {
+export async function renderReadingHome(articles: Article[], speed: SpeedSummary | null, navigate: (pane: 'review' | 'words' | 'stats', queue?: 'words' | 'articles') => void, books: Record<string, Book> = {}): Promise<void> {
   const request = ++homeRequest;
+  if (document.body.classList.contains('app')) {
+    const target = readingResume(articles, books);
+    document.body.dataset.resumeArticle = target?.articleId ?? '';
+    const root = $('continue-reading');
+    if (!target) { root.replaceChildren(); return; }
+    root.replaceChildren(el('section', { class: 'phone-continue' }, [
+      el('div', { class: 'phone-continue-label' }, [el('span', {}, ['接着读']), icon('bookmark')]),
+      el('h2', {}, [target.title]), el('p', {}, [target.source]),
+      el('div', { class: 'progress' }, [el('i', { style: `width:${target.progress}%` })]),
+      el('div', { class: 'phone-continue-bottom' }, [el('span', {}, [`已读 ${target.progress}%`]),
+        el('a', { class: 'primary', href: `read.html?u=${encodeURIComponent(target.articleId)}&from=articles`, 'data-track': 'articles.open' }, ['继续阅读', icon('arrow')])]),
+    ]));
+    return;
+  }
   const next = articles.filter(a => !a.finished && !parseChapterId(a.id)).sort((a,b) => b.lastSeenTs - a.lastSeenTs)[0];
   const continueBox = $('continue-reading');
   if (next) {

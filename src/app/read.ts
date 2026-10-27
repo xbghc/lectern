@@ -1,8 +1,11 @@
 import "./boot.ts";
 import { Readability } from "@mozilla/readability";
-import type { ReaderFetch, Snippet } from "../types.ts";
+import type { Article, ReaderFetch, Snippet } from "../types.ts";
 import { go, navigation, readerUrl, shim } from "./boot.ts";
 import { hostHooks, inApp, native, systemBars } from "./native.ts";
+import { setupReaderControls } from "./readerControls.ts";
+import { decorateIcons } from "../ui/icons.ts";
+import { bookProgress } from "../books/progress.ts";
 import { startFullscreen, type FullscreenReading } from "./fullscreen.ts";
 import { sanitizeArticle } from "./sanitize.ts";
 import { extractFromContainer } from "../features/reading/paragraphs.ts";
@@ -153,12 +156,14 @@ function showStatus(text: string, retry?: () => void): void {
 function makePage(body: HTMLElement, title: string, approvedArticle: boolean, onChange: () => void) {
   return createPageHost({
     reading: readingPlugin({ focus: "assume", approvedArticle, extract: () => extractFromContainer(body, title) }),
-    translation: translationPlugin({ tapRoot: body, autoEnable: true }),
+    translation: translationPlugin({ tapRoot: body, autoEnable: true, presentation: "sheet" }),
   }, { title: () => title, onChange });
 }
 let page: ReturnType<typeof makePage> | null = null;
 let full: FullscreenReading | null = null;
 let leaving = false;
+let returnPane: string | null = null;
+let bookContext: { book: Book; articleId: string; records: Article[] } | null = null;
 
 /**
  * 在不在手机上。全屏阅读只在这儿成立：在宿主里（这个 App 只装在手机上），或者窄屏——
@@ -183,6 +188,7 @@ async function leave(): Promise<void> {
   // 系统栏不在这儿还：回退落到哪一页只有宿主知道（可能是书里的上一节，那就该接着全屏），
   // 所以放回系统栏统一由宿主的 onPageStarted 判断（见 MainActivity）
   await shim.flush();
+  if (returnPane) { await go(`index.html#${returnPane}`); return; }
   const bridge = native();
   if (bridge?.navigateBack) bridge.navigateBack();
   else if (history.length > 1) history.back();
@@ -208,6 +214,12 @@ function renderMeta(url: string): void {
     const read = st.wordsRead ?? 0;
     const pct = tracked > 0 ? Math.min(100, Math.round((read / tracked) * 100)) : 0;
     parts.push(`已读 ${pct}%`);
+    const progress = bookContext ? bookProgress(bookContext.book, [...bookContext.records.filter(a => a.id !== bookContext!.articleId), {
+      id: bookContext.articleId, trackedWords: tracked, wordsRead: read,
+      finished: bookContext.records.find(a => a.id === bookContext!.articleId)?.finished ?? false,
+    }]) : pct;
+    $("rprogress").textContent = `${progress}%`;
+    $("rprogress-fill").style.width = `${progress}%`;
     const est = st.estimate;
     if (est && est.words > 0) parts.push("还需" + formatEstimate(est.ms));
     else if (tracked > 0 && read >= tracked) parts.push("已读完");
@@ -216,6 +228,7 @@ function renderMeta(url: string): void {
     parts.push(st.reason);
   }
   $("rmeta").textContent = parts.join(" · ");
+  $("rmeta").hidden = st?.tracked === true;
 }
 
 /* ==================== 本文生词 ==================== */
@@ -261,10 +274,15 @@ function renderWords(list: Snippet[]): void {
 /* ==================== 启动 ==================== */
 
 async function main(): Promise<void> {
+  decorateIcons();
   const params = new URLSearchParams(location.search);
+  const from = params.get("from"); returnPane = from && ["articles", "books"].includes(from) ? from : null;
+  const contents = $<HTMLDialogElement>("reader-contents");
+  $("reader-toc").addEventListener("click", () => { full?.reveal(); contents.showModal(); });
+  $("contents-close").addEventListener("click", () => contents.close());
   const url = params.get("u")?.trim() ?? "";
   $("back").addEventListener("click", () => void leave());
-  $("shot").addEventListener("click", () => page?.get("translation")?.screenshot());
+  $("shot").addEventListener("click", () => { contents.close(); requestAnimationFrame(() => requestAnimationFrame(() => page?.get("translation")?.screenshot())); });
   // 全屏先进：正文还在抓的时候系统栏就该让开，不必等正文回来才挪一次位置
   if (onPhone()) {
     full = startFullscreen({
@@ -289,6 +307,8 @@ async function main(): Promise<void> {
 
   hostHooks.beforeBack = () => {
     if (cancelRegion()) return true;
+    if (page?.get("translation")?.dismiss()) return true;
+    if (contents.open) { contents.close(); return true; }
     // 单子开着时先收单子：手机上"返回"关掉的是最上面那一层，不是整个页面
     if (!sheet.hidden) {
       setSheet(false);
@@ -371,7 +391,7 @@ async function main(): Promise<void> {
   const pageUrl = cached.finalUrl || url;
   const articleId = normalizeUrl(pageUrl);
   document.title = cached.title;
-  $("rtitle").textContent = cached.title;
+  $("rtitle").textContent = book?.title || hostnameOf(pageUrl);
   const box = $("article");
   const heading = el("h1", "atitle", cached.title);
   const byline = el("div", "aline");
@@ -419,20 +439,24 @@ async function main(): Promise<void> {
   /* 章末的翻页。书里没有"下一页"这一说，读完一节要能直接进下一节，也要能回目录。 */
   if (book && chapter) {
     const current = book;
+    const records = await chrome.runtime.sendMessage({ type: "articles:list" }) as { articles?: Article[] };
+    bookContext = { book, articleId, records: records.articles ?? [] };
     const nav = el("div", "chapter-nav");
     const jump = (to: number, label: string): void => {
       const btn = el("button", "mini", label);
-      btn.addEventListener("click", () => void go(readerUrl(chapterId(current.id, to))));
+      btn.addEventListener("click", () => void go(readerUrl(chapterId(current.id, to)) + (returnPane ? `&from=${returnPane}` : "")));
       nav.append(btn);
     };
     if (chapter.index > 0) jump(chapter.index - 1, "‹ 上一节");
     const toc = el("button", "mini", "目录");
-    toc.addEventListener("click", () => void go(`index.html?book=${encodeURIComponent(current.id)}`));
+    toc.addEventListener("click", () => contents.showModal());
     nav.append(toc);
     if (chapter.index + 1 < current.chapters.length) jump(chapter.index + 1, "下一节 ›");
     box.append(nav);
   }
 
+  await setupReaderControls({ articleId, body, book, chapter: chapter?.index ?? null,
+    openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")), reveal: () => full?.reveal() });
   const title = cached.title;
   page = makePage(body, title, !!cached.archiveManifest || !!cached.book, () => renderMeta(pageUrl));
   page.start(pageUrl);
@@ -452,6 +476,7 @@ async function main(): Promise<void> {
     if (area === "local" && changes["snippets"]) void refreshCount();
   });
   $("words").addEventListener("click", async () => {
+    contents.close();
     try { renderWords(await refreshCount()); }
     catch (err) {
       const box = $("sheet-list");

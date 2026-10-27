@@ -246,6 +246,14 @@ button:active { background: #f1ebe2; border-color: #a45531; color: #a45531; }
   /* 出错那句：浅色那份深棕放在深色卡片上只剩 2:1 */
   .err { color: #d4a373; }
 }
+
+.reader-sheet-backdrop { position:fixed; inset:0; background:rgba(36,30,22,.17); pointer-events:auto; }
+.box.reader-sheet { position:fixed; width:100%; max-width:none; border-radius:18px 18px 0 0; padding:20px 22px calc(22px + max(env(safe-area-inset-bottom),var(--inset-bottom,0px))); box-shadow:0 -10px 35px rgba(36,27,21,.15); overscroll-behavior:contain; }
+.reader-sheet .term { font-size:28px; padding-right:36px; }
+.reader-sheet .tr { font-size:18px; margin:12px 0; }
+.reader-sheet .note, .reader-sheet .usage { font-size:13px; line-height:1.8; }
+.reader-sheet-close { position:sticky; top:0; z-index:2; float:right; margin:-7px -10px 0 0; border:0; width:40px; height:40px; padding:0; font:26px/1 system-ui,sans-serif; color:inherit; background:inherit; }
+.reader-sheet .qin { font-size:16px; }
 `;
 
 /** 一问的长度上限。追问是「就这一段再问一句」，不是往这里贴一段材料。 */
@@ -267,6 +275,9 @@ const VISIBLE_MIN_PX = 40;
 const DOCK_CLOSE_RATIO = 0.25;
 
 export interface PopoverActions {
+  /** The native reader keeps translation inside a bottom sheet; extension pages retain anchored popovers. */
+  presentation?: "sheet";
+  onClose?: () => void;
   /** 这次贴位的样式已经写好；观察器按帧去量真正画出来的位置。 */
   onPositioned?: (box: HTMLElement) => void;
   /** 用户点了「翻译」（长选区需要确认时才出现这个按钮）。 */
@@ -345,6 +356,7 @@ export class Popover {
   /** 同一帧里的多次贴位合并成一次，见 reposition。 */
   private repositioning = false;
   private recognizing = false;
+  private sheetCleanup: (() => void) | null = null;
 
   constructor(actions: PopoverActions, typewriter: TypewriterDeps = {}) {
     this.actions = actions;
@@ -434,6 +446,26 @@ export class Popover {
       this.toggleTerm();
     });
 
+    if (this.actions.presentation === "sheet") {
+      const backdrop = document.createElement("div"); backdrop.className = "reader-sheet-backdrop";
+      backdrop.addEventListener("click", () => this.actions.onClose?.());
+      backdrop.addEventListener("touchmove", event => event.preventDefault(), { passive: false });
+      backdrop.addEventListener("wheel", event => event.preventDefault(), { passive: false });
+      root.append(backdrop);
+      box.classList.add("reader-sheet"); box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "翻译与讲解"); box.setAttribute("aria-modal", "true");
+      const resize = (): void => this.position();
+      window.addEventListener("resize", resize);
+      window.visualViewport?.addEventListener("resize", resize);
+      window.visualViewport?.addEventListener("scroll", resize);
+      this.sheetCleanup = () => { window.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
+      box.addEventListener("keydown", event => {
+        if (event.key !== "Tab") return;
+        const controls = [...box.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),[tabindex="0"]')];
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && root.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && root.activeElement === last) { event.preventDefault(); first?.focus(); }
+      });
+    }
     root.append(style, box);
     document.documentElement.appendChild(host);
     this.host = host;
@@ -466,6 +498,7 @@ export class Popover {
     const host = this.host;
     if (!box || !host) return;
     this.anchor = rect;
+    if (this.actions.presentation === "sheet") { this.frame = null; this.position(); return; }
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
     const origin = freeze(host, vw, vh);
@@ -509,6 +542,21 @@ export class Popover {
    */
   private position(): void {
     const box = this.box;
+    if (box && this.actions.presentation === "sheet") {
+      if (!box.querySelector(".reader-sheet-close")) {
+        const close = document.createElement("button"); close.type = "button"; close.className = "reader-sheet-close";
+        close.textContent = "×"; close.setAttribute("aria-label", "关闭翻译");
+        close.addEventListener("click", () => this.actions.onClose?.()); box.prepend(close);
+        close.focus({ preventScroll: true });
+      }
+      const viewport = window.visualViewport;
+      const height = viewport?.height ?? window.innerHeight;
+      box.style.maxHeight = `${Math.max(120, Math.min(height * .68, 520))}px`;
+      box.style.bottom = `${Math.max(0, window.innerHeight - height - (viewport?.offsetTop ?? 0))}px`;
+      box.style.top = "auto"; box.style.left = "0"; box.style.transform = "";
+      box.classList.toggle("scrolls", box.scrollHeight > box.clientHeight);
+      this.actions.onPositioned?.(box); return;
+    }
     const rect = this.anchor;
     const f = this.frame;
     if (!box || !rect || !f) return;
@@ -1012,6 +1060,7 @@ export class Popover {
   }
 
   hide(): void {
+    this.sheetCleanup?.(); this.sheetCleanup = null;
     stopSpeaking();
     this.tw.clear();
     this.finishing = null;

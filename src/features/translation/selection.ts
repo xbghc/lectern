@@ -58,6 +58,7 @@ const POPOVER_TOUCH_GRACE_MS = 1_000;
 const WARM_INTERVAL_MS = 20_000;
 
 export interface SelectionDeps {
+  presentation?: "sheet";
   recordTrace?: (trace: TranslationTrace) => void;
   /** App 阅读器传正文容器，启用单击单词、双击句子。 */
   tapRoot?: HTMLElement;
@@ -124,6 +125,8 @@ export class SelectionTranslator {
   constructor(deps: SelectionDeps) {
     this.deps = deps;
     this.popover = new Popover({
+      presentation: deps.presentation,
+      onClose: () => { this.dismiss(); if (this.deps.tapRoot) { this.deps.tapRoot.tabIndex = -1; this.deps.tapRoot.focus({ preventScroll: true }); } },
       onConfirm: () => void this.runPending(),
       onOpenOptions: () => this.deps.openOptions(),
       onAsk: (question) => void this.runAsk(question),
@@ -284,6 +287,8 @@ export class SelectionTranslator {
     const host = this.popover.hostElement;
     return host !== null && e.composedPath().includes(host);
   }
+
+  get visible(): boolean { return this.popover.hostElement !== null; }
 
   dismiss(): void {
     this.trace?.finish("cancelled", "浮层关闭、选择改变或页面离开");

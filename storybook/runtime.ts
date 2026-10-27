@@ -1,13 +1,15 @@
 import { handle } from '../src/background/handle.ts';
 import { installChromeShim, memoryBackend } from '../src/app/shim.ts';
-import { ARTICLE_URL, fixtures } from './fixtures.ts';
+import { chapterId } from '../src/books/types.ts';
+import { ARTICLE_URL, BOOK_ID, fixtures } from './fixtures.ts';
 import { matchesUrlRules } from "../src/lib/url.ts";
 import type { Settings } from "../src/types.ts";
 import type { AnyMessage, PageState } from '../src/types.ts';
 import type { SyncStatus } from '../src/sync/engine.ts';
 
-declare global { interface Window { __PREVIEW__: { state: string; tab: string; page: string }; __previewErrors: string[] } }
+declare global { interface Window { __PREVIEW__: { state: string; tab: string; page: string }; __previewErrors: string[]; __PREVIEW_SEARCH__: string } }
 const options = window.__PREVIEW__;
+window.__PREVIEW_SEARCH__ = options.tab === 'bookReader' ? `?u=${encodeURIComponent(chapterId(BOOK_ID, 0))}&from=books` : `?u=${encodeURIComponent(ARTICLE_URL)}`;
 const seed = fixtures(options.state === 'empty');
 let syncStatus: SyncStatus = {
   enabled: options.state !== 'empty', baseUrl: options.state === 'empty' ? '' : 'https://sync.example.com',
@@ -132,7 +134,10 @@ if (options.page === 'reader' && options.state === 'empty') void storage.remove(
 window.addEventListener('DOMContentLoaded', () => {
   const tab = options.tab === 'articleReview' ? 'review' : options.tab;
   document.querySelector<HTMLButtonElement>(`[data-tab="${tab}"]`)?.click();
+  if (options.page === 'app' && ['review', 'articleReview'].includes(options.tab)) document.getElementById('words-review')?.click();
   if (options.tab === 'classification') {
+    const tools = document.getElementById('article-tools') as HTMLDetailsElement | null;
+    if (tools) tools.open = true;
     setTimeout(() => {
       document.querySelector<HTMLButtonElement>('#manage-articles')?.click();
       document.querySelector<HTMLInputElement>('#select-articles')?.click();

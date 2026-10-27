@@ -36,7 +36,9 @@ import {
 const bar = document.createElement("div");
 bar.className = "topnav";
 const back = document.createElement("a");
-back.href = "index.html";
+let returnPane = "articles";
+try { const saved = window.sessionStorage.getItem("lectern:home-pane"); if (saved && ["articles", "books", "words"].includes(saved)) returnPane = saved; } catch { /* optional preference */ }
+back.href = `index.html#${returnPane}`;
 back.textContent = "‹ 返回";
 bar.append(back);
 document.body.prepend(bar);
@@ -277,3 +279,4 @@ function addUpdateSection(): void {
 
 addUpdateSection();
 setupSettingsLayout();
+document.getElementById("settings-statistics")?.addEventListener("click", e => { if (!leaveAnyway()) e.preventDefault(); });

@@ -13,7 +13,8 @@ import { formatDuration } from "../lib/stats.ts";
 import { importEpub } from "../books/import.ts";
 import { coverUrl, deleteBook, getBook, importHash, listBooks, localSink, saveBook } from "../books/local.ts";
 import { canOpenBooks, openEpub, pickEpub } from "../books/native.ts";
-import { chapterId, nextChapter, type Book } from "../books/types.ts";
+import { bookProgress, resumeChapter } from "../books/progress.ts";
+import { chapterId, type Book } from "../books/types.ts";
 
 /**
  * App 首页 = 扩展的 dashboard（文章 / 复习 / 生词本），外加一个"文章从哪来"的入口：
@@ -106,7 +107,7 @@ $("add").addEventListener("submit", (e) => {
     hint.textContent = "没认出网址，得是 http(s):// 开头的地址。";
     return;
   }
-  location.href = readerUrl(url);
+  location.href = readerUrl(url) + "&from=articles";
 });
 
 const shared = new URLSearchParams(location.search).get("share");
@@ -144,7 +145,7 @@ function chapterRow(book: Book, index: number, title: string, words: number, don
   const item = document.createElement("div");
   item.className = "card chapter-row";
   const link = document.createElement("a");
-  link.href = readerUrl(chapterId(book.id, index));
+  link.href = readerUrl(chapterId(book.id, index)) + "&from=books";
   link.textContent = `${index + 1}. ${title}`;
   const meta = document.createElement("span");
   meta.className = "muted small";
@@ -167,6 +168,7 @@ async function renderBooks(): Promise<void> {
   const records = new Map((res.articles ?? []).map(a => [a.id, a]));
 
   const fragment = document.createDocumentFragment();
+  const homeFragment = document.createDocumentFragment();
   for (const book of books) {
     const done = new Set(book.chapters.filter(c => finished.has(chapterId(book.id, c.index))).map(c => c.index));
     const card = document.createElement("div");
@@ -175,23 +177,34 @@ async function renderBooks(): Promise<void> {
     const row = document.createElement("div");
     row.className = "row1";
     const cover = await coverUrl(book);
-    if (cover) {
-      urls.push(cover);
-      const img = document.createElement("img");
-      img.className = "book-cover";
-      img.src = cover;
-      img.alt = "";
-      row.append(img);
+    if (cover) urls.push(cover);
+    const target = chapterId(book.id, resumeChapter(book, res.articles ?? []));
+    const progress = bookProgress(book, res.articles ?? []);
+    const coverNode = (): HTMLElement => {
+      const box = document.createElement("div"); box.className = "shelf-cover";
+      if (cover) { const img = document.createElement("img"); img.src = cover; img.alt = ""; box.append(img); }
+      else { const name = document.createElement("span"); name.textContent = book.title; box.append(name); }
+      return box;
+    };
+    const coverLink = document.createElement("a"); coverLink.className = "shelf-cover-link";
+    coverLink.href = readerUrl(target) + "&from=books"; coverLink.setAttribute("aria-label", `阅读《${book.title}》`);
+    coverLink.append(coverNode()); row.append(coverLink);
+    if (homeFragment.childElementCount < 2) {
+      const preview = document.createElement("a"); preview.className = "phone-shelf-preview";
+      preview.href = readerUrl(target) + "&from=articles";
+      const info = document.createElement("div"); const name = document.createElement("h3"); name.textContent = book.title;
+      const detail = document.createElement("p"); detail.textContent = progress ? `已读 ${progress}%` : "尚未开始";
+      info.append(name, detail); preview.append(coverNode(), info); homeFragment.append(preview);
     }
     const title = document.createElement("div");
     title.className = "title";
     const open = document.createElement("a");
-    open.href = readerUrl(chapterId(book.id, nextChapter(book, done)));
+    open.href = readerUrl(target) + "&from=books";
     open.textContent = book.title;
     title.append(open);
     const pill = document.createElement("span");
     pill.className = `pill${done.size === book.chapters.length ? " done" : ""}`;
-    pill.textContent = `${done.size}/${book.chapters.length}`;
+    pill.textContent = `已读 ${progress}%`;
     row.append(title, pill);
 
     const sub = document.createElement("div");
@@ -250,6 +263,8 @@ async function renderBooks(): Promise<void> {
   }
   if (turn !== bookRender) { for (const url of urls) URL.revokeObjectURL(url); return; }
   bookList.replaceChildren(fragment);
+  $("home-books").replaceChildren(homeFragment);
+  $("home-shelf").hidden = books.length === 0;
   for (const url of coverUrls) URL.revokeObjectURL(url);
   coverUrls = urls;
   bookSection.hidden = books.length === 0;

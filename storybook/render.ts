@@ -19,7 +19,7 @@ export function renderPage(args: PageArgs): HTMLElement {
 export const controls: Meta<PageArgs>["argTypes"] = {
   page: { control: false },
   state: { control: 'select', options: ['populated', 'empty', 'nonArticle', 'loading', 'error'] },
-  tab: { control: 'select', options: ['current', 'translation', 'stats', 'books', 'articles', 'words', 'review', 'articleReview', 'classification'] },
+  tab: { control: 'select', options: ['current', 'translation', 'stats', 'books', 'bookReader', 'articles', 'words', 'review', 'articleReview', 'classification'] },
   width: { control: { type: 'range', min: 320, max: 1440, step: 10 } },
   height: { control: { type: 'range', min: 400, max: 1200, step: 20 } },
 };

@@ -190,9 +190,21 @@ body.reader.immersive .rbar {
   padding-top: calc(6px + max(var(--sa-top), 18px));
   transition: transform 160ms ease;
 }
-body.reader.immersive.chrome-hidden .rbar { transform: translateY(-100%); }
-/* 顶栏浮着，所以最上面那一屏要自己留出它的高度；--rbar-h 由 fullscreen.ts 量好写进来 */
-body.reader.immersive .article { padding-top: calc(14px + var(--rbar-h, 66px)); }
+body.reader.chrome-hidden .rbar { transform: translateY(-100%); visibility: hidden; pointer-events: none; }
+/* 工具浮在正文上，开合不改变排版，也不为隐藏的顶栏和底栏预留空白。 */
+body.reader.immersive .article {
+  padding: calc(24px + var(--sa-top)) max(24px, var(--sa-right)) calc(24px + var(--sa-bottom)) max(24px, var(--sa-left));
+}
+.reader-toggle { display: none; }
+body.reader.immersive .reader-toggle {
+  display: block; position: fixed; width: 1px; height: 1px; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+body.reader.immersive .reader-toggle:focus-visible {
+  z-index: 8; top: calc(8px + var(--sa-top)); left: max(8px, var(--sa-left));
+  width: auto; height: auto; padding: 10px 14px; clip-path: none;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line);
+}
 @media (prefers-reduced-motion: reduce) {
   body.reader.immersive .rbar { transition: none; }
 }
@@ -679,7 +691,7 @@ body.app #import-book { width:100%; min-height:48px; border-style:dashed; border
 .phone-reading-record > a { display:inline-block; color:var(--accent); font-size:12px; text-decoration:none; margin-top:16px; }
 body.app .article-menu-body { min-width:140px; }
 
-/* Reader chrome: an unobtrusive source line above, chapter progress below. */
+/* Reader tools are on demand; only a faint edge-to-edge progress line stays visible. */
 body.reader .rbar { padding:calc(6px + var(--sa-top)) max(10px,var(--sa-right)) 8px max(10px,var(--sa-left)); gap:3px; }
 body.reader .rtitle { text-align:center; color:var(--muted); font:12px var(--sans); }
 body.reader .rmeta { text-align:center; font-size:10px; margin-top:5px; }
@@ -689,18 +701,18 @@ body.reader .bookmarked { color:var(--accent); }
 body.reader .bookmarked svg { fill:var(--wash); }
 body.reader .article .body { font-size:var(--reader-font-size,18px); line-height:1.9; }
 body.reader .article h1.atitle { font-size:30px; line-height:1.3; margin-bottom:18px; }
-body.reader .article .aline { font-size:11px; border:0; padding:0; margin-bottom:28px; flex-wrap:wrap; }
-.reader-progress { position:fixed; z-index:6; bottom:0; left:0; right:0; padding:8px max(22px,var(--sa-right)) calc(10px + var(--sa-bottom)) max(22px,var(--sa-left)); border-top:1px solid var(--line); background:var(--bg); font:11px var(--sans); color:var(--muted); }
-.reader-progress > div:first-child { display:flex; align-items:center; justify-content:space-between; min-height:32px; }
-.reader-progress button { padding:0; display:flex; align-items:center; gap:7px; border:0; background:none; color:inherit; min-height:32px; cursor:pointer; }
-.reader-progress svg { width:15px; height:15px; }
-.reader-progress .progress { margin:5px 0 0; height:2px; }
-.reader-feedback { position:fixed; z-index:7; left:50%; bottom:calc(90px + var(--sa-bottom)); transform:translateX(-50%); max-width:85vw; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--muted); font:12px var(--sans); pointer-events:none; }
+.reader-progress { position:fixed; z-index:6; bottom:0; left:0; right:0; height:2px; pointer-events:none; background:color-mix(in srgb,var(--muted) 10%,transparent); }
+.reader-progress > span { display:block; width:0; height:100%; background:color-mix(in srgb,var(--muted) 40%,transparent); }
+.reader-feedback { position:fixed; z-index:7; left:50%; bottom:calc(24px + var(--sa-bottom)); transform:translateX(-50%); max-width:85vw; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--muted); font:12px var(--sans); pointer-events:none; }
+body.reader.chrome-hidden .reader-feedback { visibility:hidden; }
 .reader-feedback:empty { display:none; }
 .reader-contents { width:min(520px,calc(100vw - 28px)); max-height:82dvh; padding:22px; border:1px solid var(--line); border-radius:12px; background:var(--bg); color:var(--fg); }
 .reader-contents::backdrop { background:#302c2740; }
 .reader-dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
 .reader-dialog-heading h2 { font:24px/1.4 var(--serif); }
+.reader-details { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--muted); font:12px var(--sans); margin-bottom:12px; }
+.reader-source { display:flex; flex-wrap:wrap; gap:8px 12px; color:var(--muted); font:11px/1.6 var(--sans); margin-bottom:18px; }
+.reader-source a { color:inherit; }
 .reader-chapter { display:flex; align-items:center; gap:14px; width:100%; padding:16px 0; border:0; border-bottom:1px solid var(--line); background:none; color:var(--fg); text-align:left; font:15px/1.5 var(--serif); }
 .reader-chapter > span:first-child { font:11px var(--sans); color:var(--muted); }
 .reader-chapter > span:nth-child(2) { flex:1; }

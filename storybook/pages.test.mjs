@@ -372,9 +372,9 @@ test('Android reading entry, local reader preferences and chapter navigation use
       window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder;
       window.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
       window.scrollBy = window.scrollTo = () => {};
-      window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+      window.matchMedia = query => ({ matches: query === '(max-width: 720px)', addEventListener() {}, removeEventListener() {} });
       window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
-      window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+      window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
     },
   });
   const settle = () => new Promise(resolve => setTimeout(resolve, 40));
@@ -384,6 +384,14 @@ test('Android reading entry, local reader preferences and chapter navigation use
     assert.ok(document.querySelector('.atitle').textContent.includes("Introduction"));
     assert.equal(document.querySelectorAll('.reader-chapter').length, 2);
     assert.equal(document.querySelector('.reader-chapter[aria-current]').textContent.includes("Introduction"), true);
+    assert.equal(document.body.classList.contains('chrome-hidden'), true);
+    assert.equal(document.getElementById('reader-toolbar').inert, true);
+    assert.equal(document.querySelector('#article .chapter-nav'), null);
+    assert.ok(document.querySelector('#reader-contents .chapter-nav'));
+    assert.equal(document.querySelector('#reader-progress button'), null);
+    assert.equal(document.querySelector('#lectern-focusbar, #lectern-position, #lectern-finish'), null);
+    document.getElementById('article').click();
+    assert.equal(document.getElementById('reader-toolbar').inert, false);
     const before = await chrome.runtime.sendMessage({ type: 'settings:get' });
     document.getElementById('reader-font').click();
     document.getElementById('reader-bookmark').click();
@@ -396,6 +404,8 @@ test('Android reading entry, local reader preferences and chapter navigation use
     assert.equal(document.getElementById('reader-contents').open, true);
     document.getElementById('contents-close').click();
     assert.equal(document.getElementById('reader-contents').open, false);
+    assert.equal(document.body.classList.contains('chrome-hidden'), true);
+    document.getElementById('article').click();
     document.getElementById('reader-bookmark').click();
     await settle();
     assert.equal(document.getElementById('reader-bookmark').getAttribute('aria-pressed'), 'false');

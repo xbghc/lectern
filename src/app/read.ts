@@ -155,7 +155,7 @@ function showStatus(text: string, retry?: () => void): void {
  */
 function makePage(body: HTMLElement, title: string, approvedArticle: boolean, onChange: () => void) {
   return createPageHost({
-    reading: readingPlugin({ focus: "assume", approvedArticle, extract: () => extractFromContainer(body, title) }),
+    reading: readingPlugin({ focus: "assume", approvedArticle, overlays: false, extract: () => extractFromContainer(body, title) }),
     translation: translationPlugin({ tapRoot: body, autoEnable: true, presentation: "sheet" }),
   }, { title: () => title, onChange });
 }
@@ -220,6 +220,7 @@ function renderMeta(url: string): void {
     }]) : pct;
     $("rprogress").textContent = `${progress}%`;
     $("rprogress-fill").style.width = `${progress}%`;
+    $("reader-progress").setAttribute("aria-valuenow", String(progress));
     const est = st.estimate;
     if (est && est.words > 0) parts.push("Remaining: " + formatEstimate(est.ms));
     else if (tracked > 0 && read >= tracked) parts.push("Finished");
@@ -280,6 +281,7 @@ async function main(): Promise<void> {
   const contents = $<HTMLDialogElement>("reader-contents");
   $("reader-toc").addEventListener("click", () => { full?.reveal(); contents.showModal(); });
   $("contents-close").addEventListener("click", () => contents.close());
+  contents.addEventListener("close", () => full?.hide());
   const url = params.get("u")?.trim() ?? "";
   $("back").addEventListener("click", () => void leave());
   $("shot").addEventListener("click", () => { contents.close(); requestAnimationFrame(() => requestAnimationFrame(() => page?.get("translation")?.screenshot())); });
@@ -288,10 +290,12 @@ async function main(): Promise<void> {
     full = startFullscreen({
       body: document.body,
       bar: document.querySelector<HTMLElement>(".rbar")!,
+      article: $("article"),
+      toggle: $<HTMLButtonElement>("reader-toggle"),
       host: window,
       systemBars: systemBars(),
     });
-  }
+  } else document.body.classList.remove("chrome-hidden");
   $("translate-here").addEventListener("click", () => { page?.get("translation")?.translateHere(); renderMeta(url); });
 
   /* 本文生词那张单子的开合。返回键要先问它，所以在 beforeBack 之前就备好。 */
@@ -300,8 +304,7 @@ async function main(): Promise<void> {
   const setSheet = (open: boolean): void => {
     sheet.hidden = !open;
     backdrop.hidden = !open;
-    // 开单子是"我现在要界面"，顶栏跟着露出来；收起时那一排还在，退回全屏交给下一次往下读
-    if (open) full?.reveal();
+    full?.hide();
   };
   backdrop.addEventListener("click", () => setSheet(false));
 
@@ -314,6 +317,7 @@ async function main(): Promise<void> {
       setSheet(false);
       return true;
     }
+    if (full?.shown()) { full.hide(); return true; }
     void leave();
     return true;
   };
@@ -394,7 +398,8 @@ async function main(): Promise<void> {
   $("rtitle").textContent = book?.title || hostnameOf(pageUrl);
   const box = $("article");
   const heading = el("h1", "atitle", cached.title);
-  const byline = el("div", "aline");
+  const byline = $("reader-source");
+  byline.replaceChildren();
   if (book) {
     byline.append(el("span", undefined, book.title));
     if (book.author) byline.append(el("span", undefined, book.author));
@@ -415,7 +420,7 @@ async function main(): Promise<void> {
     note.append(el("br"), again, dismiss);
     box.append(note);
   }
-  box.append(heading, byline);
+  box.append(heading);
   const body = el("div", "body");
   body.innerHTML = sanitizeArticle(cached.html, pageUrl, document, !!cached.archiveManifest || !!cached.book);
   if (cached.book) {
@@ -436,7 +441,7 @@ async function main(): Promise<void> {
   }
   box.append(body);
 
-  /* 章末的翻页。书里没有"下一页"这一说，读完一节要能直接进下一节，也要能回目录。 */
+  /* 翻章也放进目录，阅读正文时不显示额外按钮。 */
   if (book && chapter) {
     const current = book;
     const records = await chrome.runtime.sendMessage({ type: "articles:list" }) as { articles?: Article[] };
@@ -448,15 +453,12 @@ async function main(): Promise<void> {
       nav.append(btn);
     };
     if (chapter.index > 0) jump(chapter.index - 1, "‹ Previous chapter");
-    const toc = el("button", "mini", "Contents");
-    toc.addEventListener("click", () => contents.showModal());
-    nav.append(toc);
     if (chapter.index + 1 < current.chapters.length) jump(chapter.index + 1, "Next chapter ›");
-    box.append(nav);
+    contents.append(nav);
   }
 
   await setupReaderControls({ articleId, body, book, chapter: chapter?.index ?? null,
-    openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")), reveal: () => full?.reveal() });
+    openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")) });
   const title = cached.title;
   page = makePage(body, title, !!cached.archiveManifest || !!cached.book, () => renderMeta(pageUrl));
   page.start(pageUrl);

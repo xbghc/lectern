@@ -16,7 +16,7 @@ export function fontSize(value: unknown): number {
 /** Device-local reading preferences. Neither font size nor bookmarks enter the sync protocol. */
 export async function setupReaderControls(options: {
   articleId: string; body: HTMLElement; book: Book | null; chapter: number | null;
-  openChapter: (url: string) => void; reveal: () => void;
+  openChapter: (url: string) => void;
 }): Promise<void> {
   const { body, articleId, book, chapter } = options;
   const doc = body.ownerDocument;
@@ -77,13 +77,15 @@ export async function setupReaderControls(options: {
     const paragraph = mark.paragraph === undefined ? null : body.querySelectorAll<HTMLElement>('p,h2,h3,li')[mark.paragraph];
     if (paragraph && mark.offset !== undefined) window.scrollBy({ top: paragraph.getBoundingClientRect().top - mark.offset, behavior: 'instant' });
     else window.scrollTo({ top: mark.ratio * Math.max(0, doc.documentElement.scrollHeight - window.innerHeight), behavior: 'instant' });
-    options.reveal();
   });
   const contents = doc.getElementById('chapter-list')!;
   if (book) {
     doc.getElementById('contents-title')!.textContent = book.title;
     const toc = doc.getElementById('reader-toc')!;
-    toc.replaceChildren(icon('list'), document.createTextNode(`Chapter ${(chapter ?? 0) + 1} / ${book.chapters.length}`));
+    const location = `Chapter ${(chapter ?? 0) + 1} / ${book.chapters.length}`;
+    toc.setAttribute('aria-label', `Open contents, ${location}`);
+    toc.title = `Contents · ${location}`;
+    doc.getElementById('reader-location')!.textContent = location;
     for (const item of book.chapters) {
       const button = doc.createElement('button'); button.type = 'button'; button.className = 'reader-chapter';
       const number = doc.createElement('span'); number.textContent = String(item.index + 1).padStart(2, '0');

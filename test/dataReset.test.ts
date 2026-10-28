@@ -68,7 +68,7 @@ test("article-review output and its diagnostics cannot restore cleared article t
   release(Response.json({ choices: [{ message: { content: JSON.stringify({ outline: ["Private outline"], questions: ["One?", "Two?", "Three?"] }) }, finish_reason: "stop" }] }));
   const result = await work;
   assert.ok(!result.ok);
-  assert.match(result.error, /Local data was cleared/);
+  assert.match(result.error ?? "", /Local data was cleared/);
   await bookkeepingSettled();
   const state = await driver.read();
   assert.equal(state.data[`r:${request.articleId}`], undefined);

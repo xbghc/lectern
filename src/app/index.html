@@ -9,11 +9,12 @@
     <link rel="stylesheet" href="popup.css" />
     <link rel="stylesheet" href="dashboard.css" />
     <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="theme.css" />
   </head>
   <body class="dash app">
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="app-sidebar reading-header">
-      <div class="app-heading"><button id="reading-back" class="icon-btn" aria-label="Back to reading home" hidden><span data-icon="back"></span></button><div><span class="phone-header-kicker">LECTERN</span><h1 id="app-page-title">Reading</h1></div></div>
+      <div class="app-heading"><button id="reading-back" class="icon-btn" aria-label="Back to reading home" hidden><span data-icon="back"></span></button><div><span class="phone-header-kicker">Lectern</span><h1 id="app-page-title">Reading</h1></div></div>
       <nav aria-label="Main navigation">
         <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>Reading</span></button>
         <button data-tab="words" class="tab"><span data-icon="words"></span><span>Vocabulary</span><span id="nav-word-count" class="nav-count"></span></button>
@@ -90,7 +91,7 @@
     <section id="pane-words" class="pane" hidden>
       <button id="words-review" class="phone-review-entry"><span data-icon="review"></span><span><strong><span id="due-badge">0</span> items due</strong><small>Revisit words in the context you read them</small></span><span data-icon="arrow"></span></button>
       <div class="toolbar">
-        <input id="q-word" type="search" placeholder="Search text, translations or sources" />
+        <input id="q-word" type="search" placeholder="Search text, translations or sources" aria-label="Search vocabulary" />
         <select id="kind-filter">
           <option value="">All types</option>
           <option value="word">Word</option>

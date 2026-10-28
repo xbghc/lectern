@@ -31,7 +31,7 @@ Pausing focus settles the current session and keeps that page paused until you r
 
 Android puts reading first: the bottom navigation contains Reading, Vocabulary and Settings. Continue a recent article or book, browse the bookshelf, or add an article URL. **All articles and management** opens search, filters and bulk actions. Review starts from Vocabulary; Statistics is available beside the home search control.
 
-The visual design follows [the Lectern design reference](https://lectern-ui-coo.dreamyglobe32.chatgpt.site), with warm paper surfaces, restrained ochre actions and serif reading text.
+The interface follows [shadcn/ui's theme conventions](https://ui.shadcn.com/docs/theming): neutral surfaces, clear borders, rounded controls and consistent light/dark colors. Shared tokens and controls live in `src/ui/theme.css`; the existing TypeScript interfaces use these styles directly. Long-form reading retains its serif typography and unobtrusive bottom progress line.
 
 ## Model connection
 

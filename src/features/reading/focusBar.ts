@@ -22,7 +22,7 @@ export interface FocusRun extends FocusSpan { state: FocusState }
 const HOST_ID = "lectern-focusbar";
 
 const CSS = `
-:host { all: initial; }
+:host { all: initial; color-scheme: light dark; }
 .bar {
   position: fixed;
   /* App 里状态栏那一截让开（见 app/native.ts 的 --inset-top） */
@@ -32,9 +32,9 @@ const CSS = `
   height: 3px;
   z-index: 2147483644; /* 压在读完角标、位置提示之下 */
   pointer-events: none;
-  --read: #a45531;
-  --earlier: #7d8896;
-  --glanced: rgba(156, 77, 20, 0.32);
+  --read: #18181b;
+  --earlier: #71717a;
+  --glanced: rgba(24, 24, 27, 0.32);
   --unseen: rgba(128, 128, 128, 0.2);
 }
 .track { position: absolute; inset: 0; }
@@ -42,12 +42,12 @@ const CSS = `
   position: absolute;
   top: 100%;
   height: 2px;
-  background: rgba(40, 34, 28, 0.6);
+  background: rgba(24, 24, 27, 0.6);
 }
 .here[hidden] { display: none; }
 @media (prefers-color-scheme: dark) {
-  .bar { --read: #e18d5a; --earlier: #93a0af; --glanced: rgba(225, 141, 90, 0.35); --unseen: rgba(160, 160, 160, 0.22); }
-  .here { background: rgba(236, 229, 219, 0.65); }
+  .bar { --read: #fafafa; --earlier: #a1a1aa; --glanced: rgba(250, 250, 250, 0.35); --unseen: rgba(160, 160, 160, 0.22); }
+  .here { background: rgba(250, 250, 250, 0.65); }
 }
 @media print { .bar { display: none; } }
 `;

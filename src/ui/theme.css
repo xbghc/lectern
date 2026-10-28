@@ -1,0 +1,285 @@
+/* shadcn/ui-inspired Neutral theme. Shared by every extension and WebView page. */
+:root {
+  color-scheme: light dark;
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #dc2626;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #a1a1aa;
+  --sidebar: #fafafa;
+  --success: #15803d;
+  --warning: #a16207;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .05);
+  --shadow-popover: 0 4px 6px -1px rgb(0 0 0 / .08), 0 2px 4px -2px rgb(0 0 0 / .08);
+  --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --serif: "Source Serif 4", Georgia, "Songti SC", "Noto Serif CJK SC", "SimSun", serif;
+
+  /* Existing feature layouts consume these aliases; colors have one source of truth. */
+  --bg: var(--background);
+  --fg: var(--foreground);
+  --fg-soft: #3f3f46;
+  --line: var(--border);
+  --line-soft: var(--muted);
+  --side: var(--sidebar);
+  --wash: var(--muted);
+  --soft: var(--muted);
+  --bar: #d4d4d8;
+  --bar-strong: var(--primary);
+  --green: var(--success);
+  --ok: var(--success);
+  --warn: var(--warning);
+  --danger: var(--destructive);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #09090b;
+    --foreground: #fafafa;
+    --card: #18181b;
+    --card-foreground: #fafafa;
+    --popover: #18181b;
+    --popover-foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #18181b;
+    --secondary: #27272a;
+    --secondary-foreground: #fafafa;
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
+    --accent: #27272a;
+    --accent-foreground: #fafafa;
+    --destructive: #f87171;
+    --border: #27272a;
+    --input: #3f3f46;
+    --ring: #71717a;
+    --sidebar: #18181b;
+    --success: #4ade80;
+    --warning: #facc15;
+    --fg-soft: #d4d4d8;
+    --bar: #52525b;
+    --shadow-popover: 0 4px 12px rgb(0 0 0 / .3);
+  }
+}
+
+body { -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font-family: var(--sans); }
+button { font-weight: 500; }
+input::placeholder, textarea::placeholder { color: var(--muted-foreground); opacity: 1; }
+input[type="checkbox"] { accent-color: var(--primary); }
+:is(button, a, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+:is(input, textarea, select):focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent);
+  outline: none;
+}
+:is(input, textarea, select)[aria-invalid="true"] {
+  border-color: var(--destructive);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--destructive) 15%, transparent);
+}
+:is(input, textarea, select):disabled { opacity: .5; cursor: not-allowed; }
+
+.primary, .secondary, .btn, button.mini {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+}
+.primary, button.primary, button.mini.reveal {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+.secondary, .btn, button.mini {
+  background: var(--background);
+  border-color: var(--input);
+  color: var(--foreground);
+}
+.icon-btn, .iconbtn { border-radius: var(--radius-md); }
+.text-btn { font-weight: 500; }
+.primary svg, .secondary svg { width: 16px; height: 16px; }
+@media (hover: hover) {
+  .primary:hover:not(:disabled), button.primary:hover:not(:disabled), button.mini.reveal:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary) 90%, transparent);
+    color: var(--primary-foreground);
+    filter: none;
+  }
+  .secondary:hover:not(:disabled), .btn:hover:not(:disabled), button.mini:hover:not(:disabled), .icon-btn:hover:not(:disabled), .iconbtn:hover:not(:disabled) {
+    background: var(--accent);
+    color: var(--accent-foreground);
+    border-color: var(--input);
+  }
+}
+button.danger, button.mini.danger, .action-delete { color: var(--destructive); }
+
+/* Segmented controls share the same inset selected state across both hosts. */
+.segbar, .filterbar, .popup-tabs, .phone-stat-ranges {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  gap: 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--muted);
+}
+.popup-tabs { width: auto; }
+.segbar .seg, .filterbar button, body.app .filterbar button {
+  margin: 0;
+  padding: 7px 12px;
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+.segbar .seg.active, .filterbar button[aria-pressed="true"], .popup-tabs [aria-selected="true"], .phone-stat-ranges button.active {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+}
+.progress { border-radius: 999px; }
+.pill { border-radius: var(--radius-sm); font-size: 11px; font-weight: 500; }
+.article-menu-body { background: var(--popover); border-radius: var(--radius-md); box-shadow: var(--shadow-popover); }
+.article-menu-body button.mini { box-shadow: none; }
+dialog { box-shadow: 0 20px 60px rgb(0 0 0 / .18); }
+dialog::backdrop { background: rgb(0 0 0 / .5); }
+
+/* Component typography is distinct from long-form reading typography. */
+.brand-name { font: 650 22px/1.3 var(--sans); letter-spacing: -.6px; }
+.extension-popup .popup-brand .brand-name { font-size: 20px; }
+.brand-subtitle { letter-spacing: 0; margin-top: 6px; }
+.page-heading h1 { font: 650 30px/1.3 var(--sans); letter-spacing: -.8px; }
+.section-heading h2 { font: 600 15px/1.4 var(--sans); }
+.metric-value, .focus-total, .statbar .stat b, .phone-stat-total { font-weight: 600; letter-spacing: -1px; }
+.focus-total b { font-weight: 600; }
+.continue-body h2, .phone-continue h2 { font-weight: 600; letter-spacing: -.5px; }
+.dialog-heading h2, .reader-dialog-heading h2, .vocabulary-chat dialog h2 { font: 600 18px/1.5 var(--sans); letter-spacing: -.3px; }
+.word-card .title, .word-summary-row > .row1 .title { font-size: 18px; font-weight: 600; }
+.face .word { font-weight: 600; letter-spacing: -1px; }
+.phone-chat-welcome h2 { font: 600 24px/1.4 var(--sans); letter-spacing: -.6px; }
+.phone-chat-composer .primary { color: var(--primary-foreground); }
+
+/* Workspace cards, lists and navigation use the same surfaces and spacing scale. */
+.continue-card, .review-prompt, .stats-trend, .face, body.app .phone-continue {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+.continue-card { min-height: 220px; }
+.book-art { opacity: .35; }
+.reading-metrics { border: 0; gap: 16px; padding: 0; }
+.reading-metric, .reading-metric:first-child, .reading-metric:last-child {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.sidebar-quote { display: none; }
+.app-sidebar nav .tab.active { background: var(--accent); color: var(--accent-foreground); }
+.app-sidebar nav .tab, .app-sidebar .settings-link { border-radius: var(--radius-md); }
+.word-detail blockquote, .face .src { font-family: var(--serif); }
+.article-source { background: var(--muted); border-radius: var(--radius-md); }
+.phone-header-kicker { letter-spacing: 0; font-size: 12px; }
+body.app #app-page-title { font: 650 26px/1.3 var(--sans); letter-spacing: -.6px; }
+body.app .phone-continue { padding: 20px; margin-bottom: 24px; }
+.phone-continue h2 { font-size: 22px; line-height: 1.4; }
+.phone-continue > .progress { height: 4px; }
+.phone-shelf-preview { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }
+.phone-shelf-strip { gap: 12px; }
+.phone-shelf-preview h3 { font-size: 12px; font-weight: 600; }
+.phone-shelf-preview { grid-template-columns: 42px minmax(0, 1fr); gap: 10px; }
+.phone-shelf-preview .shelf-cover { width: 42px; height: 62px; }
+body.app .phone-review-entry { border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+body.app .app-sidebar .tab.active > [data-icon], .phone-settings-nav a.active svg { border-radius: var(--radius-md); }
+.phone-settings-nav a.active { color: var(--foreground); }
+body.app .book-card { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); }
+body.app .book-card .title { font-weight: 600; font-size: 14px; }
+body.app #book-list { gap: 16px; }
+.shelf-cover { border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); }
+.phone-stat-ranges { width: 100%; }
+.phone-stat-summary strong { font-weight: 600; }
+.phone-chat-starters button { border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.chat-message.is-user > div { border-color: var(--border); border-radius: var(--radius-lg); }
+.chat-word-option strong { font-size: 16px; font-weight: 600; }
+
+/* Native checkboxes remain keyboard-operable; switch tracks and thumbs stay aligned. */
+.field.check input[type="checkbox"], .mobile-settings .field.check input[type="checkbox"] {
+  width: 36px !important;
+  height: 20px;
+  min-width: 36px;
+  border-radius: 999px;
+}
+.field.check input[type="checkbox"]::before {
+  width: 16px;
+  height: 16px;
+  top: 1px;
+  left: 1px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+  transition: transform 150ms;
+}
+.field.check input[type="checkbox"]:checked::before { transform: translateX(16px); background: var(--primary-foreground); }
+.mobile-settings .settings-section { border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.mobile-settings .settings-section > summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  top: 24px;
+  right: 20px;
+  border-right: 1.5px solid var(--muted-foreground);
+  border-bottom: 1.5px solid var(--muted-foreground);
+  transform: rotate(45deg);
+}
+.mobile-settings .settings-section[open] > summary::after { content: ''; transform: rotate(225deg); top: 28px; }
+.mobile-settings h1 { font-weight: 650; letter-spacing: -.6px; }
+body.mobile-settings .settings-savebar { background: var(--background); grid-template-columns: minmax(0, 1fr) auto; }
+.mobile-settings .settings-savebar button { height: 44px; padding: 0 16px; font-size: 13px; line-height: 1.4; }
+.mobile-settings .settings-savebar #reset { white-space: nowrap; }
+.section-nav p { letter-spacing: 0; font-weight: 500; }
+.reader-contents { background: var(--popover); }
+.phone-shelf-preview .shelf-cover > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  padding-block: 0;
+  margin-block: 6px;
+}
+@media (max-width: 720px) {
+  body.app #pane-words .toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
+  body.app #q-word { grid-column: 1 / -1; width: 100%; min-height: 44px; }
+  body.app #word-summary { text-align: right; font-size: 11px; line-height: 1.5; }
+  body.app #kind-filter { min-height: 44px; }
+}
+
+/* Keep reader chrome opt-in, without changing the article's dimensions or scroll position. */
+body.reader .article .body, body.reader .article h1 { font-family: var(--serif); }
+.reader-progress { border: 0; border-radius: 0; box-shadow: none; }
+@media (pointer: coarse) {
+  .segbar .seg, .filterbar button, body.app .filterbar button { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

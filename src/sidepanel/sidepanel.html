@@ -7,39 +7,40 @@
     <style>
       body { width: auto; padding: 12px 14px 40px; }
       h1 { font-size: 14px; margin: 0 0 2px; }
-      #where { color: var(--muted); font-size: 11px; margin: 0 0 12px; font-family: var(--sans);
+      #where { color: var(--muted-foreground); font-size: 11px; margin: 0 0 12px; font-family: var(--sans);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      /* 每条生词是一张小索引卡，顶部同样一道赭线 */
+      /* Vocabulary cards share the neutral component theme. */
       .item {
-        border: 1px solid var(--line); border-top: 2px solid var(--accent);
-        border-radius: 3px; background: var(--card);
-        padding: 10px 11px; margin-bottom: 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm); background: var(--card);
+        padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
       }
       .item .t { font-weight: 600; word-break: break-word; font-size: 15px; }
-      .item .m { color: var(--muted); font-size: 11px; margin-top: 1px; }
+      .item .m { color: var(--muted-foreground); font-size: 11px; margin-top: 1px; }
       .item .tr { margin-top: 5px; font-size: 14px; }
       .item .n { color: var(--fg-soft); font-size: 12.5px; line-height: 1.75; margin-top: 5px; }
       .item .u { color: var(--fg-soft); font-size: 12.5px; line-height: 1.75; margin-top: 5px; }
-      .item .u::before { content: "Usage · "; color: var(--muted); font-size: 11px; }
+      .item .u::before { content: "Usage · "; color: var(--muted-foreground); font-size: 11px; }
       .item .vocab { margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); }
       .item .v + .v { margin-top: 6px; }
       .item .vw { font-weight: 600; font-size: 13px; }
-      .item .vm { color: var(--muted); font-size: 11px; margin-left: 6px; }
+      .item .vm { color: var(--muted-foreground); font-size: 11px; margin-left: 6px; }
       .item .vd { font-size: 12.5px; line-height: 1.7; }
-      .item .vn { color: var(--muted); font-size: 11.5px; line-height: 1.7; }
+      .item .vn { color: var(--muted-foreground); font-size: 11.5px; line-height: 1.7; }
       /* 可点朗读的音标 */
       .ph { cursor: pointer; border-bottom: 1px dotted currentColor; }
-      .ph:hover { color: var(--accent); }
+      .ph:hover { color: var(--primary); }
       /* pre-line：空状态那两句话是用换行分开的，不写这条就挤成一行 */
-      .empty { color: var(--muted); text-align: center; padding: 40px 8px; line-height: 1.8; white-space: pre-line; }
+      .empty { color: var(--muted-foreground); text-align: center; padding: 40px 8px; line-height: 1.8; white-space: pre-line; }
       .foot button:disabled { opacity: 0.45; cursor: default; }
       .foot { margin-top: 14px; display: flex; gap: 8px; }
       .foot button {
         font-family: var(--sans); font-size: 11.5px; cursor: pointer; padding: 4px 10px;
-        border-radius: 3px; border: 1px solid var(--line); background: var(--bg); color: var(--muted);
+        border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--bg); color: var(--muted-foreground);
       }
-      .foot button:hover { border-color: var(--accent); color: var(--accent); }
+      .foot button:hover { border-color: var(--primary); color: var(--primary); }
     </style>
+    <link rel="stylesheet" href="theme.css" />
   </head>
   <body>
     <h1>Words on this page</h1>

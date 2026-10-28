@@ -236,6 +236,34 @@ test("非文章页：不留设置监听，也不挂任何页面监听", async ()
   classifyAsArticle = true;
 });
 
+test('switching pages while saved progress loads never restores or starts the abandoned article', async () => {
+  sent = []; scrolls = 0; settingsListeners = 0;
+  const extracted = extractFromContainer(doc.getElementById('art')!, 'Old article')!, anchor = extracted.paragraphs[1]!;
+  const abort = new AbortController();
+  let restored = false, release!: (value: unknown) => void, entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  Object.defineProperty(anchor.el, 'scrollIntoView', { configurable: true, value: () => { restored = true; } });
+  const scroll = mock.method(dom.window, 'scrollBy', () => {}), original = chrome.runtime.sendMessage.bind(chrome.runtime);
+  const messages = mock.method(chrome.runtime, 'sendMessage', async (msg: { type?: string }) => {
+    if (msg.type === 'article:local-state') { entered(); return new Promise(resolve => { release = resolve; }); }
+    return original(msg);
+  });
+  let ctl: Awaited<ReturnType<typeof startTracking>> | undefined;
+  try {
+    const pending = startTracking({ url: FIRST, focus: 'assume', approvedArticle: true, overlays: false, extract: () => extracted, signal: abort.signal });
+    await started; abort.abort();
+    release({ [`pos:${FIRST}`]: { articleId: FIRST, hash: anchor.hash, index: 1, offset: 0, paragraphCount: 3, savedTs: Date.now() - 1000 } });
+    ctl = await pending;
+    ctl.setVisible(true);
+    assert.equal(restored, false);
+    assert.equal(ctl.state().tracked, false);
+    assert.equal(sent.some(message => message.type === 'session:start'), false);
+    assert.equal(scrolls, 0); assert.equal(settingsListeners, 0);
+  } finally {
+    ctl?.stop(); messages.mock.restore(); scroll.mock.restore(); delete (anchor.el as Partial<HTMLElement>).scrollIntoView;
+  }
+});
+
 /* ---- features/reading：异步起步 ---- */
 
 const ctxOf = (url: string, signal = new AbortController().signal): PageContext => ({

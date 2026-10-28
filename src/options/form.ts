@@ -295,10 +295,21 @@ $<HTMLInputElement>("import-file").addEventListener("change", async (e) => {
   input.value = "";
 });
 
-$("clear").addEventListener("click", async () => {
+const clearButton = $<HTMLButtonElement>("clear");
+clearButton.addEventListener("click", async () => {
+  if (clearButton.disabled) return;
   if (!confirm("Clear reading records and offline articles on this device and disconnect sync? Server data and other devices will not be affected. Settings and model credentials will be kept. Export any data you want to keep first.")) return;
-  await chrome.runtime.sendMessage({ type: "data:clear" });
-  dataStatus.textContent = "Cleared";
+  clearButton.disabled = true;
+  dataStatus.classList.remove("error");
+  dataStatus.textContent = "Clearing…";
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "data:clear" }) as { ok?: boolean; error?: string } | undefined;
+    if (!result?.ok) throw new Error(result?.error || "The app did not confirm that records were cleared. Try again.");
+    dataStatus.textContent = "Cleared";
+  } catch (error) {
+    dataStatus.classList.add("error");
+    dataStatus.textContent = `Could not clear: ${error instanceof Error ? error.message : String(error)}`;
+  } finally { clearButton.disabled = false; }
 });
 
 void chrome.runtime.sendMessage({ type: "settings:get" }).then((s: Settings) => load(s ?? DEFAULT_SETTINGS));

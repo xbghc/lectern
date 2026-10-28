@@ -1,4 +1,4 @@
-import { test, beforeEach, after } from "node:test";
+import { test, beforeEach, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { IDBFactory } from "fake-indexeddb";
 import { freshState, memoryDriver, installStorage, localStorage, trackChanges, type StateDriver } from "../src/sync/storage.ts";
@@ -47,7 +47,8 @@ globalThis.fetch = async (input, init = {}) => {
 };
 // The sync engine captures fetch once, just as it does before installing Android's bridge.
 const { runSync, disconnectSync, materialSync } = await import("../src/sync/engine.ts");
-const { flushArchives } = await import("../src/archive/background.ts");
+const syncFetch = globalThis.fetch;
+const { flushArchives, saveArchive } = await import("../src/archive/background.ts");
 const { deleteBook } = await import("../src/books/local.ts");
 const { handle } = await import("../src/background/handle.ts");
 beforeEach(async () => {
@@ -67,6 +68,7 @@ after(async () => {
   if (oldIdb === undefined) delete g.indexedDB; else g.indexedDB = oldIdb;
   if (oldChrome === undefined) delete g.chrome; else g.chrome = oldChrome;
 });
+afterEach(() => { globalThis.fetch = syncFetch; });
 async function resource(text: string) {
   const blob = new Blob([text], { type: "image/png" }), hash = await hashBytes(new Uint8Array(await blob.arrayBuffer()));
   return { blob, hash, mime: blob.type, size: blob.size };
@@ -134,4 +136,27 @@ test("an archive request started before clearing cannot continue with a differen
   release(); await assert.rejects(work, /Sync settings changed/);
   assert.equal(calls.some(call => call.token === "Bearer synthetic-b"), false);
   assert.equal((await driver.read()).data.archivePending, undefined);
+});
+
+test("clearing data rejects both active and queued captures and prevents late resource writes", async () => {
+  const image = await resource('private image');
+  let release!: (response: Response) => void, entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  globalThis.fetch = async () => { entered(); return new Promise<Response>(resolve => { release = resolve; }); };
+  const url = 'https://example.com/private-image';
+  const payload = { articleId: 'https://example.com/capture', url: 'https://example.com/capture', title: 'Private article',
+    html: `<p>Private text</p><img src="${url}">`, resources: [{ url }], missingResources: [], createdTs: 1 };
+  const first = saveArchive(payload); await started;
+  const queued = saveArchive({ ...payload, articleId: 'https://example.com/queued', url: 'https://example.com/queued', resources: [] });
+  // Attach rejection handlers before resolving the simulated request.
+  const results = Promise.allSettled([first, queued]);
+  await handle({ type: 'data:clear' }, {});
+  release(new Response(image.blob, { headers: { 'content-type': image.mime } }));
+  const outcomes = await results;
+  assert.deepEqual(outcomes.map(result => result.status), ['rejected', 'rejected']);
+  assert.equal(await cachedBlob(image.hash), undefined);
+  const state = await driver.read();
+  assert.equal(Object.keys(state.data.archives ?? {}).length, 0);
+  assert.equal(Object.keys(state.data.archivePending ?? {}).length, 0);
+  assert.equal(state.outbox.some(op => op.record.type === 'archive'), false);
 });

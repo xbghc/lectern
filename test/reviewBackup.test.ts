@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { freshState, installStorage, memoryDriver, localStorage, applyRemote } from "../src/sync/storage.ts";
-import { exportAll, importBundle } from "../src/background/store.ts";
+import { exportAll, importBundle, getArticles } from "../src/background/store.ts";
 import { addSnippet, getCards, gradeStoredCard } from "../src/features/translation/vocab.ts";
 import { gradeCard, gradeFsrs } from "../src/lib/review.ts";
 import { gradeArticleCard, getArticleCards } from "../src/features/reading/articleReview.ts";
@@ -91,4 +91,27 @@ test("a failed import transaction rolls back both review history and ordinary re
   installStorage({ read: () => target.read(), update: fn => target.update(state => { fn(state); throw new Error("disk full"); }) });
   await assert.rejects(importBundle(bundle), /disk full/);
   assert.deepEqual(await target.read(), before);
+});
+
+test('imported manual completion choices survive merging and can be changed immediately afterward', async () => {
+  const source = device();
+  await upsertArticleMeta({ articleId: web, url: web, title: 'Article', totalWords: 100, trackedWords: 100, paragraphCount: 1, now });
+  await source.update(state => { state.counter = 500; });
+  await setFinished(web, false);
+  const bundle = await exportAll();
+  const target = device();
+  await upsertArticleMeta({ articleId: web, url: web, title: 'Old article', totalWords: 100, trackedWords: 100, paragraphCount: 1, now: now - day });
+  await setFinished(web, true);
+  const old = await exportAll();
+  assert.equal((await importBundle(bundle)).ok, true);
+  assert.equal((await getArticles())[web]!.finished, false, 'the newer explicit unfinished choice overrides old completion');
+  assert.equal((await getArticleCards()).length, 0);
+  await importBundle(old);
+  assert.equal((await getArticles())[web]!.finished, false, 'reimporting old completion cannot undo the newer choice');
+  // Also repair a profile imported by a previous release that never observed the inner stamp.
+  await target.update(state => { state.counter = 0; });
+  await setFinished(web, true);
+  assert.equal((await getArticles())[web]!.finished, true, 'the local logical clock must advance past the imported manual stamp');
+  await applyRemote(target, [], 1);
+  assert.equal((await getArticles())[web]!.finished, true);
 });

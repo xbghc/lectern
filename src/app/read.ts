@@ -19,8 +19,8 @@ import { hostnameOf, normalizeUrl } from "../lib/url.ts";
 import { reasonOf } from "../lib/reason.ts";
 import { decodeWith, hasBom, pickCharset } from "../lib/charset.ts";
 import { recordFetch } from "../background/appLog.ts";
-import { READER_PREFIX } from "../background/store.ts";
-import { localStorage } from "../sync/storage.ts";
+import { READER_PREFIX, serialize } from "../background/store.ts";
+import { assertDataIdentity, dataIdentity, localStorage } from "../sync/storage.ts";
 import { loadArchivedArticle, hydrateArchiveImages } from "../archive/reader.ts";
 import type { ArchiveManifest } from "../archive/types.ts";
 import { getBook, hydrateBookImages } from "../books/local.ts";
@@ -75,7 +75,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
  * 成功失败都往诊断日志里记一条现场（编码是谁定的、掉了多少字节、抽出多长）：
  * 手机上没有控制台，不记的话出了岔子只剩界面上那一句话。
  */
-async function fetchAndExtract(url: string): Promise<CachedArticle> {
+async function fetchAndExtract(url: string, identity: string): Promise<CachedArticle> {
   const started = Date.now();
   const log: ReaderFetch = {
     ts: started,
@@ -133,7 +133,7 @@ async function fetchAndExtract(url: string): Promise<CachedArticle> {
   } finally {
     log.ms = Date.now() - started;
     // 不 await：这一条记不下来也不该拖住正文显示
-    void recordFetch(log);
+    void recordFetch(log, identity);
   }
 }
 
@@ -332,7 +332,12 @@ async function main(): Promise<void> {
   $("rmeta").textContent = hostnameOf(url);
 
   // 缓存按用户给的地址查：抓之前还不知道它会跳到哪
+  const identity = await dataIdentity();
   const key = cacheKey(normalizeUrl(url));
+  const saveCached = (content: CachedArticle): Promise<void> => serialize(async () => {
+    await assertDataIdentity(identity);
+    await localStorage().set({ [key]: content });
+  });
   const refresh = params.get("refresh") === "1";
   let cached = (await localStorage().get(key))[key] as CachedArticle | undefined;
   let book: Book | null = null;
@@ -351,17 +356,18 @@ async function main(): Promise<void> {
   let archived = false;
   let refetchFailure = "";
   try {
-    const saved = chapter ? null : await loadArchivedArticle(url);
+    const saved = chapter ? null : await loadArchivedArticle(url, identity);
     if (saved) {
       cached = saved;
       archived = true;
-      await localStorage().set({ [key]: cached });
+      await saveCached(cached);
     }
   } catch (err) {
     archiveError = err;
     // Keep the last downloaded version readable while a newer version is unavailable.
     archived = !!cached?.archiveManifest;
   }
+  await assertDataIdentity(identity);
   if (archiveError && !cached) {
     $("rtitle").textContent = hostnameOf(url);
     showStatus(`This article is archived but has not been downloaded to this device: ${archiveError instanceof Error ? archiveError.message : String(archiveError)}`, () => location.reload());
@@ -371,8 +377,8 @@ async function main(): Promise<void> {
     $("rtitle").textContent = hostnameOf(url);
     showStatus(refresh ? "Fetching the article again…" : "Fetching article…");
     try {
-      cached = await fetchAndExtract(url);
-      await localStorage().set({ [key]: cached });
+      cached = await fetchAndExtract(url, identity);
+      await saveCached(cached);
     } catch (err) {
       const msg = reasonOf(err);
       if (refresh && cached) {
@@ -389,6 +395,7 @@ async function main(): Promise<void> {
       }
     }
   }
+  await assertDataIdentity(identity);
   if (!cached) return;
 
   // 老缓存（没有 finalUrl 的）退回用户给的地址
@@ -430,7 +437,7 @@ async function main(): Promise<void> {
   if (cached.archiveManifest) {
     const status = el("span", undefined, "Saved article · Preparing images…");
     byline.append(status);
-    const hydration = hydrateArchiveImages(body, cached.archiveManifest);
+    const hydration = hydrateArchiveImages(body, cached.archiveManifest, identity);
     box.append(body);
     const resources = await hydration;
     window.addEventListener("pagehide", resources.release, { once: true });
@@ -462,6 +469,7 @@ async function main(): Promise<void> {
 
   await setupReaderControls({ articleId, body, book, chapter: chapter?.index ?? null,
     openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")) });
+  await assertDataIdentity(identity);
   const title = cached.title;
   page = makePage(body, title, !!cached.archiveManifest || !!cached.book, () => renderMeta(pageUrl));
   page.start(pageUrl);

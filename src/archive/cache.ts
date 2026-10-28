@@ -1,5 +1,6 @@
 import { openRenamedDb } from "../lib/renamedDb.ts";
 import { ARCHIVE_HASH, hashBytes } from "./types.ts";
+import { assertDataIdentity, withDataLock } from "../sync/storage.ts";
 
 let opening: Promise<IDBDatabase> | null = null;
 
@@ -19,18 +20,23 @@ export async function cachedBlob(hash: string): Promise<Blob | undefined> {
 }
 
 /** Commit before publishing any manifest referencing these bytes. */
-export async function cacheBlob(hash: string, blob: Blob): Promise<void> {
+export async function cacheBlob(hash: string, blob: Blob, expectedIdentity?: string): Promise<void> {
   if (!ARCHIVE_HASH.test(hash) || await hashBytes(new Uint8Array(await blob.arrayBuffer())) !== hash) {
     throw new Error("Article resource verification failed");
   }
-  const db = await open();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction("blobs", "readwrite");
-    tx.objectStore("blobs").put(blob, hash);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error ?? new Error("Saving article resources was interrupted"));
-  });
+  const write = async (): Promise<void> => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
+    const db = await open();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("blobs", "readwrite");
+      tx.objectStore("blobs").put(blob, hash);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error("Saving article resources was interrupted"));
+    });
+  };
+  if (expectedIdentity !== undefined) await withDataLock(write);
+  else await write();
 }
 
 /** 删书时回收它独占的图片。别的书或文章还在引用的哈希由调用方先滤掉。 */

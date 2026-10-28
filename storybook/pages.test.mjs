@@ -67,6 +67,39 @@ test('page bundles inline their assets and replace only the App platform boot', 
   }
 });
 
+test('clearing records reports storage or messaging failures and permits retry without claiming success', async () => {
+  const html = pages.appOptions.replace('<!--PREVIEW_CONFIG-->', '<script>window.__PREVIEW__={page:"appOptions",state:"populated",tab:"articles"}</script>');
+  let close;
+  const dom = new JSDOM(html, { url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
+    beforeParse(window) {
+      close = window.close.bind(window); window.structuredClone = structuredClone;
+      window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder; window.confirm = () => true;
+      window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+    },
+  });
+  const settle = () => new Promise(resolve => setTimeout(resolve, 30));
+  try {
+    await settle();
+    const { chrome, document } = dom.window, original = chrome.runtime.sendMessage;
+    const button = document.getElementById('clear'), status = document.getElementById('data-status');
+    const before = await original({ type: 'data:export' });
+    chrome.runtime.sendMessage = message => message.type === 'data:clear' ? Promise.resolve({ ok: false, error: 'Resource storage is unavailable' }) : original(message);
+    button.click(); await settle();
+    assert.match(status.textContent, /Could not clear.*Resource storage is unavailable/);
+    assert.equal(button.disabled, false);
+    assert.equal((await original({ type: 'data:export' })).articles.length, before.articles.length);
+    chrome.runtime.sendMessage = message => message.type === 'data:clear' ? Promise.reject(new Error('Message channel closed')) : original(message);
+    button.click(); await settle();
+    assert.match(status.textContent, /Could not clear.*Message channel closed/);
+    assert.equal(button.disabled, false);
+    chrome.runtime.sendMessage = original;
+    button.click(); await settle();
+    assert.equal(status.textContent, 'Cleared');
+    assert.equal((await original({ type: 'data:export' })).articles.length, 0);
+    assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+  } finally { close(); }
+});
+
 test('sync settings keep secrets out of status, require a new token for a new address, and preserve local records on disconnect', async () => {
   const html = pages.options.replace('<!--PREVIEW_CONFIG-->', '<script>window.__PREVIEW__={page:"options",state:"populated",tab:"articles"}</script>');
   let closeWindow;

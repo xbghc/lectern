@@ -1,4 +1,4 @@
-import { syncDriver, trackChanges, withDataLock } from "../sync/storage.ts";
+import { assertDataIdentity, dataIdentity, syncDriver, trackChanges, withDataLock } from "../sync/storage.ts";
 import { recordKey, type SyncRecord } from "../sync/protocol.ts";
 import { syncRequest, scheduleSync, type SyncBinding } from "../sync/engine.ts";
 import { cacheBlob, cachedBlob } from "./cache.ts";
@@ -35,10 +35,12 @@ async function resourceBlob(resource: ArchiveCapture["resources"][number]): Prom
   return new Blob([new Uint8Array(bytes)], { type: mime });
 }
 
-export function saveArchive(payload: ArchiveCapture): Promise<{ ok: true; manifest: ArchiveManifest; missing: number }> {
+export async function saveArchive(payload: ArchiveCapture): Promise<{ ok: true; manifest: ArchiveManifest; missing: number }> {
+  // Capture ownership when requested, before waiting behind an earlier download.
+  const deviceId = await dataIdentity();
   return serial(async () => {
     validateArchiveCapture(payload);
-    const deviceId = (await syncDriver().read()).deviceId;
+    await assertDataIdentity(deviceId);
     const resources = new Map<string, ArchiveResource>();
     const hashes = new Map<string, string>();
     const missing = new Set((payload.missingResources ?? []).filter(value => typeof value === "string"));
@@ -53,7 +55,7 @@ export function saveArchive(payload: ArchiveCapture): Promise<{ ok: true; manife
           if (blob.size > MAX_RESOURCE_BYTES || totalBytes + blob.size > MAX_ARCHIVE_BYTES) throw new Error("Article resources exceed the size limit");
           totalBytes += blob.size;
           const hash = await hashBytes(new Uint8Array(await blob.arrayBuffer()));
-          await cacheBlob(hash, blob);
+          await cacheBlob(hash, blob, deviceId);
           resources.set(hash, { hash, mime: blob.type, size: blob.size });
           hashes.set(resource.url, hash);
         } catch { missing.add(resource.url); }
@@ -62,7 +64,7 @@ export function saveArchive(payload: ArchiveCapture): Promise<{ ok: true; manife
     const html = rewriteArchiveImages(payload.html, hashes);
     const body = new Blob([html], { type: "text/html" });
     const htmlHash = await hashBytes(new Uint8Array(await body.arrayBuffer()));
-    await cacheBlob(htmlHash, body);
+    await cacheBlob(htmlHash, body, deviceId);
     const manifest: ArchiveManifest = {
       articleId: payload.articleId, version: crypto.randomUUID(), url: payload.url,
       title: String(payload.title || payload.url).slice(0, 2000), htmlHash,

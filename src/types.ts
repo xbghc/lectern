@@ -181,7 +181,7 @@ export interface PageState {
 
 export type ContentToBg =
   | { type: "translation:trace"; trace: TranslationTrace }
-  | { type: "article:local-state"; articleId: string }
+  | { type: "article:local-state"; articleId: string; dataIdentity?: string }
   | { type: "archive:save"; payload: import("./archive/types.ts").ArchiveCapture }
   | { type: "page:capture" }
   | { type: "ocr:warm" }
@@ -192,9 +192,9 @@ export type ContentToBg =
   | { type: "articles:delete"; articleIds: string[] }
   | { type: "articles:blacklist-suggest"; articleIds: string[] }
   | { type: "article:meta"; meta: ArticleMeta }
-  | { type: "session:start"; articleId: string; url: string; title: string; startTs: number }
+  | { type: "session:start"; articleId: string; url: string; title: string; startTs: number; dataIdentity?: string }
   /** `position` 捎在心跳上而不另开一条消息：这样它天然享有 session 的补记链路。 */
-  | { type: "session:heartbeat"; articleId: string; now: number; wordsRead: number; position?: ReadingPosition }
+  | { type: "session:heartbeat"; articleId: string; now: number; wordsRead: number; position?: ReadingPosition; dataIdentity?: string }
   | {
       type: "session:end";
       articleId: string;
@@ -206,12 +206,14 @@ export type ContentToBg =
       reachedBottom: boolean;
       paragraphs: ParagraphSnapshot[];
       position?: ReadingPosition;
+      /** Profile that acknowledged article:meta; stale pages cannot repopulate a cleared profile. */
+      dataIdentity?: string;
     }
   | { type: "settings:get" }
   | { type: "sw:ping" }
-  | { type: "article:text"; articleId: string; text: string; fullChars: number }
+  | { type: "article:text"; articleId: string; text: string; fullChars: number; dataIdentity?: string }
   /** 页内判定读完。后台当场落盘并建回顾卡，不等 session 结算。 */
-  | { type: "article:finished"; articleId: string; ts: number }
+  | { type: "article:finished"; articleId: string; ts: number; dataIdentity?: string }
   /** 页内的回顾按钮被点了。content script 开不了标签页，得后台代劳。 */
   | { type: "review:open"; articleId: string }
   | { type: "options:open" };

@@ -115,9 +115,10 @@ export async function recordTiming(
   timing: CallTiming,
   usage: RawUsage = NO_USAGE,
   failedKind: string | null = null,
+  expectedIdentity?: string,
 ): Promise<void> {
   try {
-    await updateLocalOnly([KEY_LLM_TIMING], (v) => ({ [KEY_LLM_TIMING]: pushTiming(v[KEY_LLM_TIMING], timingEntry(source, config, timing, usage, failedKind)) }));
+    await updateLocalOnly([KEY_LLM_TIMING], (v) => ({ [KEY_LLM_TIMING]: pushTiming(v[KEY_LLM_TIMING], timingEntry(source, config, timing, usage, failedKind)) }), expectedIdentity);
   } catch {
     /* 同 recordFailure：日志不能反过来把主流程搞坏 */
   }
@@ -127,12 +128,12 @@ export async function recordTiming(
  * 一次成功的调用记一笔账：用量和耗时**一笔写完**。早先是两次读改写，各把整份状态库读出来再写回去。
  * 落盘失败吞掉，理由同 `recordFailure`。
  */
-export async function recordCall(source: LlmFailure["source"], config: LlmConfig, timing: CallTiming, usage: RawUsage): Promise<void> {
+export async function recordCall(source: LlmFailure["source"], config: LlmConfig, timing: CallTiming, usage: RawUsage, expectedIdentity?: string): Promise<void> {
   try {
     await updateLocalOnly([KEY_USAGE, KEY_LLM_TIMING], (v) => ({
       [KEY_USAGE]: bumpUsage(v[KEY_USAGE], usage.inputTokens, usage.outputTokens, false),
       [KEY_LLM_TIMING]: pushTiming(v[KEY_LLM_TIMING], timingEntry(source, config, timing, usage, null)),
-    }));
+    }), expectedIdentity);
   } catch {
     /* 见上 */
   }
@@ -151,6 +152,8 @@ export const bookkeepingSettled = (): Promise<void> => deferred;
 
 /** 各条路径交给 recordFailure 的现场。 */
 export interface FailureContext {
+  /** Do not restore diagnostic content belonging to data the user has cleared. */
+  dataIdentity?: string;
   source: LlmFailure["source"];
   /** 请求里值得留下的部分，各路径各留各的；文章回顾只留标题、URL 和字数，不留正文 */
   request: LlmFailure["request"];
@@ -195,7 +198,7 @@ export async function recordFailure(err: unknown, config: LlmConfig, ctx: Failur
       [KEY_LLM_LOG]: pushFailure(v[KEY_LLM_LOG], entry),
       ...(timing ? { [KEY_LLM_TIMING]: pushTiming(v[KEY_LLM_TIMING], timing) } : {}),
       ...(ctx.countUsage ? { [KEY_USAGE]: bumpUsage(v[KEY_USAGE], spent.inputTokens, spent.outputTokens, true) } : {}),
-    }));
+    }), ctx.dataIdentity);
   } catch {
     /* 日志是附属品，不能反过来把给调用方的回复搞丢 */
   }

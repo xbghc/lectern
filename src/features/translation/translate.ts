@@ -15,6 +15,7 @@ import { addSnippet, getSnippets } from "./vocab.ts";
 import { getLlmConfig } from "../../core/background/llm.ts";
 import { type FailureContext, later, recordCall, recordFailure, recordTiming } from "../../background/llmLog.ts";
 import type { TranslationBackendTiming } from "../../lib/translationDiagnostics.ts";
+import { assertDataIdentity, dataIdentity, onDataReset } from "../../sync/storage.ts";
 
 /**
  * 翻译请求的门面：缓存、并发去重、用量记账都在这里，
@@ -85,6 +86,11 @@ interface Live {
 }
 
 const live = new Map<string, Live>();
+onDataReset(() => {
+  cache.clear();
+  for (const entry of live.values()) entry.ctrl.abort();
+  live.clear();
+});
 
 export interface StreamHandle {
   done: Promise<TranslateReply>;
@@ -95,10 +101,12 @@ export interface StreamHandle {
 async function runStream(req: TranslateRequest, key: string, e: Live): Promise<TranslateReply> {
   const start = performance.now();
   const metrics = e.timing;
+  const identity = await dataIdentity();
   const config = await getLlmConfig();
   metrics.configMs = performance.now() - start;
   const modelStart = performance.now();
   const context = (): FailureContext => ({
+    dataIdentity: identity,
     source: "translate",
     request: {
       kind: req.kind,
@@ -112,6 +120,19 @@ async function runStream(req: TranslateRequest, key: string, e: Live): Promise<T
     partialShown: Boolean(e.last?.translation),
   });
   try {
+    const hit = cache.get(key);
+    if (hit) {
+      // Local deletion and remote tombstones both invalidate a memoized translation.
+      const saved = (await getSnippets()).find(s => s.id === hit.id);
+      await assertDataIdentity(identity);
+      if (e.ctrl.signal.aborted) throw new LlmError("Canceled", "abort");
+      if (saved) {
+        metrics.cache = "hit";
+        return { ok: true, snippet: saved, cached: true };
+      }
+      cache.delete(key);
+    }
+    await assertDataIdentity(identity);
     const { result, usage, timing, recovered } = await translateStream(
       req,
       config,
@@ -146,10 +167,10 @@ async function runStream(req: TranslateRequest, key: string, e: Live): Promise<T
       context: req.context,
       result,
       now: Date.now(),
-    });
+    }, identity);
     metrics.snippetWriteMs = performance.now() - stageStart;
     remember(key, snippet);
-    later(() => recordCall("translate", config, timing, usage));
+    later(() => recordCall("translate", config, timing, usage, identity));
     // 自动重发、抢救回来的，人没看见失败，日志里照样留一条（带 recovered 标记）
     if (recovered) {
       const ctx = { ...context(), recovered: recovered.by };
@@ -167,7 +188,7 @@ async function runStream(req: TranslateRequest, key: string, e: Live): Promise<T
     return report(err, config, context());
   } finally {
     metrics.totalMs = performance.now() - start;
-    live.delete(key);
+    if (live.get(key) === e) live.delete(key);
   }
 }
 
@@ -182,13 +203,6 @@ export function streamTranslate(req: TranslateRequest, onPartial: (p: PartialTra
     attempts: 0, accountingMs: null, diagnosticWriteMs: null, snippetWriteMs: null,
   });
   const key = keyOf(req);
-
-  const hit = cache.get(key);
-  if (hit) {
-    const diagnostics = timing("hit");
-    diagnostics.totalMs = diagnostics.subscriberMs = performance.now() - subscribed;
-    return { done: Promise.resolve({ ok: true, snippet: hit, cached: true, diagnostics }), cancel: () => undefined };
-  }
 
   let entry = live.get(key);
   const joined = !!entry;
@@ -206,7 +220,7 @@ export function streamTranslate(req: TranslateRequest, onPartial: (p: PartialTra
   let off = false;
   return {
     done: shared.done.then(res => ({ ...res, diagnostics: { ...shared.timing,
-      cache: joined ? "shared" : "miss", subscriberMs: performance.now() - subscribed } })),
+      cache: joined ? "shared" : shared.timing.cache, subscriberMs: performance.now() - subscribed } })),
     cancel: () => {
       if (off) return;
       off = true;
@@ -248,15 +262,17 @@ export function streamAsk(req: AskRequest, onDelta: (text: string) => void): Ask
 }
 
 async function runAsk(req: AskRequest, onDelta: (text: string) => void, signal: AbortSignal): Promise<AskReply> {
+  const identity = await dataIdentity();
   const config = await getLlmConfig();
   try {
     const { text, usage, timing } = await askStream(req, config, onDelta, signal);
-    later(() => recordCall("ask", config, timing, usage));
+    await assertDataIdentity(identity);
+    later(() => recordCall("ask", config, timing, usage, identity));
     return { ok: true, text };
   } catch (err) {
     // 同 runStream：主动取消和缺配置都不算"调用失败"
     const f = report(err, config, {
-      source: "ask",
+      source: "ask", dataIdentity: identity,
       request: { text: req.text, question: req.question, articleTitle: req.articleTitle, turns: req.history.length },
     });
     return { ok: false, error: f.error, needsConfig: f.needsConfig };
@@ -274,6 +290,7 @@ export interface AssistOutcome {
 export function streamVocabularyChat(input: VocabularyChatRequest, onDelta: (text: string) => void): AskHandle {
   const ctrl = new AbortController();
   const done = (async (): Promise<AskReply> => {
+    const identity = await dataIdentity();
     let req: VocabularyChatRequest;
     try { req = normalizeChatRequest(input); }
     catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error), needsConfig: false }; }
@@ -284,10 +301,11 @@ export function streamVocabularyChat(input: VocabularyChatRequest, onDelta: (tex
       if (words.some(w => !w)) return { ok: false, error: "A selected word no longer exists. Choose your words again.", needsConfig: false };
       const { text, usage, timing } = await callMessagesStream(config, VOCABULARY_CHAT_SYSTEM,
         buildVocabularyChatPrompt(req, words as Snippet[]), { signal: ctrl.signal, onDelta: value => onDelta(value.trimStart().slice(0, CHAT_ANSWER_CHARS)) });
-      later(() => recordCall("assist", config, timing, usage));
+      await assertDataIdentity(identity);
+      later(() => recordCall("assist", config, timing, usage, identity));
       return { ok: true, text: text.trim().slice(0, CHAT_ANSWER_CHARS) };
     } catch (err) {
-      const failure = report(err, config, { source: "assist", request: { mode: "vocabulary-chat", turns: req.history.length } });
+      const failure = report(err, config, { source: "assist", request: { mode: "vocabulary-chat", turns: req.history.length }, dataIdentity: identity });
       return { ok: false, error: failure.error, needsConfig: failure.needsConfig };
     }
   })();
@@ -299,19 +317,22 @@ export async function handleAssist(
   mode: AssistMode,
   input: { key: string; translation: string; originalText: string; context: string; articleTitle: string },
 ): Promise<AssistOutcome> {
+  const identity = await dataIdentity();
   const config = await getLlmConfig();
   try {
     const { text, usage, timing } = await assist(mode, input, config);
-    later(() => recordCall("assist", config, timing, usage));
+    await assertDataIdentity(identity);
+    later(() => recordCall("assist", config, timing, usage, identity));
     return { ok: true, text };
   } catch (err) {
-    const f = report(err, config, { source: "assist", request: { mode, key: input.key, articleTitle: input.articleTitle } });
+    const f = report(err, config, { source: "assist", request: { mode, key: input.key, articleTitle: input.articleTitle }, dataIdentity: identity });
     return { ok: false, error: f.error, needsConfig: f.needsConfig };
   }
 }
 
 /** 设置页的「测试连接」。故意用一句极短的输入，别为了测连通烧 token。 */
 export async function testConnection(): Promise<{ ok: boolean; error?: string; model?: string }> {
+  const identity = await dataIdentity();
   const config = await getLlmConfig();
   try {
     const { result, usage, timing } = await translate(
@@ -328,9 +349,10 @@ export async function testConnection(): Promise<{ ok: boolean; error?: string; m
       config,
     );
     // 测连通不记用量（见上），但耗时要记——它本来就是用来量延迟的那一下
-    later(() => recordTiming("test", config, timing, usage));
+    await assertDataIdentity(identity);
+    later(() => recordTiming("test", config, timing, usage, null, identity));
     return { ok: true, model: `${config.model} → ${result.translation}` };
   } catch (err) {
-    return { ok: false, error: report(err, config, { source: "test", request: { text: "hello" } }, false).error };
+    return { ok: false, error: report(err, config, { source: "test", request: { text: "hello" }, dataIdentity: identity }, false).error };
   }
 }

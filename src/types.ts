@@ -401,7 +401,12 @@ export interface ReadingEstimate {
 
 export interface ExportBundle {
   /** Optional extension: preserve event identity and FSRS checkpoints across manual file transfers. */
-  reviewHistory?: { version: 1; records: import("./sync/protocol.ts").SyncRecord[] };
+  reviewHistory?: {
+    version: 1;
+    records: import("./sync/protocol.ts").SyncRecord[];
+    /** Book-only word cards have no sync record; their pre-review baselines travel in backups only. */
+    localWordBases?: Record<string, FsrsState>;
+  };
   /**
    * 4：加了 `positions`。导入时 3 和 4 都认——安卓 App 和扩展之间靠这份文件互相合并，
    * 两边不一定同时升级。

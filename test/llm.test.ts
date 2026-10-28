@@ -27,6 +27,21 @@ const REQ: TranslateRequest = {
   explainVocab: true,
 };
 
+test("non-streaming timeouts cover stalled success and error bodies after headers arrive", { timeout: 2000 }, async () => {
+  for (const status of [200, 500]) {
+    let signal: AbortSignal | undefined;
+    await assert.rejects(callMessages({ ...CFG, timeoutMs: 25 }, "system", "text", {
+      fetch: async (_url, init) => {
+        signal = init!.signal!;
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) { signal!.addEventListener("abort", () => controller.error(new DOMException("Canceled", "AbortError")), { once: true }); },
+        }), { status });
+      },
+    }), (error: unknown) => error instanceof LlmError && error.kind === "timeout" && error.timing !== undefined);
+    assert.equal(signal?.aborted, true);
+  }
+});
+
 /**
  * 规范化用例里的"选区"。生词讲解只留选中文本里出现的词，
  * 夹具用到的词都得在这里出现，否则会被 inSelection 挡掉。

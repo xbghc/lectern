@@ -1,4 +1,4 @@
-import { localStorage } from "../../sync/storage.ts";
+import { localStorage, dataIdentity, assertDataIdentity, onDataReset } from "../../sync/storage.ts";
 import type {
   ArticleCard,
   ArticleReview,
@@ -71,6 +71,7 @@ export async function getArticleReview(articleId: string): Promise<ArticleReview
  * 读完立刻打开面板正好落在生成窗口里。
  */
 const generating = new Map<string, Promise<ArticleReviewOutcome>>();
+onDataReset(() => generating.clear());
 
 /**
  * 拿到回顾材料，没有就生成。
@@ -82,7 +83,9 @@ export function ensureArticleReview(articleId: string, regenerate = false): Prom
   const running = generating.get(articleId);
   if (running) return running;
 
-  const task = (async (): Promise<ArticleReviewOutcome> => {
+  let task: Promise<ArticleReviewOutcome>;
+  task = (async (): Promise<ArticleReviewOutcome> => {
+    const identity = await dataIdentity();
     try {
       if (!regenerate) {
         const have = await getArticleReview(articleId);
@@ -105,14 +108,15 @@ export function ensureArticleReview(articleId: string, regenerate = false): Prom
           config,
           Date.now(),
         );
-        later(() => recordCall("articleReview", config, timing, usage));
+        later(() => recordCall("articleReview", config, timing, usage, identity));
         // 自动重发成了的，头一次的现场照样进日志（带 recovered 标记）
         if (recovered) {
           const request = { title: article?.title ?? "", url: article?.url ?? articleId, fullChars: text.fullChars };
-          later(() => recordFailure(recovered.error, config, { source: "articleReview", request, recovered: recovered.by }));
+          later(() => recordFailure(recovered.error, config, { source: "articleReview", request, recovered: recovered.by, dataIdentity: identity }));
         }
         const full: ArticleReview = { articleId, ...review };
         await serialize(async () => {
+          await assertDataIdentity(identity);
           if (await isArticleDeleted(articleId)) return;
           await local().set({ [reviewKey(articleId)]: full });
         });
@@ -122,11 +126,11 @@ export function ensureArticleReview(articleId: string, regenerate = false): Prom
         // 只留标题、URL 和字数：正文几十 KB 一篇，且是可再抓取的输入，不该进日志。
         // 配置缺失不算一次失败的调用，recordFailure 里挡掉，不污染用量统计
         const request = { title: article?.title ?? "", url: article?.url ?? articleId, fullChars: text.fullChars };
-        later(() => recordFailure(err, config, { source: "articleReview", request, countUsage: true }));
+        later(() => recordFailure(err, config, { source: "articleReview", request, countUsage: true, dataIdentity: identity }));
         return { ok: false, error: err instanceof Error ? err.message : String(err), needsConfig };
       }
     } finally {
-      generating.delete(articleId);
+      if (generating.get(articleId) === task!) generating.delete(articleId);
     }
   })();
 

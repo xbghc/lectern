@@ -1,12 +1,13 @@
 import { hostnameOf, isUrlExcluded, matchesUrlRule, matchesUrlRules, normalizeUrl } from "../lib/url.ts";
-import { localStorage, hasSyncStorage, resetLocal, syncDriver, withDataLock, projectRecords } from "../sync/storage.ts";
-import { mergeRecord, recordKey, validateRecord } from "../sync/protocol.ts";
+import { localStorage, hasSyncStorage, resetLocal, syncDriver, withDataLock, projectRecords, notifyDataReset, assertDataIdentity, trackChanges, notifyLocalMutation } from "../sync/storage.ts";
+import { mergeRecord, recordKey, validateRecord, object } from "../sync/protocol.ts";
 import type { SyncRecord } from "../sync/protocol.ts";
 import type {
   Article,
   ArticleCard,
   ArticleReview,
   ExportBundle,
+  FsrsState,
   ParagraphRecord,
   ReadingPosition,
   Session,
@@ -17,7 +18,7 @@ import type {
 } from "../types.ts";
 import { DEFAULT_SETTINGS, MAX_AUTO_WORDS } from "../types.ts";
 import { isFinished } from "../lib/finish.ts";
-import { type DataSet, type MergeReport, describeReport, emptyDataSet, mergeData, parseBundle } from "../lib/merge.ts";
+import { type DataSet, type MergeReport, describeReport, emptyDataSet, mergeData, parseBundle, pickFsrs } from "../lib/merge.ts";
 import { summarizeSpeed } from "../lib/readingTime.ts";
 import { mergeEpisodes } from "../lib/stats.ts";
 import { KEY_CARDS, KEY_SNIPPETS, MAX_SNIPPETS } from "../features/translation/vocab.ts";
@@ -66,16 +67,20 @@ const LOCAL_ONLY_KEYS: ReadonlySet<string> = new Set(["llmUsage", "llmTiming", "
  * 还要记用量、记耗时、存划词三笔，前两笔各 170–290 毫秒，浮层的收尾就晚了这么久。这里直接改状态库里的键，
  * 一次调用要动几个键就一笔写完。库的 update 本身是事务，不用再串一层。没有状态库（老路径、部分测试）时退回普通读写。
  */
-export async function updateLocalOnly(keys: readonly string[], change: (values: Record<string, unknown>) => Record<string, unknown>): Promise<void> {
+export async function updateLocalOnly(keys: readonly string[], change: (values: Record<string, unknown>) => Record<string, unknown>, expectedIdentity?: string): Promise<void> {
   const stray = keys.find((k) => !LOCAL_ONLY_KEYS.has(k));
   if (stray !== undefined) throw new Error(`${stray} is not a device-local storage key`);
   if (hasSyncStorage()) {
     await syncDriver().update((state) => {
+      if (expectedIdentity !== undefined && state.deviceId !== expectedIdentity) return;
       Object.assign(state.data, change(Object.fromEntries(keys.map((k) => [k, state.data[k]]))));
     });
     return;
   }
-  await serialize(async () => { await local().set(change(await local().get([...keys]))); });
+  await serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
+    await local().set(change(await local().get([...keys])));
+  });
 }
 
 export async function getSettings(): Promise<Settings> {
@@ -544,11 +549,16 @@ function collect(all: Record<string, unknown>): DataSet {
 }
 
 export async function exportAll(): Promise<ExportBundle> {
-  const data = collect(await local().get(null));
+  // Cards and their replay history must come from the same snapshot.
+  const state = hasSyncStorage() ? await syncDriver().read() : undefined;
+  const data = collect(state?.data ?? await local().get(null));
   const llm = await getLlmConfig();
   const exportable = (id: string): boolean => !id.startsWith("epub:");
+  const localWordBases = state ? Object.fromEntries(data.cards
+    .filter(card => !state.records[recordKey({ type: "card", id: card.key })])
+    .map(card => [card.key, state.data.reviewBases?.[`word:${card.key}`] ?? card])) : {};
   return {
-    ...(hasSyncStorage() ? {reviewHistory:{version:1 as const,records:Object.values((await syncDriver().read()).records).filter(r=>["card","articleCard","reviewEvent"].includes(r.type))}} : {}),
+    ...(state ? {reviewHistory:{version:1 as const,records:Object.values(state.records).filter(r=>["card","articleCard","reviewEvent"].includes(r.type)),localWordBases}} : {}),
     schema: 4,
     exportedAt: Date.now(),
     settings: await getSettings(),
@@ -585,12 +595,22 @@ export type ImportOutcome = { ok: true; report: MergeReport; message: string } |
 export async function importBundle(raw: unknown): Promise<ImportOutcome> {
   let incoming: DataSet;
   let history:SyncRecord[]=[];
+  const localWordBases: Record<string, FsrsState> = Object.create(null);
   try {
     incoming = parseBundle(raw);
-    const extra=(raw as {reviewHistory?:{version?:unknown;records?:unknown}}).reviewHistory;
+    const extra=(raw as {reviewHistory?:{version?:unknown;records?:unknown;localWordBases?:unknown}}).reviewHistory;
     if(extra!==undefined) {
       if(extra.version!==1||!Array.isArray(extra.records))throw new Error("Incompatible review history format");
       history=extra.records.map(value=>{const r=validateRecord(value);if(!["card","articleCard","reviewEvent"].includes(r.type))throw new Error("Review history contains an unsupported record type");return r;});
+      if (extra.localWordBases !== undefined) {
+        if (!extra.localWordBases || typeof extra.localWordBases !== "object" || Array.isArray(extra.localWordBases)) throw new Error("Invalid local review baselines");
+        for (const [key, base] of Object.entries(extra.localWordBases)) {
+          // Reuse the wire validator, without putting this local-only card into sync.
+          validateRecord({ type: "card", id: key, value: { id: "backup", key, snippetIds: [], base },
+            stamp: { counter: 0, deviceId: "backup" }, generation: "initial", deleted: false });
+          localWordBases[key] = base as FsrsState;
+        }
+      }
     }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -621,17 +641,49 @@ export async function importBundle(raw: unknown): Promise<ImportOutcome> {
     for (const id of Object.keys(incoming.paragraphs)) writes[paraKey(id)] = data.paragraphs[id];
     for (const id of Object.keys(incoming.positions)) writes[posKey(id)] = data.positions[id];
     for (const id of Object.keys(incoming.articleReviews)) writes[reviewKey(id)] = data.articleReviews[id];
-    if(history.length&&hasSyncStorage())await syncDriver().update(state=>{
-      for(const record of history) {
-        const key=recordKey(record),previous=state.records[key],merged=mergeRecord(previous,record);
-        if(JSON.stringify(previous)!==JSON.stringify(merged)) {
-          state.records[key]=merged;state.outbox.push({opId:crypto.randomUUID(),record});
+    if (hasSyncStorage()) {
+      await syncDriver().update(state => {
+        const previousData = structuredClone(state.data);
+        Object.assign(state.data, writes);
+        const bases = { ...object(state.data.reviewBases) };
+        const historyBases = new Set<string>();
+        for (const record of history) {
+          const key = recordKey(record), previous = state.records[key], merged = mergeRecord(previous, record);
+          if (JSON.stringify(previous) !== JSON.stringify(merged)) {
+            state.records[key] = merged;
+            state.outbox.push({ opId: crypto.randomUUID(), record });
+          }
+          state.counter = Math.max(state.counter, record.stamp.counter);
+          if (!merged.deleted && (merged.type === "card" || merged.type === "articleCard")) {
+            const baseKey = `${merged.type === "card" ? "word" : "article"}:${merged.id}`;
+            const base = object(merged.value).base as FsrsState;
+            bases[baseKey] = bases[baseKey] ? pickFsrs(bases[baseKey], base) : base;
+            historyBases.add(baseKey);
+          }
         }
-        state.counter=Math.max(state.counter,record.stamp.counter);
-      }
-      projectRecords(state);
-    });
-    await local().set(writes);
+        for (const [key, base] of Object.entries(localWordBases)) {
+          const baseKey = `word:${key}`;
+          bases[baseKey] = bases[baseKey] ? pickFsrs(bases[baseKey], base) : base;
+          historyBases.add(baseKey);
+        }
+        // Old exports (and early book exports) carry a final schedule but no matching baseline.
+        // Adopt it only when it is newer than the local, already-replayed card.
+        const importSnapshots = (kind: "word" | "article", cards: Array<StoredCard | ArticleCard>, prior: Array<StoredCard | ArticleCard>): void => {
+          for (const card of cards) {
+            const id = "key" in card ? card.key : card.articleId, baseKey = `${kind}:${id}`;
+            if (historyBases.has(baseKey)) continue;
+            const old = prior.find(c => ("key" in c ? c.key : c.articleId) === id);
+            if (!old || pickFsrs(old, card) === card) bases[baseKey] = card;
+          }
+        };
+        importSnapshots("word", incoming.cards, before.cards);
+        importSnapshots("article", incoming.articleCards, before.articleCards);
+        state.data.reviewBases = bases;
+        trackChanges(state, previousData, state.data);
+        projectRecords(state);
+      });
+      await notifyLocalMutation();
+    } else await local().set(writes);
     return { ok: true, report, message: describeReport(report) };
   });
 }
@@ -643,5 +695,6 @@ export async function clearData(): Promise<void> {
     const all = await local().get(null);
     const keep = new Set<string>([KEY_SETTINGS, KEY_LLM]);
     await local().remove(Object.keys(all).filter((k) => !keep.has(k)));
+    notifyDataReset();
   });
 }

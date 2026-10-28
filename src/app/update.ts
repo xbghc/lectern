@@ -28,6 +28,7 @@ const KEY_AUTO = "fs:update:auto";
 const KEY_LAST = "fs:update:last";
 const KEY_SKIP = "fs:update:skip";
 const KEY_INSTALL = "fs:update:install";
+const KEY_FOUND = "fs:update:found";
 
 /** 装着的到底是哪个版本，以宿主报的为准；在普通浏览器里调试时退回构建时注入的那个。 */
 export function currentVersion(): string {
@@ -104,9 +105,13 @@ export async function autoCheck(): Promise<Update | null> {
   try {
     if (!canSelfUpdate() || !autoCheckEnabled() || isDebugBuild()) return null;
     const last = Number(localStorage.getItem(KEY_LAST) ?? 0);
-    if (Number.isFinite(last) && Date.now() - last < DAY) return null;
+    if (Number.isFinite(last) && Date.now() - last < DAY) {
+      const cached = readUpdate(JSON.parse(localStorage.getItem(KEY_FOUND) ?? "null"), currentVersion());
+      return cached && !isSkipped(cached.version) ? cached : null;
+    }
     localStorage.setItem(KEY_LAST, String(Date.now()));
     const update = await checkForUpdate();
+    localStorage.setItem(KEY_FOUND, JSON.stringify(update ? { tag_name: update.tag, body: update.notes, assets: [update.apk] } : null));
     if (!update || isSkipped(update.version)) return null;
     return update;
   } catch {
@@ -172,20 +177,19 @@ export async function autoUpdate(): Promise<Exclude<AutoStep, { do: "nothing" | 
         failedVersion: lastFailure()?.version || null,
       });
     const settle = (step: AutoStep): Exclude<AutoStep, { do: "nothing" | "download" }> | null => {
-      if (step.do === "ready") bridge?.updateArm?.(step.silent ? step.version : "");
+      bridge?.updateArm?.(step.do === "ready" && step.silent ? step.version : "");
       return step.do === "ready" || step.do === "offer" ? step : null;
     };
 
-    // 先看躺着的：一天只问 GitHub 一次，但下好的包每次开首页都该认
-    const first = plan(null);
-    if (first.do === "ready") return settle(first);
+    // Cached packages remain usable offline; they must not bypass the daily check for a newer release.
     const found = await autoCheck();
     const step = plan(found);
     if (step.do !== "download") return settle(step);
+    bridge?.updateArm?.("");
     try {
       await downloadUpdate(step.update.apk.browser_download_url, step.update.apk.size, () => undefined);
     } catch {
-      return { do: "offer", update: step.update }; // 没下成：退回老样子，让人自己决定
+      return settle({ do: "offer", update: step.update }); // 没下成：退回老样子，让人自己决定
     }
     const after = plan(null);
     return after.do === "ready" ? settle(after) : { do: "offer", update: step.update };

@@ -72,7 +72,7 @@ export function setupSyncSettings(): void {
       const list = document.createElement("ul");
       for (const reason of status.blockedReasons) list.append(text("li", reason));
       const scope = status.blockedMaterials > 0 ? `${quantity(status.blockedMaterials, "reading item")} (including ${quantity(status.blocked, "record")})` : `${quantity(status.blocked, "record")}`;
-      dd.append(`${scope} failed validation and remain on this device: `, list, text("span", "Other records sync normally. Open the article's details on the dashboard to inspect its records.", "note"));
+      dd.append(`${scope} could not be uploaded and remain on this device: `, list, text("span", "Other records sync normally. Open the article's details on the dashboard to inspect its records.", "note"));
       rows.push(["Could not upload", dd]);
     }
     if (status.userId) {

@@ -58,8 +58,10 @@ async function request(config:SyncConfig,path:string,init:RequestInit={}):Promis
   }
   return response;
 }
-export async function syncRequest(path:string,init:RequestInit={}):Promise<Response> {
-  const {config}=await syncDriver().read();
+export interface SyncBinding { config: SyncConfig; deviceId: string }
+export async function syncRequest(path:string,init:RequestInit={},expected?:SyncBinding):Promise<Response> {
+  const {config,deviceId}=await syncDriver().read();
+  if(expected&&(deviceId!==expected.deviceId||JSON.stringify(config)!==JSON.stringify(expected.config)))throw new Error("Sync settings changed. This sync cycle was stopped.");
   if(!config.enabled||!config.token||!config.userId)throw new Error("Enable sync in settings first");
   if(!path.startsWith("/v1/")||path.includes(".."))throw new Error("Invalid sync path");
   return request(config,path,init);
@@ -145,10 +147,16 @@ function describe(stuck:Blocked[]):{reasons:string[];materials:number} {
 export async function materialSync(articleId:string):Promise<MaterialSync> {
   if(!hasSyncStorage())return {state:"local",waiting:[],reasons:[]};
   const s=await syncDriver().read();
-  const known=Boolean(s.records[recordKey({type:"article",id:articleId})]);
+  const pendingArchive=object(s.data.archivePending)[articleId];
+  const known=Boolean(s.records[recordKey({type:"article",id:articleId})]||pendingArchive);
   if(!s.config.enabled||!known)return {state:"local",waiting:[],reasons:[]};
   const mine=(op:SyncOperation):boolean=>materialOf(op.record)===articleId;
   const waiting=s.outbox.filter(mine);
+  if(pendingArchive) {
+    const failure=s.archiveErrors?.[articleId];
+    if(failure&&failure.version===pendingArchive.version)return {state:"blocked",waiting:[...tally(waiting),[LABEL.archive,1]],reasons:[failure.reason]};
+    if(!waiting.length)return {state:"pending",waiting:[[LABEL.archive,1]],reasons:[]};
+  }
   if(!waiting.length)return {state:"synced",waiting:[],reasons:[]};
   const stuck=triage(s.outbox,new Map()).blocked.filter(b=>mine(b.op));
   if(!stuck.length)return {state:"pending",waiting:tally(waiting),reasons:[]};
@@ -229,7 +237,7 @@ async function cycle():Promise<SyncStatus> {
     // 这一轮往服务器上放过东西，结尾才需要再下载一次；没放过，开头那次已经是最新的
     let uploaded=Object.keys(object((await syncDriver().read()).data.archivePending)).length>0;
     const {flushArchives}=await import("../archive/background.ts");
-    await flushArchives();
+    const archiveFailures=await flushArchives({config,deviceId:initial.deviceId});
     // 老版本留下的残缺文章先补齐再分拣；补不了的才轮到 triage 把它留下。补齐之后同一条记录的几次改动折成一条再发
     if(await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");const repaired=repairOutbox(s);foldOutbox(s);return repaired;}))await notifyProjection();
     const verdicts=new Map<string,string|null>();let stuck:Blocked[]=[];
@@ -256,7 +264,12 @@ async function cycle():Promise<SyncStatus> {
     }
     if(uploaded)await pull();
     await check();
-    const blocked=stuck.length?{count:stuck.length,...describe(stuck)}:undefined;
+    const descriptions=describe(stuck);
+    const blocked=stuck.length||archiveFailures.length?{
+      count:stuck.length+archiveFailures.length,
+      reasons:[...descriptions.reasons,...archiveFailures.map(f=>`Offline archive ${f.articleId}: ${f.reason}`)],
+      materials:new Set([...stuck.map(b=>materialOf(b.op.record)),...archiveFailures.map(f=>f.articleId)].filter(id=>id!==null)).size,
+    }:undefined;
     await syncDriver().update(s=>{if(JSON.stringify(s.config)!==JSON.stringify(config))throw new Error("Sync settings changed. This sync cycle was stopped.");s.lastSuccess=Date.now();s.error=null;s.failures=0;s.retryAt=0;s.blocked=blocked;});
     succeeded=true;
   } catch(error) {

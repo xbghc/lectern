@@ -7,6 +7,7 @@ import { reasonOf } from "../../lib/reason.ts";
 import { getLlmConfig } from "./llm.ts";
 import type { RuleApplyReply, RuleChange, RuleChatReply, RuleRejected, Settings } from "../../types.ts";
 import type { HandlerMap } from "./router.ts";
+import { dataIdentity, assertDataIdentity } from "../../sync/storage.ts";
 
 /*
  * 名单对话的后台一半：一句话 → 模型 → 改动清单（不写）；人确认 → 在最新的名单上再核一遍、写进去。
@@ -35,6 +36,7 @@ async function withHits(changes: RuleChange[]): Promise<RuleChange[]> {
 export function ruleChatHandlers(lists: readonly UrlRuleList[]) {
   return {
     "rules:chat": async (m): Promise<RuleChatReply> => {
+      const identity = await dataIdentity();
       const turns = Array.isArray(m.turns) ? m.turns.filter((t) => t && typeof t.text === "string" && t.text.trim()) : [];
       if (turns.at(-1)?.role !== "user") return { ok: false, error: "Describe the changes you want first" };
       const current = listsOf(await getSettings(), lists);
@@ -44,12 +46,13 @@ export function ruleChatHandlers(lists: readonly UrlRuleList[]) {
       const config = { ...saved, maxTokens: Math.max(1500, saved.maxTokens) };
       try {
         const result = await callMessages(config, ruleChatSystem(lists, current, pageUrl), ruleChatInput(turns));
-        later(() => recordCall("ruleChat", config, result.timing, result.usage));
+        await assertDataIdentity(identity);
+        later(() => recordCall("ruleChat", config, result.timing, result.usage, identity));
         if (result.truncated) throw new Error("The model response was truncated. Try a shorter request.");
         const plan = parseRulePlan(extractJson(result.text), lists, current);
         return { ok: true, ...plan, changes: await withHits(plan.changes) };
       } catch (err) {
-        later(() => recordFailure(err, config, { source: "ruleChat", request: { message: turns.at(-1)!.text, pageUrl: pageUrl ?? null } }));
+        later(() => recordFailure(err, config, { source: "ruleChat", request: { message: turns.at(-1)!.text, pageUrl: pageUrl ?? null }, dataIdentity: identity }));
         return { ok: false, error: reasonOf(err) };
       }
     },

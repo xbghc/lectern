@@ -167,7 +167,7 @@ export async function deleteSnippet(snippetId: string): Promise<void> {
   });
 }
 
-export async function gradeStoredCard(cardId: string, grade: GradeValue, now: number): Promise<StoredCard | null> {
+export async function gradeStoredCard(cardId: string, grade: GradeValue, now: number, eventId: string = crypto.randomUUID()): Promise<StoredCard | null> {
   return serialize(async () => {
     const cards = await getCards();
     const i = cards.findIndex((c) => c.id === cardId);
@@ -179,7 +179,7 @@ export async function gradeStoredCard(cardId: string, grade: GradeValue, now: nu
     const baseKey = `word:${prior.key}`;
     if (!bases[baseKey]) bases[baseKey] = prior;
     const events = (history.reviewEvents ?? []) as unknown[];
-    events.push({id:crypto.randomUUID(),kind:"word",cardKey:prior.key,grade,ts:now,algorithm:"fsrs-5-default-v1"});
+    events.push({id:eventId,kind:"word",cardKey:prior.key,grade,ts:now,algorithm:"fsrs-5-default-v1"});
     cards[i] = next;
     await local().set({ [KEY_CARDS]: cards, reviewEvents:events, reviewBases:bases });
     return hasSyncStorage() ? (await getCards()).find(c=>c.key===prior.key)??null : next;

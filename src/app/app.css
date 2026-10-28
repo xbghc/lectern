@@ -337,8 +337,9 @@ body.mobile-settings .settings-savebar { position: fixed; z-index: 10; top: auto
 .mobile-settings .settings-savebar #status { grid-column: 1 / -1; min-height: 0; }
 .mobile-settings .settings-savebar #status:empty { display: none; }
 .mobile-settings .settings-savebar button { width: 100%; }
-/* 保存条在手机上是两格，塞不下第三个按钮；改错了重进一次设置页就回去了 */
-.mobile-settings #revert { display: none; }
+/* The bottom bar is reserved for saving and discarding the current changes. */
+.mobile-settings #revert[hidden] { display: none; }
+body.mobile-settings .settings-savebar:not(.is-dirty) { grid-template-columns:1fr; }
 
 
 /* ==================== 书 ==================== */
@@ -1249,3 +1250,47 @@ body.vocabulary-chat { position:fixed; inset:0; width:100%; max-width:none; marg
 .chat-history-row { display:flex; align-items:center; gap:10px; }
 .vocabulary-chat .phone-chat-history-item { background:none; border:0; color:var(--fg); min-width:0; }
 .vocabulary-chat .phone-chat-history-item > div { overflow-wrap:anywhere; }
+
+/* Reading settings stay explicit and separate from chapter navigation. */
+body.reader .iconbtn { width:48px; min-width:48px; height:48px; }
+body.reader .iconbtn[hidden] { display:none; }
+.reader-contents { font-family:var(--sans); }
+.reader-contents button { min-height:48px; }
+.reader-font-settings { width:min(360px,calc(100vw - 28px)); }
+.reader-font-stepper { display:grid; grid-template-columns:64px 1fr 64px; gap:12px; align-items:center; margin:20px 0; }
+.reader-font-stepper button { border:1px solid var(--border); border-radius:var(--radius-md); background:var(--card); color:var(--fg); font-size:20px; }
+.reader-font-stepper output { text-align:center; font-size:20px; font-variant-numeric:tabular-nums; }
+.reader-font-preview { padding:16px; background:var(--muted); border-radius:var(--radius-md); font-family:var(--serif); line-height:1.9; }
+#reader-font-reset { width:100%; }
+#reader-font-status:empty { display:none; }
+#reader-tools .reader-tool-actions { display:grid; gap:8px; }
+#reader-tools .reader-tool-actions button { display:flex; align-items:center; gap:10px; text-align:left; }
+#reader-tools .reader-tool-actions button[hidden] { display:none; }
+#reader-tools .reader-tool-actions .ui-icon { width:18px; height:18px; }
+#reader-gesture-help { width:100%; margin-top:16px; }
+#reader-intro p { font-size:15px; line-height:1.7; }
+#reader-intro-done { width:100%; }
+#contents-book-title { margin-bottom:12px; font-size:15px; }
+
+/* Mobile controls use a full finger target without enlarging their icons. */
+@media (max-width:720px), (any-pointer:coarse) {
+  body.app button, body.app .icon-btn, body.app .word-actions > summary,
+  body.reader button, body.mobile-settings button, body.vocabulary-chat button,
+  body.vocabulary-chat .icon-btn { min-width:48px; min-height:48px; }
+  body.app .workspace-bar .icon-btn, body.app .queue-heading #add-article,
+  body.vocabulary-chat .icon-btn { width:48px; height:48px; }
+  body.app .word-actions > summary { width:48px; height:48px; }
+  body.app .word-summary-row > .sub, body.app .book-card .sub,
+  body.app .book-card .pill, body.app .phone-continue-bottom > span,
+  body.app .phone-shelf-preview p, body.app .book-local-label,
+  body.app .phone-review-entry small { font-size:12px; }
+  body.app .word-chat-entry { width:48px; height:48px; flex:none; }
+  body.app .word-detail > summary, body.app .book-toc > summary,
+  body.mobile-settings summary, body.mobile-settings .field.check label { min-height:48px; box-sizing:border-box; align-content:center; }
+  body.mobile-settings .settings-section > summary { min-height:72px; }
+  body.mobile-settings .field.check label { display:flex; align-items:center; }
+  body.app .word-actions .word-controls button { padding:10px 12px; }
+  body.app .rating-help > summary { min-height:48px; box-sizing:border-box; align-content:center; }
+  body.mobile-settings input:not([type="checkbox"]):not([type="radio"]), body.mobile-settings select,
+  body.app .toolbar input[type="search"], body.app .toolbar select { min-height:48px; }
+}

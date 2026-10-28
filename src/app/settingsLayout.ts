@@ -32,6 +32,7 @@ export function setupSettingsLayout(): void {
     "Data": "Import, export and clear records",
     "Diagnostics": "Request timings, errors and interaction counts",
     "Updates": "App version and updates",
+    "Reset preferences": "Restore reading defaults while keeping your connections and data",
   };
   for (const fieldset of document.querySelectorAll<HTMLFieldSetElement>("body > fieldset")) {
     const legend = fieldset.querySelector("legend");

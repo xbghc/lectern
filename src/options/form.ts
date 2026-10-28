@@ -133,14 +133,20 @@ export const hasUnsavedChanges = (): boolean => changedCount() > 0;
 /** 状态栏一处两用：刚发生的事（存好了、填错了）优先，没有就报还有几项没保存。 */
 function renderStatus(): void {
   const changed = changedCount();
+  saveBar.hidden = changed === 0 && !saving && !flashing;
   saveBar.classList.toggle("is-dirty", changed > 0);
   revertBtn.hidden = changed === 0;
   status.classList.toggle("error", flashing?.error ?? false);
   status.textContent = flashing ? flashing.msg : changed > 0 ? `${changed} unsaved changes` : "";
-  $<HTMLButtonElement>("save").disabled = saving || !baseline || !llmBaseline;
+  $<HTMLButtonElement>("save").disabled = saving || testing || !baseline || !llmBaseline || changed === 0;
+  revertBtn.disabled = saving || testing;
+  $<HTMLButtonElement>("reset").disabled = saving || testing;
   const test = $<HTMLButtonElement>("test-llm");
-  test.disabled = saving || testing || !llmBaseline || llmChangedCount() > 0;
-  test.title = llmChangedCount() > 0 ? "Save your model settings before testing the connection" : "Test the saved model connection";
+  test.disabled = saving || testing || !baseline || !llmBaseline;
+  test.textContent = testing ? "Testing connection…" : saving ? "Saving…" : changed > 0 ? "Save changes and test" : "Test connection";
+  test.title = changed > 0 ? "Save all changes, then test the model connection" : "Test the saved model connection";
+  $("consent-agree").textContent = changed > 0 ? "Save changes and agree" : "Agree and start";
+  $("model-save-state").textContent = llmChangedCount() > 0 ? "Model changes have not been saved." : savedLlm?.provider ? "Model settings saved on this device." : "";
 }
 
 function flash(msg: string, error = false): void {
@@ -184,8 +190,8 @@ window.addEventListener("beforeunload", (e) => {
   e.returnValue = true;
 });
 
-$("save").addEventListener("click", async () => {
-  if (saving || !baseline || !llmBaseline) return;
+async function saveChanges(): Promise<boolean> {
+  if (saving || testing || !baseline || !llmBaseline) return false;
   const next = collect();
   if (next.stallTimeoutMs <= next.idleTimeoutMs) {
     const msg = "The stall timeout must be longer than the idle timeout.";
@@ -193,7 +199,7 @@ $("save").addEventListener("click", async () => {
     markThresholds(msg);
     fields.stall.reportValidity();
     flash(msg, true);
-    return;
+    return false;
   }
   let model: Partial<LlmConfig> | null = null;
   try { if (llmChangedCount() > 0) model = collectLlm(); }
@@ -203,10 +209,12 @@ $("save").addEventListener("click", async () => {
     flash(message, true);
     const section = llmFields.apiKey.closest("details");
     if (section) section.open = true;
-    return;
+    return false;
   }
   saving = true;
   const modelSection = llmFields.apiKey.closest("fieldset")!;
+  const preferenceControls = Object.values(fields).map(input => ({ input, disabled: input.disabled }));
+  for (const { input } of preferenceControls) input.disabled = true;
   modelSection.disabled = true;
   renderStatus();
   try {
@@ -215,16 +223,20 @@ $("save").addEventListener("click", async () => {
     if (result?.ok === false) throw new Error(result.error ?? "Unknown error");
     load(next);
     flash("Saved. Changes apply to open pages immediately.");
+    return true;
   } catch (err) {
     const message = `Could not save: ${err instanceof Error ? err.message : "Unknown error"}`;
     if (model) llmStatus.textContent = message;
     flash(message, true);
+    return false;
   } finally {
     saving = false;
     modelSection.disabled = false;
+    for (const { input, disabled } of preferenceControls) input.disabled = disabled;
     renderStatus();
   }
-});
+}
+$("save").addEventListener("click", () => void saveChanges());
 
 /*
  * 「用一句话改名单」。确认之后写进去的是存储里的名单；这里的两个名单框和「上次保存的值」跟着改。
@@ -330,7 +342,10 @@ let saved = { baseUrl: "", apiKeySet: false };
 
 const llmStatus = $("llm-status");
 // 上一次保存留下的提示（「先选一家」之类）在人动手改了之后就过时了
-$("provider").addEventListener("change", () => { llmStatus.textContent = ""; renderStatus(); });
+$("provider").addEventListener("change", () => {
+  $<HTMLDetailsElement>("model-advanced").open = picker.provider() === "custom";
+  llmStatus.textContent = ""; renderStatus();
+});
 for (const input of Object.values(llmFields)) {
   for (const event of ["input", "change"]) input.addEventListener(event, () => { llmStatus.textContent = ""; renderStatus(); });
 }
@@ -363,7 +378,11 @@ async function setConsent(at: number | null): Promise<void> {
   if (savedLlm) savedLlm = { ...savedLlm, consentAt: at };
   llmStatus.textContent = "";
 }
-$("consent-agree").addEventListener("click", () => void setConsent(Date.now()));
+$("consent-agree").addEventListener("click", async () => {
+  // Consent applies to the provider shown in this form, not a previously saved connection.
+  if (hasUnsavedChanges() && !await saveChanges()) return;
+  await setConsent(Date.now());
+});
 $("consent-revoke").addEventListener("click", () => void setConsent(null));
 
 function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
@@ -372,6 +391,7 @@ function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
   llmFields.apiKey.value = "";
   llmFields.apiKey.placeholder = cfg.apiKeySet ? "Configured; leave blank to keep it" : "Not configured";
   picker.show(cfg);
+  $<HTMLDetailsElement>("model-advanced").open = cfg.provider === "custom";
   saved = { baseUrl: cfg.baseUrl, apiKeySet: !!cfg.apiKeySet };
   llmFields.maxTokens.value = String(cfg.maxTokens);
   llmFields.timeout.value = String(Math.round(cfg.timeoutMs / 1000));
@@ -418,17 +438,21 @@ async function saveLlm(patch: Partial<LlmConfig>): Promise<void> {
   const result = await chrome.runtime.sendMessage({ type: "llm:set", config: patch }) as { ok?: boolean; error?: string };
   if (!result?.ok) throw new Error(result?.error ?? "Unknown error");
   await loadLlm();
-  llmStatus.textContent = consented ? "Model settings saved." : "Saved. Select Agree and start at the top of this page to enable model requests.";
+  llmStatus.textContent = consented ? "Model settings saved." : "Saved. Review the sharing notice in this section before testing the connection.";
 }
 
 $("test-llm").addEventListener("click", async () => {
-  if (saving || testing || llmChangedCount() > 0) return;
+  if (saving || testing) return;
+  if (hasUnsavedChanges() && !await saveChanges()) return;
   // 测试连接也是一次请求：没同意过就不发，说清楚卡在哪儿
   if (!consented) {
-    llmStatus.textContent = "Select Agree and start at the top of this page before testing the connection.";
+    llmStatus.textContent = "Your settings are saved. Review the sharing notice and select Agree and start before testing.";
+    $("consent-agree").focus();
     return;
   }
   testing = true;
+  const modelSection = llmFields.apiKey.closest("fieldset")!;
+  modelSection.disabled = true;
   renderStatus();
   llmStatus.textContent = "Testing saved connection…";
   try {
@@ -440,7 +464,7 @@ $("test-llm").addEventListener("click", async () => {
     llmStatus.textContent = res.ok ? `Connected (${res.model})` : `Connection failed: ${res.error ?? "Unknown error"}`;
   } catch (err) {
     llmStatus.textContent = `Connection failed: ${err instanceof Error ? err.message : "Unknown error"}`;
-  } finally { testing = false; renderStatus(); }
+  } finally { testing = false; modelSection.disabled = false; renderStatus(); }
 });
 
 async function loadLlm(): Promise<void> {

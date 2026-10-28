@@ -15,7 +15,7 @@ The interface and documentation are in English. AI translations, teaching notes,
 
 Install from the Chrome Web Store, or extract a release ZIP and load its directory through **chrome://extensions → Developer mode → Load unpacked**. Chrome and Edge 114 or newer are supported; Firefox is not supported because the extension uses `chrome.sidePanel`.
 
-The settings page opens after installation. Read the content-sharing notice, choose **Agree and start**, select a provider and model, enter your API key, then choose **Save**. This single button saves both reading preferences and model configuration. Use **Test saved connection** to check the saved configuration. Saving alone does not send a model request. Lectern does not call a model before consent. Without a configured model and key, it cannot classify new articles or translate; existing history remains available.
+The settings page opens after installation. Choose a provider, enter your API key and select a model. Advanced connection settings contain the protocol, URL and response limits; choosing a custom endpoint opens them automatically. Review the content-sharing notice and confirm it. **Save changes and test** saves both reading preferences and model configuration, then checks the connection; **Save** saves without a model request. Consent is still required before any model request. Saved settings and the connection-test result are reported separately. Without a configured model and key, Lectern cannot classify new articles or translate; existing history remains available.
 
 The store extension and an unpacked extension have different IDs and separate local data. Sync or export your records before switching installations.
 
@@ -106,6 +106,8 @@ Use **Alt+Shift+S** in the extension, or the Android reader's tools, and select 
 
 Looked-up words and phrases become FSRS review cards. Reveal an answer and rate recall to schedule the next review. AI assistance can provide examples, a different explanation or a quiz. Article review separately revisits saved outlines and recall questions. Editing or deleting one translation preserves a card while other sources remain; an orphaned card is hidden, with its review history retained for a later matching source.
 
+**Undo last rating** returns to the previous card and restores its schedule during the current review queue. It retracts that exact rating through sync, preserves other cards and refuses a stale undo when that card has a newer rating. **How to rate your recall** explains the four choices. Vocabulary lists show meaning and a short source context first; management actions are in each item's more menu.
+
 ### Vocabulary chat
 
 Choose one to three words from Vocabulary to practice context, sentences or a short role-play. Chat uses the configured model and consent, supports streaming and stopping, and sends the selected words, source context, current message and recent six rounds of conversation. It does not change review schedules automatically.
@@ -119,6 +121,8 @@ Add a URL, share one from a browser, or open an article saved by the extension. 
 On phones, reading shows only the article and a faint 2px progress line at the very bottom of the screen. System bars and reading tools start hidden; scrolling up or returning to the beginning does not reveal them. Tap the margins beside the article to show or hide tools. Text and paragraph spacing keep their word and sentence translation gestures. Keyboard and screen-reader users have a separate **Show reading tools** button.
 
 Reader controls include font size, device-local bookmarks and a chapter outline. Previous chapter, Contents and Next chapter are available at the end of each chapter; they scroll with the text. The exact progress percentage and source details live inside the tools. Scrolling 24px in either direction, closing the outline or pressing Back hides the tools again without shifting the text. Changing font size preserves the visible paragraph. Translation panels remain available on demand. Font size and bookmarks do not sync. Opening a book resumes its most recently visited chapter and saved paragraph, including positions within the final paragraph.
+
+The text-size button opens a panel without changing the text. Decrease/increase controls adjust 14–28 px, show the current value and restore the 18 px default. Contents contains only chapter navigation; the separate **Reading tools** menu holds bookmarks and translation actions. A one-time introduction explains the margin gesture before reading, and can be reopened from Reading tools.
 
 The Android reader does not show the extension's top progress strip, position notice or completion card. Position restoration, reading records and the review queue continue to work.
 

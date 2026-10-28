@@ -84,6 +84,13 @@ test("保留文字选区时点击留白不打开工具", () => {
   assert.equal(hidden(), true);
 });
 
+test("触屏连续点留白即使带着双击计数，仍可在关闭面板后再次调出工具", () => {
+  click(article);
+  full.hide();
+  article.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, detail: 2 }));
+  assert.equal(hidden(), false);
+});
+
 test("工具打开后，继续朝任意方向阅读都会收起，微小抖动不收", () => {
   host.scrollTo(400);
   full.reveal();

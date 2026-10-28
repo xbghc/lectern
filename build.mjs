@@ -63,6 +63,7 @@ function copyStaticExtension() {
     ["src/ocr/ocr.html", "ocr.html"],
     ["src/popup/popup.html", "popup.html"],
     ["src/popup/popup.css", "popup.css"],
+    ["src/ui/theme.css", "theme.css"],
     ["src/options/options.html", "options.html"],
     ["src/dashboard/dashboard.html", "dashboard.html"],
     ["src/dashboard/dashboard.css", "dashboard.css"],
@@ -81,6 +82,7 @@ function copyStaticApp() {
   copyFonts();
   for (const [from, to] of [
     ["src/popup/popup.css", "popup.css"],
+    ["src/ui/theme.css", "theme.css"],
     ["src/dashboard/dashboard.css", "dashboard.css"],
     ["src/app/app.css", "app.css"],
     ["src/app/index.html", "index.html"],

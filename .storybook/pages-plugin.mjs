@@ -13,7 +13,7 @@ export const pages = {
   appOptions: ['src/options/options.html', 'src/app/options.ts'],
 };
 const root = resolve(import.meta.dirname, '..');
-const cssFiles = { 'popup.css': 'src/popup/popup.css', 'dashboard.css': 'src/dashboard/dashboard.css', 'app.css': 'src/app/app.css' };
+const cssFiles = { 'popup.css': 'src/popup/popup.css', 'dashboard.css': 'src/dashboard/dashboard.css', 'app.css': 'src/app/app.css', 'theme.css': 'src/ui/theme.css' };
 const script = text => `<script>${text.replace(/<\/script/gi, '<\\/script')}</script>`;
 
 /** Bundle the real page entry; only the platform boot and transport are replaced. */
@@ -33,7 +33,7 @@ export async function compilePages() {
       } }],
     });
     let html = (await readFile(resolve(root, template), 'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
-    if (name === 'appOptions') html = html.replace('</head>', '<link rel="stylesheet" href="app.css" /></head>');
+    if (name === 'appOptions') html = html.replace('<link rel="stylesheet" href="theme.css" />', '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /><link rel="stylesheet" href="app.css" /><link rel="stylesheet" href="theme.css" />');
     for (const [file, path] of Object.entries(cssFiles)) {
       let css = await readFile(resolve(root, path), 'utf8');
       const fonts = [...css.matchAll(/url\(["']?fonts\/([^"')]+)["']?\)/g)];

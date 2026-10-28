@@ -11,8 +11,7 @@ import { Typewriter, type TypewriterDeps } from "./typewriter.ts";
  * 不隔离的话浮层在不同网站上会长得完全不一样。用 closed 模式，
  * 页面脚本也拿不到里面的内容。
  *
- * 配色与扩展其余部分同一套纸墨系统，顶部一道赭线呼应索引卡。
- * 拉丁衬线是扩展自带的（见 FONT_FACES），中文交给系统宋体。
+ * 配色与扩展其余部分使用同一套 shadcn 中性色，控件保持清晰的边框与焦点。
  */
 
 const HOST_ID = "lectern-popover";
@@ -29,35 +28,9 @@ const MIN_ROOM = 120;
  */
 const EXPECTED_HEIGHT: Record<SnippetKind, number> = { word: 270, phrase: 400, sentence: MAX_HEIGHT };
 
-/*
- * 字体 URL 只能在运行时拼：Shadow DOM 里的 `url()` 是相对宿主页面解析的，
- * 必须是绝对的 chrome-extension:// 地址，而扩展 id 每次安装都不同。
- * manifest 的 web_accessible_resources 放行了 fonts/*.woff2，否则宿主页面
- * 取这个地址会被拒。
- *
- * 代价：任何网页都能通过探测这个地址判断出装了本扩展。对一个自用的阅读工具
- * 来说这点指纹无所谓，换来的是浮层和扩展其余部分字体一致。
- */
-const FONT_FACES = `
-@font-face {
-  font-family: "Source Serif 4";
-  font-style: normal; font-weight: 400; font-display: swap;
-  src: url("__FONTS__source-serif-4-latin-400-normal.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Source Serif 4";
-  font-style: normal; font-weight: 600; font-display: swap;
-  src: url("__FONTS__source-serif-4-latin-600-normal.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Source Serif 4";
-  font-style: italic; font-weight: 400; font-display: swap;
-  src: url("__FONTS__source-serif-4-latin-400-italic.woff2") format("woff2");
-}
-`;
-
 const CSS = `
-:host { all: initial; }
+:host { all: initial; color-scheme: light dark; }
+button:focus-visible, input:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
 .box {
   /*
    * 挂在宿主里，宿主冻结成定位那一刻的视口（见 freeze）：页面滚动时浮层由浏览器带着和原文一起挪，
@@ -75,13 +48,13 @@ const CSS = `
   overflow-y: auto;
   box-sizing: border-box;
   padding: 18px 20px;
-  border-radius: 8px;
-  border: 1px solid #e6dfd5;
+  border-radius: 12px;
+  border: 1px solid #e4e4e7;
 
-  background: #fffdfa;
-  color: #302c27;
-  box-shadow: 0 1px 2px rgba(31, 27, 22, 0.06), 0 10px 28px rgba(31, 27, 22, 0.12);
-  font: 14px/1.7 "Source Serif 4", Georgia, "Songti SC", "Noto Serif CJK SC", "SimSun", serif;
+  background: #ffffff;
+  color: #09090b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 28px rgba(0, 0, 0, 0.12);
+  font: 14px/1.7 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   overflow-wrap: break-word;
   /* 浮层里的字要能选中复制。有的网站给 html 挂 user-select: none 防复制，不写明的话浮层会跟着继承过来 */
   -webkit-user-select: text;
@@ -95,65 +68,66 @@ const CSS = `
  * 内容放得下时不加——实测 contain 在放得下的盒子上也会把滚轮吞掉，指针停在浮层上时页面就滚不动了。
  */
 .box.scrolls { overscroll-behavior: contain; }
-.head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 5px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; margin-bottom: 5px; }
 .term { font-weight: 600; font-size: 23px; letter-spacing: -0.01em; }
 /*
  * 截断过的原文可以点：点一下展开全文，再点收起（见 fillTerm）。没截断的不挂 aria-expanded，不可点也不变色。
  * 不学音标描虚线：一整段粗体原文底下拖一道线太吵，结尾那个「…」本身就在说后面还有。
  */
 .term[aria-expanded] { cursor: pointer; }
-@media (hover: hover) { .term[aria-expanded]:hover { color: #a45531; } }
-.term[aria-expanded]:active { color: #a45531; }
+@media (hover: hover) { .term[aria-expanded]:hover { color: #18181b; } }
+.term[aria-expanded]:active { color: #18181b; }
 /* 注脚一律无衬线，和 popup / dashboard 同一套分工 */
 .meta {
-  color: #766d62; font-size: 11.5px;
+  max-width: 100%;
+  color: #71717a; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 .tr { font-size: 16px; margin: 3px 0 6px; }
-.note { color: #554e45; font-size: 13px; line-height: 1.85; }
-.ctx { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1ebe2; display: flex; gap: 7px; flex-wrap: wrap; }
+.note { color: #3f3f46; font-size: 13px; line-height: 1.85; }
+.ctx { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f4f4f5; display: flex; gap: 7px; flex-wrap: wrap; }
 
 /* ---- 讲解：用法一行，生词逐条 ---- */
-.usage { margin-top: 7px; color: #554e45; font-size: 13px; line-height: 1.8; }
+.usage { margin-top: 7px; color: #3f3f46; font-size: 13px; line-height: 1.8; }
 .usage::before {
   content: "Usage · ";
-  color: #8f8475; font-size: 11.5px;
+  color: #71717a; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
-.vocab { margin-top: 9px; padding-top: 8px; border-top: 1px solid #f1ebe2; }
+.vocab { margin-top: 9px; padding-top: 8px; border-top: 1px solid #f4f4f5; }
 /* 还没生成到的时候整块藏起来，免得先亮出一条空的分隔线和一个"用法 ·" */
 .usage:empty, .vocab:empty { display: none; }
 .v + .v { margin-top: 8px; }
 .vh { display: flex; align-items: baseline; gap: 7px; }
 .vw { font-weight: 600; }
 .vm {
-  color: #766d62; font-size: 11.5px;
+  color: #71717a; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 /*
  * 可点朗读的音标。虚线下划线是这里唯一的提示——音标本身没法长得像按钮，
  * 而加个喇叭图标又会把这一行注脚顶成一行控件。
  */
-.ph { cursor: pointer; border-bottom: 1px dotted #aea392; }
+.ph { cursor: pointer; border-bottom: 1px dotted #a1a1aa; }
 /* :hover 一律关进 (hover: hover)，理由见 popup.css——这一份浮层在手机上也用 */
-@media (hover: hover) { .ph:hover { color: #a45531; border-bottom-color: #a45531; } }
-.ph:active { color: #a45531; border-bottom-color: #a45531; }
-.vd { font-size: 13px; line-height: 1.75; color: #554e45; }
+@media (hover: hover) { .ph:hover { color: #18181b; border-bottom-color: #18181b; } }
+.ph:active { color: #18181b; border-bottom-color: #18181b; }
+.vd { font-size: 13px; line-height: 1.75; color: #3f3f46; }
 .vn {
-  font-size: 12px; line-height: 1.7; color: #766d62;
+  font-size: 12px; line-height: 1.7; color: #71717a;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 button {
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   font-size: 12px; cursor: pointer;
-  padding: 4px 11px; border-radius: 3px;
-  border: 1px solid #d0c8ba; background: #faf8f4; color: #554e45;
+  padding: 4px 11px; border-radius: 6px;
+  border: 1px solid #e4e4e7; background: #ffffff; color: #3f3f46;
   /* 拖选浮层里的字时，别把按钮上的字也圈进去 */
   -webkit-user-select: none;
   user-select: none;
 }
-@media (hover: hover) { button:hover { border-color: #a45531; color: #a45531; } }
-button:active { background: #f1ebe2; border-color: #a45531; color: #a45531; }
+@media (hover: hover) { button:hover { border-color: #18181b; color: #18181b; } }
+button:active { background: #f4f4f5; border-color: #18181b; color: #18181b; }
 /*
  * 「还在写」的尾灯。译文约 800ms 就到，讲解还要两三秒——中间没有任何动静的话，
  * 浮层看起来就是已经完事了，人转头就走，正要出来的讲解白生成。
@@ -162,17 +136,17 @@ button:active { background: #f1ebe2; border-color: #a45531; color: #a45531; }
 .more { display: none; margin-top: 9px; }
 .more.on { display: block; }
 /* ---- 追问：译文出来之后，就着这一段再问一句 ---- */
-.ask { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1ebe2; }
+.ask { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f4f4f5; }
 /* 骨架里先空着。译文还没到就先亮一道分隔线，看着像下面还有东西没加载出来 */
 .ask:empty { display: none; }
 .qa + .qa { margin-top: 10px; }
 .qq {
-  color: #766d62; font-size: 11.5px;
+  color: #71717a; font-size: 11.5px;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 .qq::before { content: "Q · "; }
 /* 答案里的换行是模型自己分的段，留着 */
-.aa { margin-top: 3px; font-size: 13px; line-height: 1.8; color: #554e45; white-space: pre-wrap; }
+.aa { margin-top: 3px; font-size: 13px; line-height: 1.8; color: #3f3f46; white-space: pre-wrap; }
 .askbar { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
 /*
  * 图标按钮：拿一个字符当图标，不写文字标签。同 App 阅读器顶栏的 .iconbtn（那里是 ‹ 和 词）
@@ -183,25 +157,25 @@ button:active { background: #f1ebe2; border-color: #a45531; color: #a45531; }
  */
 .iconbtn {
   padding: 2px 7px; border-color: transparent; background: transparent;
-  color: #8f8475; font-size: 15px; line-height: 1.3;
-  font-family: "Source Serif 4", Georgia, "Songti SC", "Noto Serif CJK SC", "SimSun", serif;
+  color: #71717a; font-size: 15px; line-height: 1.3;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
-@media (hover: hover) { .iconbtn:hover { color: #a45531; border-color: transparent; background: transparent; } }
-.iconbtn:active { color: #a45531; }
+@media (hover: hover) { .iconbtn:hover { color: #18181b; border-color: transparent; background: transparent; } }
+.iconbtn:active { color: #18181b; }
 .qin {
   flex: 1; min-width: 0; box-sizing: border-box;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   font-size: 12px; padding: 4px 8px;
-  border: 1px solid #d0c8ba; border-radius: 3px;
-  background: #fffdfa; color: #302c27;
+  border: 1px solid #e4e4e7; border-radius: 6px;
+  background: #ffffff; color: #09090b;
 }
-.qin:focus { outline: none; border-color: #a45531; }
+.qin:focus { outline: none; border-color: #18181b; }
 /* 上一问还没答完时禁用。pointer-events 一并关掉，否则 :hover 还会把它描成可点的样子 */
 .qin:disabled, button:disabled { opacity: 0.5; pointer-events: none; }
-.err { color: #845424; }
+.err { color: #a16207; }
 .spin {
   display: inline-block; width: 11px; height: 11px;
-  border: 2px solid #e6dfd5; border-top-color: #a45531;
+  border: 2px solid #e4e4e7; border-top-color: #18181b;
   border-radius: 50%; animation: r 0.7s linear infinite; vertical-align: -1px;
 }
 @keyframes r { to { transform: rotate(360deg); } }
@@ -223,28 +197,28 @@ button:active { background: #f1ebe2; border-color: #a45531; color: #a45531; }
 /*
  * 深色的一套覆盖必须排在最后。这些选择器和上面浅色那套**同名同权重**（button、.note、
  * .qin…），@media 不加权重，靠的纯粹是后来居上：排在前面的话，浅色那份会在深色下把它压回去，
- * 卡片是深的、字却还是 #554e45，正文直接看不清。
+ * 卡片是深的、字却还是 #3f3f46，正文直接看不清。
  */
 @media (prefers-color-scheme: dark) {
-  .box { background: #342f2c; color: #d6cec3; border-color: #423e38; border-top-color: #e18d5a; }
-  .meta, .vm, .vn, .qq { color: #a39889; }
-  .ph { border-bottom-color: #756a5d; }
-  @media (hover: hover) { .ph:hover { color: #e18d5a; border-bottom-color: #e18d5a; } }
-  @media (hover: hover) { .term[aria-expanded]:hover { color: #e18d5a; } }
-  .note, .usage, .vd, .aa { color: #b7aea0; }
-  .usage::before { color: #a39889; }
-  .ctx, .vocab, .ask { border-top-color: #3a3632; }
-  button { background: #2b2724; color: #b7aea0; border-color: #4c4741; }
-  @media (hover: hover) { button:hover { background: #423e38; color: #e18d5a; border-color: #e18d5a; } }
-  .qin { background: #2b2724; color: #d6cec3; border-color: #4c4741; }
-  .qin:focus { border-color: #e18d5a; }
+  .box { background: #18181b; color: #fafafa; border-color: #27272a; }
+  .meta, .vm, .vn, .qq { color: #a1a1aa; }
+  .ph { border-bottom-color: #71717a; }
+  @media (hover: hover) { .ph:hover { color: #fafafa; border-bottom-color: #fafafa; } }
+  @media (hover: hover) { .term[aria-expanded]:hover { color: #fafafa; } }
+  .note, .usage, .vd, .aa { color: #d4d4d8; }
+  .usage::before { color: #a1a1aa; }
+  .ctx, .vocab, .ask { border-top-color: #27272a; }
+  button { background: #09090b; color: #d4d4d8; border-color: #3f3f46; }
+  @media (hover: hover) { button:hover { background: #27272a; color: #fafafa; border-color: #fafafa; } }
+  .qin { background: #09090b; color: #fafafa; border-color: #3f3f46; }
+  .qin:focus { border-color: #fafafa; }
   /* 图标按钮在深色下同样不要底和框，只换字色 */
-  .iconbtn { background: transparent; border-color: transparent; color: #a39889; }
-  @media (hover: hover) { .iconbtn:hover { background: transparent; border-color: transparent; color: #e18d5a; } }
-  button:active { background: #4c4741; border-color: #e18d5a; color: #e18d5a; }
-  .ph:active, .iconbtn:active, .term[aria-expanded]:active { color: #e18d5a; }
+  .iconbtn { background: transparent; border-color: transparent; color: #a1a1aa; }
+  @media (hover: hover) { .iconbtn:hover { background: transparent; border-color: transparent; color: #fafafa; } }
+  button:active { background: #3f3f46; border-color: #fafafa; color: #fafafa; }
+  .ph:active, .iconbtn:active, .term[aria-expanded]:active { color: #fafafa; }
   /* 出错那句：浅色那份深棕放在深色卡片上只剩 2:1 */
-  .err { color: #d4a373; }
+  .err { color: #facc15; }
 }
 
 .reader-sheet-backdrop { position:fixed; inset:0; background:rgba(36,30,22,.17); pointer-events:auto; }
@@ -417,14 +391,7 @@ export class Popover {
     host.style.cssText = "all:initial;position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none;overflow-anchor:none;";
     const root = host.attachShadow({ mode: "closed" });
     const style = document.createElement("style");
-    // 字体地址带扩展 id，只能此刻才知道。取不到（扩展正在重载）就退回系统衬线。
-    let faces = "";
-    try {
-      faces = FONT_FACES.replace(/__FONTS__/g, chrome.runtime.getURL("fonts/"));
-    } catch {
-      /* 字体加载失败不该让浮层不可用 */
-    }
-    style.textContent = faces + CSS;
+    style.textContent = CSS;
     const box = document.createElement("div");
     box.className = "box";
 

@@ -1,17 +1,17 @@
 /**
  * 读完文章后贴在右下角的回顾入口。
  *
- * 和翻译浮层同一套纸墨配色，但**另起一个 host**：浮层的 `hide()` 会把自己的
+ * 和翻译浮层同一套中性配色，但**另起一个 host**：浮层的 `hide()` 会把自己的
  * 宿主整个 remove 掉，共用的话读完之后随手划一个词，按钮就跟着没了。
  *
- * 也不共用它的字体：那边引 Source Serif 是为了让译文和扩展其余部分一致，
- * 这里只有一行汉字标签，系统无衬线就够，省一次 woff2 请求。
+ * 控件与提示使用系统无衬线字体，不需要额外字体请求。
  */
 
 const HOST_ID = "lectern-finish";
 
 const CSS = `
-:host { all: initial; }
+:host { all: initial; color-scheme: light dark; }
+button:focus-visible, input:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
 .card {
   position: fixed;
   /* 横屏时刘海在右边：和底边一样让开安全区 */
@@ -24,12 +24,12 @@ const CSS = `
   align-items: center;
   gap: 10px;
   padding: 10px 10px 10px 14px;
-  border-radius: 3px;
-  border: 1px solid #e6dfd5;
-  border-left: 3px solid #a45531;
-  background: #fffdfa;
-  color: #302c27;
-  box-shadow: 0 1px 2px rgba(31, 27, 22, 0.06), 0 10px 28px rgba(31, 27, 22, 0.14);
+  border-radius: 12px;
+  border: 1px solid #e4e4e7;
+
+  background: #ffffff;
+  color: #09090b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 28px rgba(0, 0, 0, 0.14);
   font: 13px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
   animation: rise 240ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
@@ -42,41 +42,41 @@ const CSS = `
 }
 .label { display: flex; flex-direction: column; gap: 1px; }
 .title { font-weight: 600; letter-spacing: -0.01em; }
-.sub { color: #766d62; font-size: 11.5px; }
+.sub { color: #71717a; font-size: 11.5px; }
 button {
   font: inherit;
   cursor: pointer;
-  border-radius: 2px;
-  border: 1px solid #e6dfd5;
-  background: #ebe5db;
-  color: #554e45;
+  border-radius: 6px;
+  border: 1px solid #e4e4e7;
+  background: #f4f4f5;
+  color: #3f3f46;
   padding: 5px 11px;
   transition: color 120ms, border-color 120ms;
 }
 /* 触屏上点过之后 :hover 会一直挂着，所以只给真有悬停的设备；手指用 :active */
-@media (hover: hover) { button:hover { color: #a45531; border-color: #a45531; } }
-button:active { color: #a45531; border-color: #a45531; }
+@media (hover: hover) { button:hover { color: #18181b; border-color: #18181b; } }
+button:active { color: #18181b; border-color: #18181b; }
 @media (pointer: coarse) { button { padding: 11px 14px; } }
 .close {
   padding: 5px 8px;
   border-color: transparent;
   background: transparent;
-  color: #766d62;
+  color: #71717a;
   font-size: 15px;
   line-height: 1;
 }
-@media (hover: hover) { .close:hover { color: #554e45; border-color: transparent; background: transparent; } }
-.close:active { color: #554e45; border-color: transparent; background: transparent; }
+@media (hover: hover) { .close:hover { color: #3f3f46; border-color: transparent; background: transparent; } }
+.close:active { color: #3f3f46; border-color: transparent; background: transparent; }
 @media (pointer: coarse) { .close { padding: 11px 13px; } }
 @media (prefers-color-scheme: dark) {
-  .card { background: #342f2c; color: #d6cec3; border-color: #423e38; border-left-color: #e18d5a; }
-  .sub { color: #a39889; }
-  button { background: #2b2724; color: #b7aea0; border-color: #4c4741; }
-  button:active { background: #423e38; color: #e18d5a; border-color: #e18d5a; }
-  @media (hover: hover) { button:hover { background: #423e38; color: #e18d5a; border-color: #e18d5a; } }
+  .card { background: #18181b; color: #fafafa; border-color: #27272a;  }
+  .sub { color: #a1a1aa; }
+  button { background: #09090b; color: #d4d4d8; border-color: #3f3f46; }
+  button:active { background: #27272a; color: #fafafa; border-color: #fafafa; }
+  @media (hover: hover) { button:hover { background: #27272a; color: #fafafa; border-color: #fafafa; } }
   .close { background: transparent; border-color: transparent; }
-  .close:active { background: transparent; border-color: transparent; color: #d6cec3; }
-  @media (hover: hover) { .close:hover { background: transparent; border-color: transparent; color: #d6cec3; } }
+  .close:active { background: transparent; border-color: transparent; color: #fafafa; }
+  @media (hover: hover) { .close:hover { background: transparent; border-color: transparent; color: #fafafa; } }
 }
 `;
 

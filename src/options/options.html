@@ -9,41 +9,41 @@
       html { scroll-behavior: smooth; }
       @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
       body { width: auto; max-width: 680px; margin: 0 auto; padding: 28px 20px 60px; font-family: var(--sans); }
-      h1 { font-family: var(--serif); font-size: 22px; margin: 0 0 6px; }
+      h1 { font-family: var(--sans); font-size: 22px; margin: 0 0 6px; }
       /* popup.css 的 .small 是 11px，给 380px 的弹窗用的；这一页大段的说明全靠它，整屏读下来太小 */
       .small { font-size: 12px; line-height: 1.65; }
-      legend { font-family: var(--serif); font-size: 15px; }
-      fieldset { border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px; margin: 18px 0; background: var(--card); scroll-margin-top: 16px; }
+      legend { font-family: var(--sans); font-size: 15px; }
+      fieldset { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px 18px; margin: 18px 0; background: var(--card); scroll-margin-top: 16px; }
       fieldset > p:first-of-type { margin-top: 4px; }
       fieldset > p:last-child { margin-bottom: 2px; }
       legend { padding: 0 6px; font-weight: 600; }
       .field { display: grid; grid-template-columns: 190px 100px 1fr; gap: 10px; align-items: center; margin: 10px 0; }
       .field label { color: var(--fg); }
-      .field .hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .field .hint { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
       .field .wide { grid-column: 2 / 4; }
       input[type="number"], input[type="text"], input[type="password"], textarea {
         font: inherit; color: var(--fg); background: var(--bg);
-        border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; width: 100%;
+        border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; width: 100%;
       }
       textarea { min-height: 88px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
       /* 勾选框和上下的数字框左边对齐，不悬在那一列中间 */
-      input[type="checkbox"] { accent-color: var(--accent); justify-self: start; margin-left: 0; }
-      p a { color: var(--accent); }
-      input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      input[type="checkbox"] { accent-color: var(--primary); justify-self: start; margin-left: 0; }
+      p a { color: var(--primary); }
+      input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
       /* 越界的数保存时会被夹回区间里，先在框上亮出来。不用 :invalid——它连不踩 step 的数也算，而那些数是收的 */
       input:out-of-range, input[aria-invalid="true"] { border-color: var(--danger); }
       button {
-        font-family: var(--sans); font-size: 13px; padding: 7px 15px; border-radius: 3px; cursor: pointer;
+        font-family: var(--sans); font-size: 13px; padding: 7px 15px; border-radius: var(--radius-sm); cursor: pointer;
         border: 1px solid var(--line); background: var(--bg); color: var(--fg);
       }
-      button.primary { background: var(--accent); border-color: var(--accent); color: var(--card); }
+      button.primary { background: var(--primary); border-color: var(--primary); color: var(--card); }
       button.danger { color: var(--warn); border-color: var(--warn); }
-      button:hover:not(:disabled) { border-color: var(--muted); }
-      button.primary:hover:not(:disabled) { border-color: var(--accent); filter: brightness(1.08); }
+      button:hover:not(:disabled) { border-color: var(--muted-foreground); }
+      button.primary:hover:not(:disabled) { border-color: var(--primary); filter: brightness(1.08); }
       /* 颜色都是自己写死的，浏览器给禁用按钮的那层灰盖不上来，不补这条就看不出哪个按不动 */
       button:disabled { opacity: 0.5; cursor: default; }
       .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-      #status { color: var(--accent); font-size: 12px; min-height: 1.2em; }
+      #status { color: var(--primary); font-size: 12px; min-height: 1.2em; }
       #status.error { color: var(--danger); }
       .field label { font-size: 13px; }
 
@@ -54,12 +54,12 @@
       fieldset { position: relative; }
       button.info {
         width: 18px; height: 18px; margin-left: 7px; padding: 0; border-radius: 50%; vertical-align: 1px;
-        font: italic 600 12px/16px var(--serif); color: var(--muted); background: transparent;
+        font: italic 600 12px/16px var(--sans); color: var(--muted-foreground); background: transparent;
       }
-      button.info[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+      button.info[aria-expanded="true"] { color: var(--primary); border-color: var(--primary); }
       .info-pop {
         position: absolute; z-index: 6; top: 16px; left: 18px; width: min(440px, calc(100% - 36px));
-        padding: 12px 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg);
+        padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg);
         box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14); font-size: 12px; line-height: 1.65; color: var(--fg-soft);
       }
       .info-pop p { margin: 0 0 8px; }
@@ -70,64 +70,64 @@
       .field.tall > label { padding-top: 6px; }
       .provider-picker input, .provider-picker select, #protocol {
         width: 100%; padding: 5px 7px; font: inherit; font-size: 13px; color: var(--fg);
-        background: var(--bg); border: 1px solid var(--line); border-radius: 3px;
+        background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm);
       }
       .provider-picker select { padding: 2px; }
-      .provider-picker optgroup { color: var(--muted); font-style: normal; font-weight: 400; }
+      .provider-picker optgroup { color: var(--muted-foreground); font-style: normal; font-weight: 400; }
       .provider-picker option { color: var(--fg); padding: 2px 6px; }
-      #protocol:disabled { color: var(--muted); }
+      #protocol:disabled { color: var(--muted-foreground); }
       /*
        * 「同意把内容发给模型服务」的确认块。只在还没同意时出现，放在所有分区前面：
        * 这是用之前必须看到的一段话，不能收进哪个分区里等人去翻。同意之后整块收起，模型分区里留一行「已同意 · 撤回」。
        */
-      .consent { margin: 16px 0 24px; padding: 14px 16px; border: 1px solid var(--accent); border-radius: 6px; background: var(--card); }
+      .consent { margin: 16px 0 24px; padding: 14px 16px; border: 1px solid var(--primary); border-radius: var(--radius-md); background: var(--card); }
       .consent h2 { margin: 0 0 8px; font-size: 15px; }
       .consent p { margin: 0 0 8px; }
       .consent ul { margin: 0 0 8px; padding-left: 1.2em; }
       .consent li { margin-bottom: 4px; }
       .consent .row { margin-top: 12px; }
-      button.linklike { border: 0; padding: 0; background: none; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; }
+      button.linklike { border: 0; padding: 0; background: none; color: var(--primary); text-decoration: underline; cursor: pointer; font: inherit; }
       .info-pop p:last-child { margin-bottom: 0; }
 
       /*
        * 状态块：一行结论常驻，细目收着。结论行要让人不展开也知道「好着没有」——
        * 圆点的颜色、状态、最要紧的那一个数；账号、服务器这些只在排查时才看。
        */
-      .status-panel { margin-top: 14px; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--bg); }
+      .status-panel { margin-top: 14px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); }
       .status-panel > summary {
         display: flex; align-items: baseline; gap: 8px; padding: 9px 12px; cursor: pointer; list-style: none;
         font-size: 13px; line-height: 1.5;
       }
       .status-panel > summary::-webkit-details-marker { display: none; }
-      .status-panel > summary::after { content: "Details"; margin-left: auto; flex: none; font-size: 12px; color: var(--muted); }
+      .status-panel > summary::after { content: "Details"; margin-left: auto; flex: none; font-size: 12px; color: var(--muted-foreground); }
       .status-panel[open] > summary::after { content: "Collapse"; }
-      .status-panel .dot { flex: none; align-self: center; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+      .status-panel .dot { flex: none; align-self: center; width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); }
       .status-panel .dot[data-tone="ok"] { background: var(--ok); }
-      .status-panel .dot[data-tone="busy"] { background: var(--accent); }
+      .status-panel .dot[data-tone="busy"] { background: var(--primary); }
       .status-panel .dot[data-tone="warn"] { background: var(--warn); }
       .status-panel .dot[data-tone="error"] { background: var(--danger); }
       #sync-summary { min-width: 0; overflow-wrap: anywhere; }
-      #sync-summary .aside { color: var(--muted); font-size: 12px; }
+      #sync-summary .aside { color: var(--muted-foreground); font-size: 12px; }
       #sync-summary .aside.warn { color: var(--warn); }
       #sync-summary .aside.error { color: var(--danger); }
       .status-panel dl {
         display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px; margin: 0;
         padding: 10px 12px 12px; border-top: 1px solid var(--line-soft); font-size: 12px; line-height: 1.6;
       }
-      .status-panel dt { color: var(--muted); }
+      .status-panel dt { color: var(--muted-foreground); }
       .status-panel dd { margin: 0; color: var(--fg-soft); overflow-wrap: anywhere; }
       .status-panel dd.mono { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
       .status-panel dd.warn { color: var(--warn); }
       .status-panel dd.error { color: var(--danger); }
       .status-panel dd ul { margin: 0; padding-left: 1.2em; }
-      .status-panel dd .note { display: block; margin-top: 2px; color: var(--muted); }
+      .status-panel dd .note { display: block; margin-top: 2px; color: var(--muted-foreground); }
       .status-panel > p { margin: 0; padding: 10px 12px; border-top: 1px solid var(--line-soft); }
       /* 按钮计数：数字右对齐、等宽，一列扫下来才比得出大小；一次没点过的行压淡，它们是要找的「极少用到」，但不该抢在前面 */
       .usage-table { width: 100%; border-collapse: collapse; border-top: 1px solid var(--line-soft); font-size: 12px; line-height: 1.6; }
       .usage-table th, .usage-table td { padding: 4px 12px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .usage-table th { color: var(--muted); font-weight: 400; border-bottom: 1px solid var(--line-soft); }
+      .usage-table th { color: var(--muted-foreground); font-weight: 400; border-bottom: 1px solid var(--line-soft); }
       .usage-table th:first-child, .usage-table td:first-child { text-align: left; white-space: normal; width: 100%; }
-      .usage-table tr.never td { color: var(--muted); }
+      .usage-table tr.never td { color: var(--muted-foreground); }
       #sync-feedback.error { color: var(--warn); }
 
       /*
@@ -150,14 +150,14 @@
           display: block; position: fixed; top: 32px; left: var(--nav-left); width: 172px;
           max-height: calc(100vh - 64px); overflow-y: auto;
         }
-        .section-nav p { margin: 20px 0 6px; padding-left: 14px; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); }
+        .section-nav p { margin: 20px 0 6px; padding-left: 14px; font-size: 11px; letter-spacing: 0.1em; color: var(--muted-foreground); }
         .section-nav p:first-child { margin-top: 0; }
         .section-nav a {
           display: block; padding: 5px 12px; border-left: 2px solid var(--line);
           font-size: 13px; line-height: 1.5; color: var(--fg-soft); text-decoration: none;
         }
-        .section-nav a:hover { color: var(--fg); border-left-color: var(--muted); }
-        .section-nav a[aria-current] { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+        .section-nav a:hover { color: var(--fg); border-left-color: var(--muted-foreground); }
+        .section-nav a[aria-current] { color: var(--primary); border-left-color: var(--primary); font-weight: 600; }
       }
 
       /*
@@ -192,25 +192,26 @@
         /* 保存条吸在视口边上时占的是正文的地方：三个按钮挤一行，别叠成两行 */
         .savebar button { flex: 1 1 0; }
       }
-      /* Same paper surfaces and typography as the reading workspace. */
+      /* Shared card surfaces and typography. */
       body { max-width:780px; padding-top:38px; }
-      h1 { font-size:32px; font-weight:400; margin:20px 0 16px; }
-      .settings-back { font-size:12px; text-decoration:none; color:var(--accent); }
-      fieldset { border:0; border-top:1px solid var(--line); border-radius:0; padding:22px 0; margin:26px 0; background:transparent; }
-      legend { padding:0 10px 0 0; font:21px var(--serif); }
+      h1 { font-size:30px; font-weight:650; margin:20px 0 16px; }
+      .settings-back { font-size:12px; text-decoration:none; color:var(--primary); }
+      fieldset { border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px 24px; margin:24px 0; background:var(--card); box-shadow:var(--shadow-sm); }
+      legend { padding:0 10px 0 0; font:600 16px var(--sans); }
       .field { grid-template-columns:190px 110px 1fr; gap:12px; margin:16px 0; }
-      input[type="text"], input[type="password"], input[type="number"], textarea, .provider-picker input, .provider-picker select, #protocol { border-radius:5px; background:var(--card); padding:9px 11px; }
-      button { border-radius:5px; background:var(--card); }
+      input[type="text"], input[type="password"], input[type="number"], textarea, .provider-picker input, .provider-picker select, #protocol { border-radius: var(--radius-sm); background:var(--card); padding:9px 11px; }
+      button { border-radius: var(--radius-sm); background:var(--card); }
       .field.check input[type="checkbox"] { appearance:none; position:relative; width:35px; height:21px; border-radius:20px; background:var(--line); border:1px solid var(--line); cursor:pointer; }
       .field.check input[type="checkbox"]::before { content:''; position:absolute; left:2px; top:2px; width:15px; height:15px; border-radius:50%; background:var(--card); }
-      .field.check input[type="checkbox"]:checked { background:var(--accent); border-color:var(--accent); }
+      .field.check input[type="checkbox"]:checked { background:var(--primary); border-color:var(--primary); }
       .field.check input[type="checkbox"]:checked::before { transform:translateX(14px); }
-      .section-nav a { border-left:0; border-radius:5px; padding:9px 12px; }
+      .section-nav a { border-left:0; border-radius: var(--radius-sm); padding:9px 12px; }
       .section-nav a[aria-current] { background:var(--wash); }
-      .status-panel { background:var(--card); border-radius:6px; }
+      .status-panel { background:var(--card); border-radius: var(--radius-md); }
       @media(min-width:960px) { body.has-nav{ --nav-left:max(24px,calc(50% - 490px)); margin-left:calc(var(--nav-left) + 210px); } .section-nav{ top:48px; width:180px; } }
       @media(max-width:560px) { body{padding-top:14px} .field{grid-template-columns:1fr} .field.check{grid-template-columns:1fr auto} h1{font-size:28px} fieldset{padding:18px 0;margin:20px 0} .field .wide{grid-column:auto} .field.check input[type="checkbox"]{width:39px;height:25px} .field.check input[type="checkbox"]::before{width:19px;height:19px} }
     </style>
+    <link rel="stylesheet" href="theme.css" />
   </head>
   <body>
     <a class="settings-back" href="dashboard.html">‹ Back to workspace</a>

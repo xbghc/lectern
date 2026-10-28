@@ -1,6 +1,6 @@
 {
   "name": "lectern",
-  "version": "0.3.24",
+  "version": "0.3.25",
   "private": true,
   "description": "A browser extension and Android reading companion with focus tracking, AI translation, spaced repetition and optional device sync.",
   "type": "module",

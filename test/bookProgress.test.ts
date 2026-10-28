@@ -14,11 +14,12 @@ test('book progress is derived and weighted by chapter size, and clamps excess r
   assert.equal(bookProgress(book, [record(0, 900, 10), record(1, -10, 20)]), 17);
   assert.equal(bookProgress({ ...book, chapters: [] }, []), 0);
 });
-test('resume honors the latest unfinished chapter, including nonsequential reading', () => {
+test('resume honors the latest chapter, including nonsequential reading and completed chapters', () => {
   const records = [record(0, 100, 50, true), record(2, 50, 100)];
   assert.equal(resumeChapter(book, records), 2);
   assert.equal(readingResume(records, { [book.id]: book })?.articleId, chapterId(book.id, 2));
-  assert.equal(resumeChapter(book, [record(0, 100, 50, true)]), 1);
+  assert.equal(resumeChapter(book, [record(0, 100, 50, true)]), 0);
+  assert.equal(resumeChapter(book, [...records, record(1, 200, 200, true)]), 1);
 });
 test('a finished book does not replace an unfinished article in the continue card', () => {
   const web = { id: 'https://example.com/a', url: 'https://example.com/a', title: 'Article', wordsRead: 25, trackedWords: 100, finished: false, lastSeenTs: 40 } as Article;

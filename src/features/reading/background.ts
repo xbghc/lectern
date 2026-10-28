@@ -8,6 +8,7 @@ import type { ReadingSettings } from "./settings.ts";
 import { buildOverview } from "../../lib/stats.ts";
 import { recentActivity } from "../../lib/activity.ts";
 import { samePosition } from "../../lib/position.ts";
+import { isBookChapterId } from "../../books/types.ts";
 import {
   articleReviewState,
   articleReviewStats,
@@ -124,7 +125,7 @@ export const readingHandlers = {
   },
   "article:local-state": async (msg) => {
     // 续读位置可能是另一台设备几秒前才写的：先等一轮拉取（有上限），再读
-    await syncBefore();
+    if (!isBookChapterId(msg.articleId)) await syncBefore();
     return localStorage().get([`p:${msg.articleId}`, `pos:${msg.articleId}`, "articles", "speed"]);
   },
   "article:classify": (msg) => {

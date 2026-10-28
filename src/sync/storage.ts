@@ -8,6 +8,7 @@ import { normalizeUrl } from "../lib/url.ts";
 import { compareStamp, mergeRecord, object, recordKey, SYNCED_SETTINGS, validateRecord } from "./protocol.ts";
 import type { SyncOperation, SyncRecord, RecordType } from "./protocol.ts";
 import { openRenamedDb } from "../lib/renamedDb.ts";
+import { isBookChapterId } from "../books/types.ts";
 
 export interface SyncConfig { enabled: boolean; baseUrl: string; token: string; serverId?: string; userId?: string }
 export interface SyncState {
@@ -246,10 +247,21 @@ export function trackChanges(state: SyncState, before: Record<string, any>, afte
 
 export function projectRecords(state: SyncState): void {
   const data = state.data;
-  for (const k of Object.keys(data)) if (/^(p:|pos:|r:|t:)/.test(k)) delete data[k];
-  const articles: Record<string,Article> = {}, sessions:Session[] = [], snippets:any[] = [], cards:StoredCard[] = [], articleCards:ArticleCard[] = [], events:any[] = [];
-  const bases: Record<string,FsrsState> = {}, archives:Record<string,unknown> = {}, deleted:Record<string,number> = {};
+  // EPUB records deliberately have no sync record to project from. Preserve their local
+  // values before rebuilding the web projection, including on unrelated settings writes.
+  for (const k of Object.keys(data)) if (/^(p:|pos:|r:|t:)/.test(k) && !isBookChapterId(k.slice(k.indexOf(":") + 1))) delete data[k];
+  const articles: Record<string,Article> = Object.fromEntries(Object.entries(object(data.articles)).filter(([id]) => isBookChapterId(id)));
+  const sessions: Session[] = (data.sessions ?? []).filter((s: Session) => isBookChapterId(s.articleId));
+  const snippets: any[] = (data.snippets ?? []).filter((s: { articleId: string }) => isBookChapterId(s.articleId));
+  const localSnippetIds = new Set(snippets.map(s => s.id));
+  const localCards: StoredCard[] = (data.cards ?? []).filter((c: StoredCard) => c.snippetIds.some(id => localSnippetIds.has(id)));
+  const localArticleCards: ArticleCard[] = (data.articleCards ?? []).filter((c: ArticleCard) => isBookChapterId(c.articleId));
+  const localEvents = (data.reviewEvents ?? []).filter((e: { kind: string; cardKey: string }) => e.kind === "article" && isBookChapterId(e.cardKey));
+  const cards: StoredCard[] = [], articleCards: ArticleCard[] = [], events: any[] = [];
+  const bases: Record<string,FsrsState> = {}, archives:Record<string,unknown> = {};
+  const deleted: Record<string,number> = Object.fromEntries(Object.entries(object(data.deletedArticles)).filter(([id]) => isBookChapterId(id)));
   const paragraphs = new Map<string,ParagraphRecord[]>();
+  for (const id of Object.keys(articles)) paragraphs.set(id, data[`p:${id}`] ?? []);
   const active = Object.values(state.records).filter(r => {
     if (r.deleted) {
       if(r.type === "article") deleted[r.id] = r.stamp.counter || 1;
@@ -280,8 +292,24 @@ export function projectRecords(state: SyncState): void {
       case "setting": data.settings = {...object(data.settings),[r.id]:r.value}; break;
     }
   }
+  for (const local of localCards) {
+    const sources = local.snippetIds.filter(id => localSnippetIds.has(id));
+    const projected = cards.find(c => c.key === local.key);
+    if (projected) projected.snippetIds = [...new Set([...projected.snippetIds, ...sources])];
+    else {
+      const base = object(data.reviewBases)[`word:${local.key}`] ?? local;
+      bases[`word:${local.key}`] = base;
+      cards.push({ ...base, id: local.id, key: local.key, snippetIds: sources });
+    }
+  }
+  for (const local of localArticleCards) {
+    const base = object(data.reviewBases)[`article:${local.articleId}`] ?? local;
+    bases[`article:${local.articleId}`] = base;
+    articleCards.push({ ...base, articleId: local.articleId });
+  }
   // A Lamport order preserves each device's observed review order; wall time feeds FSRS only.
   events.sort((a,b) => compareStamp(a._stamp,b._stamp) || a.id.localeCompare(b.id));
+  events.push(...localEvents.sort((a: { ts: number; id: string }, b: { ts: number; id: string }) => a.ts - b.ts || a.id.localeCompare(b.id)));
   for (const e of events) {
     const list = e.kind === "article" ? articleCards : cards;
     const at = list.findIndex(c => "key" in c ? c.key === e.cardKey : c.articleId === e.cardKey);

@@ -27,6 +27,8 @@ export interface RestoreInput {
   scrollY: number;
   /** 抽取期间用户是否已经动手了（滚轮、按键、触摸）。 */
   userScrolled: boolean;
+  /** Books resume the actual saved location, including their first and final paragraphs. */
+  restoreExact?: boolean;
 }
 
 export interface RestorePlan {
@@ -81,8 +83,8 @@ export function planRestore(input: RestoreInput): RestorePlan | null {
     matched = "index";
   }
 
-  if (at >= list.length - 1) return null;
-  if (at === 0 && pos.offset < NEGLIGIBLE_OFFSET_PX) return null;
+  if (at >= list.length - 1 && !input.restoreExact) return null;
+  if (at === 0 && pos.offset < NEGLIGIBLE_OFFSET_PX && !input.restoreExact) return null;
 
   return { index: at, offset: Math.round(pos.offset), matched, total: list.length };
 }

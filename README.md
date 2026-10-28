@@ -15,7 +15,7 @@ The interface and documentation are in English. AI translations, teaching notes,
 
 Install from the Chrome Web Store, or extract a release ZIP and load its directory through **chrome://extensions → Developer mode → Load unpacked**. Chrome and Edge 114 or newer are supported; Firefox is not supported because the extension uses `chrome.sidePanel`.
 
-The settings page opens after installation. Read the content-sharing notice, choose **Agree and start**, select a provider and model, enter your API key, then choose **Save and test connection**. Lectern does not call a model before consent. Without a configured model and key, it cannot classify new articles or translate; existing history remains available.
+The settings page opens after installation. Read the content-sharing notice, choose **Agree and start**, select a provider and model, enter your API key, then choose **Save**. This single button saves both reading preferences and model configuration. Use **Test saved connection** to check the saved configuration. Saving alone does not send a model request. Lectern does not call a model before consent. Without a configured model and key, it cannot classify new articles or translate; existing history remains available.
 
 The store extension and an unpacked extension have different IDs and separate local data. Sync or export your records before switching installations.
 
@@ -118,7 +118,7 @@ Add a URL, share one from a browser, or open an article saved by the extension. 
 
 On phones, reading shows only the article and a faint 2px progress line at the very bottom of the screen. System bars and reading tools start hidden; scrolling up or returning to the beginning does not reveal them. Tap the margins beside the article to show or hide tools. Text and paragraph spacing keep their word and sentence translation gestures. Keyboard and screen-reader users have a separate **Show reading tools** button.
 
-Reader controls include font size, device-local bookmarks and a chapter outline. Chapter navigation, the exact progress percentage and source details live inside the tools. Scrolling 24px in either direction, closing the outline or pressing Back hides the tools again without shifting the text. Changing font size preserves the visible paragraph. Translation panels remain available on demand. Font size and bookmarks do not sync.
+Reader controls include font size, device-local bookmarks and a chapter outline. Previous chapter, Contents and Next chapter are available at the end of each chapter; they scroll with the text. The exact progress percentage and source details live inside the tools. Scrolling 24px in either direction, closing the outline or pressing Back hides the tools again without shifting the text. Changing font size preserves the visible paragraph. Translation panels remain available on demand. Font size and bookmarks do not sync. Opening a book resumes its most recently visited chapter and saved paragraph, including positions within the final paragraph.
 
 The Android reader does not show the extension's top progress strip, position notice or completion card. Position restoration, reading records and the review queue continue to work.
 

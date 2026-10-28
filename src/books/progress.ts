@@ -4,7 +4,8 @@ import { chapterId, nextChapter, parseChapterId, type Book } from './types.ts';
 
 export function resumeChapter(book: Book, articles: readonly Article[]): number {
   const records = articles.filter(a => parseChapterId(a.id)?.bookId === book.id);
-  const latest = records.filter(a => !a.finished).sort((a, b) => b.lastSeenTs - a.lastSeenTs)[0];
+  const latest = records.filter(a => book.chapters.some(c => c.index === parseChapterId(a.id)?.index))
+    .sort((a, b) => b.lastSeenTs - a.lastSeenTs)[0];
   const index = latest && parseChapterId(latest.id)?.index;
   if (index !== undefined && book.chapters.some(c => c.index === index)) return index;
   return nextChapter(book, new Set(records.filter(a => a.finished).map(a => parseChapterId(a.id)!.index)));

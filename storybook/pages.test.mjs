@@ -133,7 +133,36 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
   const app = open('appOptions');
   try {
     await settle();
-    assert.equal(app.dom.window.document.querySelector('.section-nav'), null);
+    const { document, chrome, Event } = app.dom.window;
+    assert.equal(document.querySelector('.section-nav'), null);
+    assert.equal(document.getElementById('save-llm'), null);
+    const type = (id, value) => { const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    let modelTests = 0;
+    chrome.runtime.sendMessage = msg => { if (msg.type === 'llm:test') modelTests++; return send(msg); };
+    type('model', 'saved-from-global-button');
+    type('apiKey', 'synthetic-unified-save-key');
+    type('finishRatio', '85');
+    assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), true);
+    assert.equal(document.getElementById('test-llm').disabled, true);
+    const leaving = new Event('beforeunload', { cancelable: true });
+    app.dom.window.dispatchEvent(leaving);
+    assert.equal(leaving.defaultPrevented, true);
+    document.getElementById('save').click();
+    await settle();
+    assert.equal((await chrome.runtime.sendMessage({ type: 'llm:get' })).model, 'saved-from-global-button');
+    assert.equal((await chrome.runtime.sendMessage({ type: 'settings:get' })).finishRatio, .85);
+    assert.equal(document.getElementById('apiKey').value, '');
+    assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), false);
+    assert.equal(modelTests, 0, 'Saving does not make a model request');
+    document.getElementById('test-llm').click();
+    await settle();
+    assert.equal(modelTests, 1);
+    type('apiKey', 'unsaved-key');
+    document.getElementById('revert').click();
+    assert.equal(document.getElementById('apiKey').value, '');
+    assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), false);
+    assert.deepEqual(Array.from(app.dom.window.__previewErrors), []);
   } finally { app.close(); }
 
   const { dom, close } = open('options');
@@ -150,16 +179,17 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     assert.ok(links.every(link => document.getElementById(link.getAttribute('href').slice(1))?.tagName === 'FIELDSET'));
     assert.deepEqual([...document.querySelectorAll('.section-nav p')].map(p => p.textContent), ["Connections", "Preferences", "Maintenance"]);
 
-    // 刚读进来的值不算修改；模型那组字段不归「保存」管，改了也不算
+    // Model settings share the global Save and unsaved-change indicator.
     assert.equal(bar.classList.contains('is-dirty'), false);
     assert.equal(revert.hidden, true);
     type('model', 'another-model');
-    assert.equal(bar.classList.contains('is-dirty'), false);
+    assert.equal(bar.classList.contains('is-dirty'), true);
+    assert.equal(status.textContent, "1 unsaved changes");
 
     type('finishRatio', '85');
     type('excluded', 'https://example.com/search\nnews.example.com');
     assert.equal(bar.classList.contains('is-dirty'), true);
-    assert.equal(status.textContent, "2 unsaved changes");
+    assert.equal(status.textContent, "3 unsaved changes");
     assert.equal(revert.hidden, false);
 
     // 恢复默认只动开关和阈值，名单原样留着
@@ -386,8 +416,9 @@ test('Android reading entry, local reader preferences and chapter navigation use
     assert.equal(document.querySelector('.reader-chapter[aria-current]').textContent.includes("Introduction"), true);
     assert.equal(document.body.classList.contains('chrome-hidden'), true);
     assert.equal(document.getElementById('reader-toolbar').inert, true);
-    assert.equal(document.querySelector('#article .chapter-nav'), null);
-    assert.ok(document.querySelector('#reader-contents .chapter-nav'));
+    assert.ok(document.querySelector('#article .chapter-nav'));
+    assert.equal(document.querySelector('#reader-contents .chapter-nav'), null);
+    assert.match(document.querySelector('#article .chapter-nav').textContent, /Next chapter/);
     assert.equal(document.querySelector('#reader-progress button'), null);
     assert.equal(document.querySelector('#lectern-focusbar, #lectern-position, #lectern-finish'), null);
     document.getElementById('article').click();

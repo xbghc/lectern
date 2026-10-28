@@ -441,7 +441,7 @@ async function main(): Promise<void> {
   }
   box.append(body);
 
-  /* 翻章也放进目录，阅读正文时不显示额外按钮。 */
+  /* 章末提供翻章入口；它随正文滚动，不占用阅读中的屏幕底部。 */
   if (book && chapter) {
     const current = book;
     const records = await chrome.runtime.sendMessage({ type: "articles:list" }) as { articles?: Article[] };
@@ -453,8 +453,11 @@ async function main(): Promise<void> {
       nav.append(btn);
     };
     if (chapter.index > 0) jump(chapter.index - 1, "‹ Previous chapter");
+    const toc = el("button", "mini", "Contents");
+    toc.addEventListener("click", () => contents.showModal());
+    nav.append(toc);
     if (chapter.index + 1 < current.chapters.length) jump(chapter.index + 1, "Next chapter ›");
-    contents.append(nav);
+    box.append(nav);
   }
 
   await setupReaderControls({ articleId, body, book, chapter: chapter?.index ?? null,

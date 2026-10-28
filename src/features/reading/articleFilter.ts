@@ -1,4 +1,4 @@
-import { localStorage } from "../../sync/storage.ts";
+import { localStorage, dataIdentity, assertDataIdentity } from "../../sync/storage.ts";
 import { decodeWith, pickCharset } from "../../lib/charset.ts";
 import { ARTICLE_SYSTEM, parseDecision, parseSuggestions, samplePage } from "../../lib/articleFilter.ts";
 import { callMessages, extractJson, LlmError } from "../../lib/llm.ts";
@@ -24,19 +24,22 @@ const DEFAULT_DEPS: FilterDeps = { wait: (ms) => new Promise((resolve) => setTim
 
 /** request 是失败时留进诊断日志的现场：只留网址标题这类能认出是哪一页的，不留正文。 */
 async function query(system: string, input: unknown, source: "articleFilter" | "blacklistSuggestion", request: LlmFailure["request"], deps: FilterDeps = DEFAULT_DEPS): Promise<unknown> {
+  const identity = await dataIdentity();
   const saved = await getLlmConfig();
   const config = { ...saved, maxTokens: Math.max(1500, saved.maxTokens), timeoutMs: Math.max(60_000, saved.timeoutMs) };
   // 每次失败都记，重发过的在 request 里标上第几次：断网断了多久一眼看得出。
   // 前面那几次等有了结果再记——重发成了才标 recovered（人没看见），没成就是人撞上的失败
   const failed: Array<{ err: unknown; request: LlmFailure["request"] }> = [];
   const flush = (recovered: boolean): void => {
-    for (const f of failed.splice(0)) later(() => recordFailure(f.err, config, { source, request: f.request, ...(recovered ? { recovered: "retry" as const } : {}) }));
+    for (const f of failed.splice(0)) later(() => recordFailure(f.err, config, { source, request: f.request, dataIdentity: identity, ...(recovered ? { recovered: "retry" as const } : {}) }));
   };
   for (;;) {
     const attempt = failed.length ? { ...request, retry: failed.length } : request;
     let result;
     try {
+      await assertDataIdentity(identity);
       result = await callMessages(config, system, JSON.stringify(input));
+      await assertDataIdentity(identity);
     } catch (err) {
       const retry = err instanceof LlmError && err.kind === "network" && failed.length < NETWORK_RETRY_MS.length;
       if (retry) {
@@ -45,17 +48,17 @@ async function query(system: string, input: unknown, source: "articleFilter" | "
         continue;
       }
       flush(false);
-      later(() => recordFailure(err, config, { source, request: attempt }));
+      later(() => recordFailure(err, config, { source, request: attempt, dataIdentity: identity }));
       throw err;
     }
     flush(true);
     // 记账不挡判别结果：页面等着这一句「是文章」才开始计时，早先两笔落盘让它白等半秒
-    later(() => recordCall(source, config, result.timing, result.usage));
+    later(() => recordCall(source, config, result.timing, result.usage, identity));
     try {
       if (result.truncated) throw new Error("The model response was truncated. Try again.");
       return extractJson(result.text);
     } catch (err) {
-      later(() => recordFailure(err, config, { source, request: attempt }));
+      later(() => recordFailure(err, config, { source, request: attempt, dataIdentity: identity }));
       throw err;
     }
   }

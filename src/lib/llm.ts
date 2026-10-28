@@ -248,13 +248,11 @@ export async function callMessages(
     } catch (err) {
       if (ctrl.signal.aborted) throw new LlmError(`Request timed out (${config.timeoutMs}ms)`, "timeout");
       throw new LlmError(`Network error: ${String(err)}`, "network");
-    } finally {
-      clearTimeout(timer);
     }
 
     if (!res.ok) throw httpError(res.status, await res.text().catch(() => ""));
 
-    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    const data = (await res.json()) as Record<string, unknown> | null;
     if (!data || typeof data !== "object") throw new LlmError("The response is not valid JSON", "parse");
 
     const reply = readReply(config.protocol, data);
@@ -270,8 +268,13 @@ export async function callMessages(
       timing: timing(),
     };
   } catch (err) {
-    if (err instanceof LlmError) err.timing = timing();
-    throw err;
+    const error = ctrl.signal.aborted ? new LlmError(`Request timed out (${config.timeoutMs}ms)`, "timeout")
+      : err instanceof SyntaxError ? new LlmError("The response is not valid JSON", "parse")
+      : err instanceof LlmError ? err : new LlmError(`Network error: ${String(err)}`, "network");
+    error.timing = timing();
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

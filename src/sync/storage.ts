@@ -19,6 +19,7 @@ export interface SyncState {
   snapshot?: {token:string;head:number;cursor:number};
   /** 上一轮里过不了校验、留在 outbox 没发的记录（见 engine.ts 的 triage）。 */
   blocked?: {count:number;reasons?:string[];reason?:string;materials?:number};
+  archiveErrors?: Record<string, { version: string; reason: string }>;
 }
 export interface StateDriver {
   read(): Promise<SyncState>;
@@ -36,7 +37,7 @@ export function withDataLock<T>(fn:()=>Promise<T>):Promise<T> {
 export const freshState = (data: Record<string, unknown> = {}): SyncState => ({
   data: structuredClone(data), records: {}, outbox: [], deviceId: crypto.randomUUID(), counter: 0, cursor: 0,
   config: { enabled: false, baseUrl: "", token: "" }, lastSuccess: null, error: null, failures: 0, retryAt: 0,
-  initializedRemote:false,snapshot:undefined,
+  initializedRemote:false,snapshot:undefined,blocked:undefined,archiveErrors:undefined,
 });
 export function memoryDriver(initial = freshState()): StateDriver {
   let state = structuredClone(initial);
@@ -315,6 +316,10 @@ export function projectRecords(state: SyncState): void {
     const at = list.findIndex(c => "key" in c ? c.key === e.cardKey : c.articleId === e.cardKey);
     if (at < 0) continue;
     const card = list[at]!;
+    // An imported scheduling snapshot already includes reviews through its lastReview.
+    // Compare against the baseline, not the result of replaying another concurrent event.
+    const base = bases[`${e.kind}:${e.cardKey}`];
+    if (base?.lastReview != null && e.ts <= base.lastReview) continue;
     list[at] = gradeFsrs(card,e.grade,Math.max(e.ts,card.lastReview ?? 0));
   }
   const snippetById = new Map(snippets.map(s => [s.id,s]));
@@ -365,6 +370,23 @@ let driver:StateDriver | undefined;
 let changed:()=>void=()=>{};
 let mirrorProjection:((data:Record<string,unknown>)=>Promise<void>)|undefined;
 let clearLegacy:(()=>Promise<void>)|undefined;
+let localGeneration = 0;
+const resetListeners = new Set<() => void>();
+/** Long-running work belongs to the data that existed when it started, not a later account. */
+export const dataIdentity = async (): Promise<string> => driver ? (await driver.read()).deviceId : `legacy:${localGeneration}`;
+export async function assertDataIdentity(expected: string): Promise<void> {
+  if (await dataIdentity() !== expected) throw new Error("Local data was cleared. Try again.");
+}
+export function onDataReset(listener: () => void): () => void {
+  resetListeners.add(listener);
+  return () => { resetListeners.delete(listener); };
+}
+export function notifyDataReset(): void {
+  localGeneration++;
+  for (const listener of resetListeners) {
+    try { listener(); } catch { /* Reset must finish even if optional cleanup fails. */ }
+  }
+}
 /**
  * 同步让本机数据变了样之后：把设置和速度镜像出去，再告诉开着的页面「该重新取一次了」。
  *
@@ -387,19 +409,22 @@ export const localStorage = ():chrome.storage.StorageArea => installed ?? chrome
 export const syncDriver = ():StateDriver => {if(!driver)throw new Error("The local sync database is not ready");return driver;};
 export const hasSyncStorage = ():boolean => Boolean(driver);
 export function onLocalMutation(fn:()=>void):void {changed=fn;}
+export async function notifyLocalMutation(): Promise<void> {
+  changed();
+  if (mirrorProjection) await notifyProjection(false).catch(() => undefined);
+}
 export function installStorage(stateDriver:StateDriver, mirror?: (data:Record<string,unknown>)=>Promise<void>, cleanupLegacy?:()=>Promise<void>):void {
   driver=stateDriver;
   mirrorProjection=mirror;
   clearLegacy=cleanupLegacy;
-  const notify=async()=>{changed(); if(mirror) {const state=await stateDriver.read(); await mirror({settings:state.data.settings??DEFAULT_SETTINGS,speed:state.data.speed??null}).catch(()=>undefined);}};
   installed={
     async get(keys:string|string[]|Record<string,unknown>|null=null) {
       const {data}=await stateDriver.read(); if(keys===null)return structuredClone(data);
       const list=typeof keys === "string"?[keys]:Array.isArray(keys)?keys:Object.keys(keys);
       return structuredClone(Object.fromEntries(list.flatMap(k=>data[k]!==undefined?[[k,data[k]]]: typeof keys === "object"&&!Array.isArray(keys)?[[k,keys[k]]]:[])));
     },
-    async set(items:Record<string,unknown>) {await stateDriver.update(state=>{const before=structuredClone(state.data);Object.assign(state.data,structuredClone(items));trackChanges(state,before,state.data);projectRecords(state);});await notify();},
-    async remove(keys:string|string[]) {await stateDriver.update(state=>{const before=structuredClone(state.data);for(const k of Array.isArray(keys)?keys:[keys])delete state.data[k];trackChanges(state,before,state.data);projectRecords(state);});await notify();},
+    async set(items:Record<string,unknown>) {await stateDriver.update(state=>{const before=structuredClone(state.data);Object.assign(state.data,structuredClone(items));trackChanges(state,before,state.data);projectRecords(state);});await notifyLocalMutation();},
+    async remove(keys:string|string[]) {await stateDriver.update(state=>{const before=structuredClone(state.data);for(const k of Array.isArray(keys)?keys:[keys])delete state.data[k];trackChanges(state,before,state.data);projectRecords(state);});await notifyLocalMutation();},
     async clear() {await resetLocal();},
   } as unknown as chrome.storage.StorageArea;
 }
@@ -407,6 +432,7 @@ export async function resetLocal():Promise<void> {
   await syncDriver().update(s=>{
     const keep={settings:s.data.settings,llm:s.data.llm}; Object.assign(s,freshState(keep));trackChanges(s,{},s.data);
   });
+  notifyDataReset();
   await clearLegacy?.();
   await notifyProjection();
 }

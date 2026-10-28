@@ -1,4 +1,4 @@
-import { localStorage, hasSyncStorage } from "../../sync/storage.ts";
+import { localStorage, hasSyncStorage, assertDataIdentity } from "../../sync/storage.ts";
 import type { ReviewCardView, Snippet, StoredCard, TranslationResult } from "../../types.ts";
 import { cardKeyOf } from "../../lib/lang.ts";
 import { type GradeValue, gradeCard, newCard } from "../../lib/review.ts";
@@ -75,8 +75,9 @@ export interface AddSnippetInput {
  * 合并规则（我定的）：同一个词元跨文章只有**一张**卡，多条 snippet 挂在它下面
  * ——否则 leak / leaks / leaked 会变成三张卡轮流来烦你。
  */
-export async function addSnippet(input: AddSnippetInput): Promise<{ snippet: Snippet; card: StoredCard | null }> {
+export async function addSnippet(input: AddSnippetInput, expectedIdentity?: string): Promise<{ snippet: Snippet; card: StoredCard | null }> {
   return serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
     const [snippets, cards] = await getSnippetsAndCards();
 
     const snippet: Snippet = {

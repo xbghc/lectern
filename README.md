@@ -128,7 +128,7 @@ The Android shell handles back navigation, foreground/background transitions, sa
 
 ### App updates
 
-The app checks the public GitHub latest-release endpoint at most once a day unless disabled in Settings. This anonymous request does not include API keys, reading data or the current version; comparison happens locally. Manual checks remain available.
+The app checks the public GitHub latest-release endpoint at most once a day unless disabled in Settings, including when an older update has already been downloaded. It remembers the latest offer between checks. This anonymous request does not include API keys, reading data or the current version; comparison happens locally. Manual checks remain available.
 
 Automatic downloading, when enabled, uses an unmetered network and HTTPS GitHub APK URLs, then attempts installation after you leave the app. Android may require permission or confirmation. Disable this option to use the update banner manually. The extension instead receives updates through the Chrome Web Store. A submitted extension update still requires store review.
 
@@ -151,9 +151,11 @@ On an accessible, fully loaded desktop article, choose **Save article to sync li
 
 After syncing on Android, open the saved article to download its resources. The **Available offline** state indicates downloaded content can be read without a network. Syncing the article list does not download all files in advance. Ordinary URL caches are not automatically converted into browser archives. The archive reader never reloads the source URL or executes its scripts.
 
+If one archive has missing or rejected resources, its upload stays pending with an error shown in sync details. Other archives and reading records continue to upload. Deleting a book preserves images still used by saved articles or another book.
+
 ### JSON export and merge
 
-Export JSON for a backup or to merge records on another device. Articles, sessions, translations, review cards and available review events merge by identity. Importing the same file twice does not duplicate records. Cards for the same word merge, using the latest review history or scheduling baseline. Older files without individual review events retain their existing schedule as a baseline.
+Export JSON for a backup or to merge records on another device. Articles, sessions, translations, review cards and available review events merge by identity. Importing the same file twice does not duplicate records. Cards for the same word merge, using the latest review history or scheduling baseline. Book vocabulary backups include their pre-review baseline so importing them does not count the same review twice. Older files without individual review events retain their latest schedule as a baseline. Import commits records and review history together.
 
 Exports do not contain API keys, sync tokens, complete archive resources, local EPUB content or vocabulary chat history. They are not a substitute for a server database-and-file backup. Import does not replace settings or keys.
 

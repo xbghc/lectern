@@ -8,8 +8,8 @@
  */
 
 import { cacheBlob, cachedBlob, dropBlobs } from "../archive/cache.ts";
-import { ARCHIVE_SRC, hashBytes, imageMime, type ArchiveResource } from "../archive/types.ts";
-import { READER_PREFIX } from "../background/store.ts";
+import { ARCHIVE_SRC, hashBytes, imageMime, type ArchiveResource, type ArchiveManifest } from "../archive/types.ts";
+import { READER_PREFIX, serialize } from "../background/store.ts";
 import { localStorage } from "../sync/storage.ts";
 import type { BookSink } from "./import.ts";
 import { BOOKS_KEY, BOOK_ID, chapterId, type Book, type BookChapterContent } from "./types.ts";
@@ -56,13 +56,28 @@ export async function deleteBook(id: string): Promise<void> {
     const result = await chrome.runtime.sendMessage({ type: "articles:delete", articleIds: ids.slice(i, i + 200) }) as { ok?: boolean; error?: string };
     if (!result?.ok) throw new Error(result?.error || "Could not delete reading records");
   }
-  const others = new Set(Object.values(books).filter(b => b.id !== id).flatMap(b => b.resources));
-  await dropBlobs(book.resources.filter(hash => !others.has(hash)));
-  const rest = { ...books };
-  delete rest[id];
-  await localStorage().set({ [BOOKS_KEY]: rest });
-  // 正文缓存的键不带文章记录，deleteArticles 只清它认识的那些，剩下的在这儿收尾
-  await localStorage().remove(ids.map(chapter => READER_PREFIX + chapter));
+  await serialize(async () => {
+    const data = await localStorage().get(null);
+    const rest = { ...data[BOOKS_KEY] as Record<string, Book> };
+    delete rest[id];
+    const referenced = new Set(Object.values(rest).flatMap(b => b.resources));
+    const keepArchive = (manifest?: ArchiveManifest): void => {
+      if (!manifest) return;
+      referenced.add(manifest.htmlHash);
+      for (const resource of manifest.resources) referenced.add(resource.hash);
+    };
+    // A cached older version can still be the only offline copy while a new version downloads.
+    for (const collection of [data.archives, data.archivePending]) {
+      for (const manifest of Object.values((collection ?? {}) as Record<string, ArchiveManifest>)) keepArchive(manifest);
+    }
+    for (const [key, value] of Object.entries(data)) {
+      if (key.startsWith(READER_PREFIX)) keepArchive((value as { archiveManifest?: ArchiveManifest } | undefined)?.archiveManifest);
+    }
+    await dropBlobs(book.resources.filter(hash => !referenced.has(hash)));
+    await localStorage().set({ [BOOKS_KEY]: rest });
+    // Unvisited chapters have a cache entry but no reading record for deleteArticles to remove.
+    await localStorage().remove(ids.map(chapter => READER_PREFIX + chapter));
+  });
 }
 
 /**

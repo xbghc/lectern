@@ -39,8 +39,8 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     }
   } } };
   const tick = () => new Promise<void>(resolve => setImmediate(resolve));
-  const input = (id: string, value: string) => { (doc.getElementById(id) as HTMLInputElement).value = value; };
-  const save = async () => { (doc.getElementById("save-llm") as HTMLButtonElement).click(); await tick(); };
+  const input = (id: string, value: string) => { (doc.getElementById(id) as HTMLInputElement).value = value; doc.getElementById(id)!.dispatchEvent(new dom.window.Event("input")); };
+  const save = async () => { (doc.getElementById("save") as HTMLButtonElement).click(); await tick(); };
   const consent = async (action: "agree" | "revoke") => {
     (doc.getElementById(`consent-${action}`) as HTMLButtonElement).click();
     await tick();

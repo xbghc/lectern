@@ -327,9 +327,10 @@
         Create an API key in your provider's console. Keys are stored separately, excluded from exports and kept out of page processes. Changing the protocol, host or port requires a different key; the previous key is never sent to the new destination. Changing only the path does not require a new key.
       </p>
       <div class="row">
-        <button id="save-llm" class="primary">Save and test connection</button>
+        <button id="test-llm">Test saved connection</button>
         <span id="llm-status" class="muted small"></span>
       </div>
+      <p class="muted small">Use Save to apply all changes, including your API key and model, before testing.</p>
       <p id="usage" class="muted small"></p>
       <p id="consent-state" class="muted small" hidden>
         Consent granted on  <span id="consent-date"></span>  for sharing content with the model provider.<button id="consent-revoke" type="button" class="linklike">Withdraw consent</button>

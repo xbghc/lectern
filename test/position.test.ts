@@ -87,6 +87,14 @@ test("上次停在最后一段就不跳——再打开多半是想重读，甩�
   assert.ok(planRestore(input({ pos: pos({ hash: "h8", index: 8 }) })), "倒数第二段还是跳");
 });
 
+test("书籍保留最后一段内的续读位置，不因文章的重读规则回到开头", () => {
+  const saved = pos({ hash: "h9", index: 9, offset: 180 });
+  const plan = planRestore({ ...input({ pos: saved }), restoreExact: true });
+  assert.deepEqual(plan, { index: 9, offset: 180, matched: "hash", total: 10 });
+  const first = planRestore({ ...input({ pos: pos({ hash: "h0", index: 0, offset: 70 }) }), restoreExact: true });
+  assert.deepEqual(first, { index: 0, offset: 70, matched: "hash", total: 10 });
+});
+
 test("落在第一段开头附近不跳（跳了等于原地不动）", () => {
   assert.equal(planRestore(input({ pos: pos({ hash: "h0", index: 0, offset: 30 }) })), null);
   const deep = planRestore(input({ pos: pos({ hash: "h0", index: 0, offset: 900 }) }));

@@ -19,11 +19,14 @@ import android.webkit.WebView;
 public class ReaderWebView extends WebView {
 
     public ReaderWebView(Context context) {
-        super(context);
+        this(context, null);
     }
 
     public ReaderWebView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        // The WebView fills the screen. Its native focus highlight looks like a page
+        // border after tapping a margin; individual HTML controls keep their CSS focus rings.
+        setDefaultFocusHighlightEnabled(false);
     }
 
     @Override

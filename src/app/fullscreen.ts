@@ -31,6 +31,7 @@ export interface FullscreenReading {
 
 export function startFullscreen(options: FullscreenOptions): FullscreenReading {
   const { body, bar, article, toggle, host, systemBars } = options;
+  const doc = body.ownerDocument;
   let shown = false;
   let stopped = false;
   let origin = host.scrollY;
@@ -55,7 +56,7 @@ export function startFullscreen(options: FullscreenOptions): FullscreenReading {
     if (event.defaultPrevented || event.detail > 1 || body.ownerDocument.getSelection()?.isCollapsed === false) return;
     // 只认容器自身的留白，不认段落内部的行间、文字、图片、链接或翻译浮层。
     const target = event.composedPath()[0];
-    if (target === article || target === body) onToggle();
+    if (target === article || target === body || target === doc.documentElement) onToggle();
   };
   const onKey = (event: KeyboardEvent): void => {
     if (event.key === "Escape" && !event.defaultPrevented && shown) apply(false);
@@ -65,7 +66,8 @@ export function startFullscreen(options: FullscreenOptions): FullscreenReading {
   apply(false);
   systemBars?.(true);
   host.addEventListener("scroll", onScroll, { passive: true });
-  body.addEventListener("click", onMarginClick);
+  // Delegating on document avoids making the entire WebView body a clickable surface.
+  doc.addEventListener("click", onMarginClick);
   body.addEventListener("keydown", onKey);
   toggle.addEventListener("click", onToggle);
 
@@ -77,7 +79,7 @@ export function startFullscreen(options: FullscreenOptions): FullscreenReading {
       if (stopped) return;
       stopped = true;
       host.removeEventListener("scroll", onScroll);
-      body.removeEventListener("click", onMarginClick);
+      doc.removeEventListener("click", onMarginClick);
       body.removeEventListener("keydown", onKey);
       toggle.removeEventListener("click", onToggle);
       body.classList.remove("immersive", "chrome-hidden");

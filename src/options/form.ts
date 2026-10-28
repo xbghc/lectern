@@ -97,21 +97,34 @@ function collect(): Settings {
 }
 
 /*
- * 「保存」管的是 fields 里那一批；同步和模型各有各的按钮，不归它。
+ * 「保存」统一保存阅读偏好和模型配置；设备同步仍由独立的连接操作管理。
  * baseline 是上次读到或存下的值，经 collect() 走一遍再记——和表单比的时候两边是同一种夹法，
  * 不会因为毫秒和秒来回取整就平白显示「有修改」。
  */
 const saveBar = $("savebar");
 const revertBtn = $<HTMLButtonElement>("revert");
 let baseline: Settings | null = null;
+let llmBaseline: Record<string, string> | null = null;
+let savedLlm: (LlmConfig & { apiKeySet?: boolean }) | null = null;
+let saving = false;
+let testing = false;
 let flashing: { msg: string; error: boolean } | null = null;
-let statusTimer: ReturnType<typeof setTimeout> | null = null;
+let statusTimer: number | null = null;
 
 function changedCount(): number {
   if (!baseline) return 0;
   const now = collect();
   const base = baseline;
-  return (Object.keys(now) as (keyof Settings)[]).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(base[k])).length;
+  return (Object.keys(now) as (keyof Settings)[]).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(base[k])).length + llmChangedCount();
+}
+
+function llmDraft(): Record<string, string> {
+  return { provider: picker.provider(), ...Object.fromEntries(Object.entries(llmFields).map(([key, input]) => [key, input.value.trim()])) };
+}
+function llmChangedCount(): number {
+  if (!llmBaseline) return 0;
+  const draft = llmDraft();
+  return Object.keys(draft).filter(key => draft[key] !== llmBaseline![key]).length;
 }
 
 /** App 的设置页要在离开前问一声（见 app/options.ts）：WebView 不弹 beforeunload 的框。 */
@@ -124,13 +137,17 @@ function renderStatus(): void {
   revertBtn.hidden = changed === 0;
   status.classList.toggle("error", flashing?.error ?? false);
   status.textContent = flashing ? flashing.msg : changed > 0 ? `${changed} unsaved changes` : "";
+  $<HTMLButtonElement>("save").disabled = saving || !baseline || !llmBaseline;
+  const test = $<HTMLButtonElement>("test-llm");
+  test.disabled = saving || testing || !llmBaseline || llmChangedCount() > 0;
+  test.title = llmChangedCount() > 0 ? "Save your model settings before testing the connection" : "Test the saved model connection";
 }
 
 function flash(msg: string, error = false): void {
   flashing = { msg, error };
-  if (statusTimer !== null) clearTimeout(statusTimer);
+  if (statusTimer !== null) window.clearTimeout(statusTimer);
   // 报错多留一会儿：它往往要人滚回去改
-  statusTimer = setTimeout(() => {
+  statusTimer = window.setTimeout(() => {
     flashing = null;
     renderStatus();
   }, error ? 6000 : 2500);
@@ -168,6 +185,7 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 $("save").addEventListener("click", async () => {
+  if (saving || !baseline || !llmBaseline) return;
   const next = collect();
   if (next.stallTimeoutMs <= next.idleTimeoutMs) {
     const msg = "The stall timeout must be longer than the idle timeout.";
@@ -177,9 +195,35 @@ $("save").addEventListener("click", async () => {
     flash(msg, true);
     return;
   }
-  await chrome.runtime.sendMessage({ type: "settings:set", settings: next });
-  load(next);
-  flash("Saved. Changes apply to open pages immediately.");
+  let model: Partial<LlmConfig> | null = null;
+  try { if (llmChangedCount() > 0) model = collectLlm(); }
+  catch (err) {
+    const message = err instanceof Error ? err.message : "Check the model settings.";
+    llmStatus.textContent = message;
+    flash(message, true);
+    const section = llmFields.apiKey.closest("details");
+    if (section) section.open = true;
+    return;
+  }
+  saving = true;
+  const modelSection = llmFields.apiKey.closest("fieldset")!;
+  modelSection.disabled = true;
+  renderStatus();
+  try {
+    if (model) await saveLlm(model);
+    const result = await chrome.runtime.sendMessage({ type: "settings:set", settings: next });
+    if (result?.ok === false) throw new Error(result.error ?? "Unknown error");
+    load(next);
+    flash("Saved. Changes apply to open pages immediately.");
+  } catch (err) {
+    const message = `Could not save: ${err instanceof Error ? err.message : "Unknown error"}`;
+    if (model) llmStatus.textContent = message;
+    flash(message, true);
+  } finally {
+    saving = false;
+    modelSection.disabled = false;
+    renderStatus();
+  }
 });
 
 /*
@@ -205,6 +249,7 @@ $("rule-chat").append(ruleChatBox({
 revertBtn.addEventListener("click", () => {
   if (!baseline) return;
   markThresholds("");
+  if (savedLlm) fillLlm(savedLlm);
   load(baseline);
   flash("Restored the last saved settings");
 });
@@ -274,7 +319,10 @@ let saved = { baseUrl: "", apiKeySet: false };
 
 const llmStatus = $("llm-status");
 // 上一次保存留下的提示（「先选一家」之类）在人动手改了之后就过时了
-$("provider").addEventListener("change", () => { llmStatus.textContent = ""; });
+$("provider").addEventListener("change", () => { llmStatus.textContent = ""; renderStatus(); });
+for (const input of Object.values(llmFields)) {
+  for (const event of ["input", "change"]) input.addEventListener(event, () => { llmStatus.textContent = ""; renderStatus(); });
+}
 
 /*
  * 同意把内容发给模型服务。没同意之前后台一个请求都不发（lib/llm.ts 的 assertReady），
@@ -301,6 +349,7 @@ async function setConsent(at: number | null): Promise<void> {
   }
   // 只在持久化成功后更新同意状态；不重载其它未保存的表单内容。
   fillConsent(at);
+  if (savedLlm) savedLlm = { ...savedLlm, consentAt: at };
   llmStatus.textContent = "";
 }
 $("consent-agree").addEventListener("click", () => void setConsent(Date.now()));
@@ -315,6 +364,9 @@ function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
   saved = { baseUrl: cfg.baseUrl, apiKeySet: !!cfg.apiKeySet };
   llmFields.maxTokens.value = String(cfg.maxTokens);
   llmFields.timeout.value = String(Math.round(cfg.timeoutMs / 1000));
+  savedLlm = cfg;
+  llmBaseline = llmDraft();
+  renderStatus();
 }
 
 function clamp(input: HTMLInputElement, fallback: number, min: number, max: number): number {
@@ -323,22 +375,21 @@ function clamp(input: HTMLInputElement, fallback: number, min: number, max: numb
   return Math.min(max, Math.max(min, v));
 }
 
-$("save-llm").addEventListener("click", async () => {
+function collectLlm(): Partial<LlmConfig> {
   let baseUrl: string;
   const model = llmFields.model.value.trim();
   const key = llmFields.apiKey.value.trim();
   // 这几样缺了哪样请求都发不出去，存下来只会换成一条更晚、更绕的报错
-  if (!picker.provider()) return void (llmStatus.textContent = "Choose a provider above, or select Custom endpoint.");
+  if (!picker.provider()) throw new Error("Choose a provider above, or select Custom endpoint.");
   try {
     baseUrl = normalizeLlmBaseUrl(llmFields.baseUrl.value);
   } catch (err) {
-    llmStatus.textContent = err instanceof Error ? err.message : "Enter a valid base URL.";
-    return;
+    throw new Error(err instanceof Error ? err.message : "Enter a valid base URL.");
   }
-  if (!model) return void (llmStatus.textContent = "Choose a model or enter its name from your provider's documentation.");
+  if (!model) throw new Error("Choose a model or enter its name from your provider's documentation.");
   // 后台也会清掉旧密钥（见 setLlmConfig），这里先拦下说明白，免得人以为是保存坏了
   if (saved.apiKeySet && !key && !sameLlmOrigin(baseUrl, saved.baseUrl)) {
-    return void (llmStatus.textContent = "The endpoint changed. Enter an API key for this provider; the previous key will not be sent to the new endpoint.");
+    throw new Error("The endpoint changed. Enter an API key for this provider; the previous key will not be sent to the new endpoint.");
   }
   const patch: Partial<LlmConfig> = {
     provider: picker.provider(),
@@ -349,32 +400,36 @@ $("save-llm").addEventListener("click", async () => {
     timeoutMs: clamp(llmFields.timeout, DEFAULT_LLM.timeoutMs / 1000, 5, 120) * 1000,
   };
   if (key) patch.apiKey = key;
+  return patch;
+}
 
-  let result: { ok?: boolean; error?: string };
-  try {
-    result = await chrome.runtime.sendMessage({ type: "llm:set", config: patch }) as typeof result;
-  } catch (err) {
-    llmStatus.textContent = `Could not save: ${err instanceof Error ? err.message : "Unknown error"}`;
-    return;
-  }
-  if (!result?.ok) {
-    llmStatus.textContent = `Could not save: ${result?.error ?? "Unknown error"}`;
-    return;
-  }
+async function saveLlm(patch: Partial<LlmConfig>): Promise<void> {
+  const result = await chrome.runtime.sendMessage({ type: "llm:set", config: patch }) as { ok?: boolean; error?: string };
+  if (!result?.ok) throw new Error(result?.error ?? "Unknown error");
+  await loadLlm();
+  llmStatus.textContent = consented ? "Model settings saved." : "Saved. Select Agree and start at the top of this page to enable model requests.";
+}
+
+$("test-llm").addEventListener("click", async () => {
+  if (saving || testing || llmChangedCount() > 0) return;
   // 测试连接也是一次请求：没同意过就不发，说清楚卡在哪儿
   if (!consented) {
-    llmStatus.textContent = "Saved. Select Agree and start at the top of this page to enable model requests.";
-    await loadLlm();
+    llmStatus.textContent = "Select Agree and start at the top of this page before testing the connection.";
     return;
   }
-  llmStatus.textContent = "Saved. Testing connection…";
-  const res = (await chrome.runtime.sendMessage({ type: "llm:test" })) as {
+  testing = true;
+  renderStatus();
+  llmStatus.textContent = "Testing saved connection…";
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: "llm:test" })) as {
     ok: boolean;
     error?: string;
     model?: string;
   };
-  llmStatus.textContent = res.ok ? `Connected (${res.model})` : `Connection failed: ${res.error ?? "Unknown error"}`;
-  await loadLlm();
+    llmStatus.textContent = res.ok ? `Connected (${res.model})` : `Connection failed: ${res.error ?? "Unknown error"}`;
+  } catch (err) {
+    llmStatus.textContent = `Connection failed: ${err instanceof Error ? err.message : "Unknown error"}`;
+  } finally { testing = false; renderStatus(); }
 });
 
 async function loadLlm(): Promise<void> {

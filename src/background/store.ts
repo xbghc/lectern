@@ -546,19 +546,20 @@ function collect(all: Record<string, unknown>): DataSet {
 export async function exportAll(): Promise<ExportBundle> {
   const data = collect(await local().get(null));
   const llm = await getLlmConfig();
+  const exportable = (id: string): boolean => !id.startsWith("epub:");
   return {
     ...(hasSyncStorage() ? {reviewHistory:{version:1 as const,records:Object.values((await syncDriver().read()).records).filter(r=>["card","articleCard","reviewEvent"].includes(r.type))}} : {}),
     schema: 4,
     exportedAt: Date.now(),
     settings: await getSettings(),
-    articles: Object.values(data.articles),
-    sessions: data.sessions,
-    paragraphs: data.paragraphs,
-    positions: Object.values(data.positions),
+    articles: Object.entries(data.articles).filter(([id]) => exportable(id)).map(([, a]) => a),
+    sessions: data.sessions.filter(s => exportable(s.articleId)),
+    paragraphs: Object.fromEntries(Object.entries(data.paragraphs).filter(([id]) => exportable(id))),
+    positions: Object.entries(data.positions).filter(([id]) => exportable(id)).map(([, p]) => p),
     snippets: data.snippets,
     cards: data.cards,
-    articleReviews: Object.values(data.articleReviews),
-    articleCards: data.articleCards,
+    articleReviews: Object.entries(data.articleReviews).filter(([id]) => exportable(id)).map(([, r]) => r),
+    articleCards: data.articleCards.filter(c => exportable(c.articleId)),
     // 导出文件常被随手分享，密钥只导出"有没有设过"这一个 bit
     llm: {
       provider: llm.provider,

@@ -18,6 +18,7 @@ import { FinishCard } from "./finishCard.ts";
 import { FocusBar } from "./focusBar.ts";
 import { PositionCard } from "./positionCard.ts";
 import { SessionMachine } from "./session.ts";
+import { isBookChapterId } from "../../books/types.ts";
 
 /**
  * 页内追踪的本体：判断是不是文章、抽正文、划 session、记段落停留、读完角标、跳回上次位置。
@@ -606,6 +607,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
     urlHash: location.hash,
     scrollY: window.scrollY,
     userScrolled: userMoved,
+    restoreExact: isBookChapterId(articleId),
   });
   // 下标由 planRestore 保证落在本次抽取的范围内
   if (plan) applyRestore(article.paragraphs[plan.index]!.el, plan);

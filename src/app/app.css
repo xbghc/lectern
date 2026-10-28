@@ -3,7 +3,7 @@
  * （导航贴底、正文放大、浮层不顶穿视口），以及只有手机上才成立的那几件事：
  * 让开系统栏、按下去要有反应、界面本身不该被长按选中。
  */
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
 
 /*
  * 安全区。targetSdk 36 起，Android 15+ 一律把窗口铺满整块屏：网页画到状态栏和手势条

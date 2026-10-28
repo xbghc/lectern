@@ -1,4 +1,4 @@
-import { localStorage } from "../sync/storage.ts";
+import { assertDataIdentity, localStorage } from "../sync/storage.ts";
 import type { AppError, ReaderFetch } from "../types.ts";
 import { serialize } from "./store.ts";
 
@@ -58,7 +58,7 @@ const clipOrNull = (s: string | null, max: number): string | null => (s === null
  *
  * 落盘失败吞掉：日志是附属品，不能反过来把阅读器搞坏。
  */
-export async function recordFetch(entry: ReaderFetch): Promise<void> {
+export async function recordFetch(entry: ReaderFetch, expectedIdentity?: string): Promise<void> {
   const safe: ReaderFetch = {
     ...entry,
     url: clip(entry.url, MAX_TEXT_CHARS),
@@ -69,6 +69,7 @@ export async function recordFetch(entry: ReaderFetch): Promise<void> {
   };
   try {
     await serialize(async () => {
+      if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
       const log = await getFetchLog();
       log.push(safe);
       await local().set({ [KEY_READER_FETCH]: log.slice(-MAX_FETCH_ENTRIES) });

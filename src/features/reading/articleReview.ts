@@ -44,8 +44,9 @@ export async function getArticleText(articleId: string): Promise<ArticleText | n
  * 存下正文。content script 在读到 finishRatio 时送来一次。
  * 已经存过就不覆盖——同一篇文章重读会再送一次，没必要写第二遍。
  */
-export async function saveArticleText(articleId: string, text: string, fullChars: number): Promise<boolean> {
+export async function saveArticleText(articleId: string, text: string, fullChars: number, expectedIdentity?: string): Promise<boolean> {
   return serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
     if (await isArticleDeleted(articleId)) return false;
     if (await getArticleText(articleId)) return false;
     const clipped = clipText(text, MAX_REVIEW_CHARS);

@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, type Article, type ParagraphRecord, type ReadingPosit
 import { chapterId, type Book } from '../src/books/types.ts';
 import { resumeChapter } from '../src/books/progress.ts';
 import { freshState, memoryDriver, installStorage, localStorage, applyRemote } from '../src/sync/storage.ts';
-import { savePosition, deleteArticles, getArticles, commitSession, exportAll } from '../src/background/store.ts';
+import { savePosition, deleteArticles, getArticles, commitSession, exportAll, upsertArticleMeta, setFinished, markFinished } from '../src/background/store.ts';
 import { newCard, newFsrs, gradeCard } from '../src/lib/review.ts';
 import { gradeStoredCard } from '../src/features/translation/vocab.ts';
 import { gradeArticleCard } from '../src/features/reading/articleReview.ts';
@@ -85,4 +85,25 @@ test('deleting a book chapter removes its saved position permanently while prese
   assert.equal(data.cards.length, 1);
   await savePosition(position);
   assert.equal((await localStorage().get(`pos:${id}`))[`pos:${id}`], undefined);
+});
+
+test('reopening a chapter preserves an explicit unfinished choice through automatic completion and projection', async () => {
+  const driver = memoryDriver(freshState()); installStorage(driver);
+  const meta = { articleId: id, url: id, title: 'Chapter', totalWords: 200, trackedWords: 200, paragraphCount: 2, now };
+  await upsertArticleMeta(meta);
+  await setFinished(id, true);
+  await setFinished(id, false);
+  await upsertArticleMeta({ ...meta, now: now + 1000 });
+  assert.equal(await markFinished(id, now + 2000), false);
+  await commitSession({ id: 'reopened', articleId: id, url: id, title: 'Chapter', startTs: now, endTs: now + 10000,
+    wordsRead: 200, endReason: 'hidden' }, [{ ...paragraph, words: 200 }], true);
+  await applyRemote(driver, [], 0);
+  const saved = (await getArticles())[id]!;
+  assert.equal(saved.manualFinished?.value, false);
+  assert.equal(saved.finished, false);
+  assert.equal(saved.finishedTs, null);
+  assert.equal((await driver.read()).data.articleCards.length, 0);
+  await setFinished(id, true);
+  await upsertArticleMeta({ ...meta, now: now + 3000 });
+  assert.equal((await getArticles())[id]!.manualFinished?.value, true);
 });

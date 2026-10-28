@@ -74,7 +74,7 @@ Provide a dedicated, limited-use model credential only through an appropriate pr
 ```text
 A model-provider API key is required for AI features.
 1. The settings page opens after installation. Read the notice and click “Agree and start.”
-2. In Model, choose a provider, enter a model ID and API key, then click “Save and test connection.”
+2. In Model, choose a provider, enter a model ID and API key, click “Save,” then click “Test saved connection.”
 3. Open an English article, such as https://en.wikipedia.org/wiki/Reading. The popup shows reading progress after article detection.
 4. In the popup's Translate tab, enable translation for this page. Select English text to view its translation and notes.
 5. Alt+Shift+S starts screenshot translation; select a region containing English text.

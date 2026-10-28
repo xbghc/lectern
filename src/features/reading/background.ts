@@ -1,5 +1,5 @@
 import { classifyPage, classifyHistoryArticle, suggestBlacklist } from "./articleFilter.ts";
-import { localStorage } from "../../sync/storage.ts";
+import { assertDataIdentity, dataIdentity, localStorage } from "../../sync/storage.ts";
 import { syncBefore } from "../../sync/engine.ts";
 import { saveArchive } from "../../archive/background.ts";
 import { normalizeUrl } from "../../lib/url.ts";
@@ -48,6 +48,7 @@ export function bootReading(): void {
 /** 进行中的 session。存在 storage.session 里：SW 被回收后仍在，浏览器关闭即弃。 */
 interface OpenSession {
   id?: string;
+  dataIdentity?: string;
   tabId: number;
   articleId: string;
   url: string;
@@ -73,8 +74,9 @@ export async function getOpen(): Promise<Record<string, OpenSession>> {
 }
 
 /** 走同一条串行队列：多个标签页的消息交错读改写会丢掉其中一份。 */
-async function mutateOpen(fn: (open: Record<string, OpenSession>) => void): Promise<void> {
+async function mutateOpen(fn: (open: Record<string, OpenSession>) => void, expectedIdentity?: string): Promise<void> {
   await serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
     const open = await getOpen();
     fn(open);
     await ephemeral().set({ [KEY_OPEN]: open });
@@ -87,9 +89,14 @@ async function mutateOpen(fn: (open: Record<string, OpenSession>) => void): Prom
  * 结束时刻取最后一次心跳——之后发生了什么无从得知，不该凭空计入。
  */
 export async function recoverOpen(tabId: number, settings?: ReadingSettings): Promise<void> {
+  const identity = await dataIdentity();
   const open = await getOpen();
   const o = open[String(tabId)];
   if (!o) return;
+  if (o.dataIdentity !== undefined && o.dataIdentity !== identity) {
+    await mutateOpen(m => { if (m[String(tabId)]?.id === o.id && m[String(tabId)]?.startTs === o.startTs) delete m[String(tabId)]; });
+    return;
+  }
   const s = settings ?? (await getSettings());
   const endTs = Math.max(o.startTs, o.lastBeatTs);
   if (endTs - o.startTs >= s.minSessionMs) await commitSession(
@@ -104,9 +111,11 @@ export async function recoverOpen(tabId: number, settings?: ReadingSettings): Pr
       endReason: "recovered",
     },
     [],
+    false,
+    identity,
   );
   // Keep the recovery checkpoint until the durable session/outbox commit succeeds.
-  await mutateOpen(m=>{if(m[String(tabId)]?.startTs===o.startTs)delete m[String(tabId)];});
+  await mutateOpen(m=>{if(m[String(tabId)]?.id===o.id&&m[String(tabId)]?.startTs===o.startTs)delete m[String(tabId)];});
 }
 
 /** 近 7 天概览。口径全在 lib/stats.ts，这里只负责取数。 */
@@ -126,6 +135,7 @@ export const readingHandlers = {
   "article:local-state": async (msg) => {
     // 续读位置可能是另一台设备几秒前才写的：先等一轮拉取（有上限），再读
     if (!isBookChapterId(msg.articleId)) await syncBefore();
+    if (msg.dataIdentity !== undefined) await assertDataIdentity(msg.dataIdentity);
     return localStorage().get([`p:${msg.articleId}`, `pos:${msg.articleId}`, "articles", "speed"]);
   },
   "article:classify": (msg) => {
@@ -145,17 +155,21 @@ export const readingHandlers = {
 
   /* ---- content script ---- */
   "article:meta": async (msg) => {
-    await upsertArticleMeta({ ...msg.meta, now: Date.now() });
-    return { ok: true };
+    const identity = await dataIdentity();
+    await upsertArticleMeta({ ...msg.meta, now: Date.now() }, identity);
+    return { ok: true, dataIdentity: identity };
   },
   "session:start": async (m, sender) => {
     const tabId = sender.tab?.id;
     if (tabId === undefined) return { ok: false };
+    const identity = m.dataIdentity ?? await dataIdentity();
+    await assertDataIdentity(identity);
     // 同一标签页若还挂着旧 session，说明结束消息丢了，先补记
     await recoverOpen(tabId);
     await mutateOpen((open) => {
       open[String(tabId)] = {
         id: crypto.randomUUID(),
+        dataIdentity: identity,
         tabId,
         articleId: m.articleId,
         url: m.url,
@@ -164,40 +178,43 @@ export const readingHandlers = {
         lastBeatTs: m.startTs,
         wordsRead: 0,
       };
-    });
+    }, identity);
     return { ok: true };
   },
   "session:heartbeat": async (m, sender) => {
     const tabId = sender.tab?.id;
     if (tabId === undefined) return { ok: false };
+    const identity = m.dataIdentity ?? await dataIdentity();
     // 没有 open 记录（浏览器重启后 storage.session 已空）时按"变了"处理：
     // 宁可多写一次，也不要把这一拍的位置丢掉。
     let moved = m.position !== undefined;
     await mutateOpen((open) => {
       const o = open[String(tabId)];
       if (!o) return;
+      if (o.articleId !== m.articleId || (o.dataIdentity !== undefined && o.dataIdentity !== identity)) { moved = false; return; }
       o.lastBeatTs = m.now;
       o.wordsRead = m.wordsRead;
       if (!m.position) return;
       moved = !samePosition(o.position, m.position);
       if (moved) o.position = m.position;
-    });
-    if (m.position && moved) await savePosition(m.position);
+    }, identity);
+    if (m.position && moved) await savePosition(m.position, identity);
     return { ok: true };
   },
   "session:end": async (m, sender) => {
     const tabId = sender.tab?.id;
+    const identity = m.dataIdentity ?? await dataIdentity();
     // 位置先存，且**不看 discard**：discard 过滤的是不值得入库的时长碎片，
     // 而"翻了两页就被叫走"的那两页照样要记住落点。
-    if (m.position) await savePosition(m.position);
+    if (m.position) await savePosition(m.position, identity);
     // url/title 从进行中的记录里取，省一次文章表查询，也不受消息乱序影响
     const candidate = tabId === undefined ? undefined : (await getOpen())[String(tabId)];
-    const o = candidate?.startTs === m.startTs ? candidate : undefined;
+    const o = candidate?.startTs === m.startTs && candidate.articleId === m.articleId ? candidate : undefined;
     const close = async () => {
       if (tabId !== undefined) {
         await mutateOpen((open) => {
-          if (open[String(tabId)]?.startTs === m.startTs) delete open[String(tabId)];
-        });
+          if (open[String(tabId)]?.startTs === m.startTs && open[String(tabId)]?.articleId === m.articleId) delete open[String(tabId)];
+        }, identity);
       }
     };
     if (m.discard) { await close(); return { ok: true, discarded: true }; }
@@ -212,12 +229,13 @@ export const readingHandlers = {
       wordsRead: m.wordsRead,
       endReason: m.endReason,
     };
-    await commitSession(session, m.paragraphs, m.reachedBottom);
+    await commitSession(session, m.paragraphs, m.reachedBottom, identity);
     await close();
     return { ok: true };
   },
   "article:text": async (m) => {
-    const stored = await saveArticleText(m.articleId, m.text, m.fullChars);
+    const identity = m.dataIdentity ?? await dataIdentity();
+    const stored = await saveArticleText(m.articleId, m.text, m.fullChars, identity);
     // 存下的那一刻就开始生成：这时用户通常还在读最后 20%，
     // 等他读完，材料已经备好，点开是秒开的。失败不上报——
     // 用户没主动要这次调用，界面上也没有等它的地方；真要用时会按需重试。
@@ -232,7 +250,7 @@ export const readingHandlers = {
     // marked 是"这篇现在算不算读完"。content script 据此决定弹不弹角标：
     // SW 正在重启时这条消息直接失败，下一拍心跳自然重试，
     // 好过弹一个点进去还没建卡的按钮。
-    const marked = await markFinished(m.articleId, m.ts);
+    const marked = await markFinished(m.articleId, m.ts, m.dataIdentity ?? await dataIdentity());
     return { ok: true, marked };
   },
   "review:open": async (m) => {

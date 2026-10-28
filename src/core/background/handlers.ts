@@ -1,5 +1,4 @@
 import { configureSync, disconnectSync, materialSync, runSync, syncStatus, testSync } from "../../sync/engine.ts";
-import { clearArchiveCache } from "../../archive/cache.ts";
 import { clearLlmLog, llmLogBundle } from "../../background/llmLog.ts";
 import { recordUiUsage } from "../../background/uiUsage.ts";
 import { getLlmConfig, getUsage, setLlmConfig } from "./llm.ts";
@@ -31,7 +30,6 @@ export const coreHandlers = {
   "data:import": (m) => importBundle(m.bundle),
   "data:clear": async () => {
     await clearData();
-    if (typeof indexedDB !== "undefined") await clearArchiveCache();
     return { ok: true };
   },
   "settings:get": () => getSettings(),

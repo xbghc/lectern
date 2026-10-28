@@ -18,6 +18,7 @@ import type {
 } from "../types.ts";
 import { DEFAULT_SETTINGS, MAX_AUTO_WORDS } from "../types.ts";
 import { isFinished } from "../lib/finish.ts";
+import { clearArchiveCache } from "../archive/cache.ts";
 import { type DataSet, type MergeReport, describeReport, emptyDataSet, mergeData, parseBundle, pickFsrs } from "../lib/merge.ts";
 import { summarizeSpeed } from "../lib/readingTime.ts";
 import { mergeEpisodes } from "../lib/stats.ts";
@@ -268,8 +269,9 @@ export async function ensureSpeedSummary(): Promise<void> {
 }
 
 /** 与删除串行，防止旧页面的迟到位置重新创建已删除数据。 */
-export async function savePosition(pos: ReadingPosition): Promise<void> {
+export async function savePosition(pos: ReadingPosition, expectedIdentity?: string): Promise<void> {
   await serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
     if (await isArticleDeleted(pos.articleId)) return;
     await local().set({ [posKey(pos.articleId)]: pos });
   });
@@ -322,8 +324,9 @@ export async function upsertArticleMeta(meta: {
   /** 按一般速度读完全部可观测段落要多久。老的调用方不带，退回上次记的。 */
   expectedMs?: number;
   now: number;
-}): Promise<void> {
+}, expectedIdentity?: string): Promise<void> {
   await serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
     const articles = await getArticles();
     const prev = articles[meta.articleId];
     // 用户下次重新打开页面，可以重新记录；旧页面的 session 不会经过这里。
@@ -356,6 +359,7 @@ export async function upsertArticleMeta(meta: {
       reachedBottom: prev?.reachedBottom ?? false,
       finished: prev?.finished ?? false,
       finishedTs: prev?.finishedTs ?? null,
+      ...(prev?.manualFinished ? { manualFinished: prev.manualFinished } : {}),
     };
     await local().set({ [KEY_ARTICLES]: prune(articles) });
   });
@@ -370,8 +374,10 @@ export async function commitSession(
   session: Session,
   paragraphs: Array<{ index: number; hash: string; words: number; firstSeenTs: number; dwellMs: number }>,
   reachedBottom = false,
+  expectedIdentity?: string,
 ): Promise<void> {
   await serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
     const [sessions, articles] = await Promise.all([getSessions(), getArticles()]);
     if (await isArticleDeleted(session.articleId)) return;
 
@@ -475,8 +481,9 @@ export async function commitSession(
  * 只据此决定弹不弹角标：已经读完过同样该弹；文章没登记过（article:meta 丢了）
  * 才是唯一不该弹的情况——那时候点进去是死路。
  */
-export async function markFinished(articleId: string, ts: number): Promise<boolean> {
+export async function markFinished(articleId: string, ts: number, expectedIdentity?: string): Promise<boolean> {
   return serialize(async () => {
+    if (expectedIdentity !== undefined) await assertDataIdentity(expectedIdentity);
     const articles = await getArticles();
     const a = articles[articleId];
     if (!a) return false;
@@ -691,10 +698,15 @@ export async function importBundle(raw: unknown): Promise<ImportOutcome> {
 /** 清空全部记录，但保留设置与 LLM 配置（重填 API key 很烦）。 */
 export async function clearData(): Promise<void> {
   await serialize(async () => {
-    if (hasSyncStorage()) { await resetLocal(); return; }
-    const all = await local().get(null);
-    const keep = new Set<string>([KEY_SETTINGS, KEY_LLM]);
-    await local().remove(Object.keys(all).filter((k) => !keep.has(k)));
-    notifyDataReset();
+    if (hasSyncStorage()) await resetLocal();
+    else {
+      const all = await local().get(null);
+      const keep = new Set<string>([KEY_SETTINGS, KEY_LLM]);
+      await local().remove(Object.keys(all).filter((k) => !keep.has(k)));
+      notifyDataReset();
+    }
+    // Keep reset and resource removal under the same data lock as guarded cache writes.
+    if (typeof indexedDB !== "undefined") await clearArchiveCache();
+    if (typeof chrome !== "undefined") await chrome.storage?.session?.remove?.("open");
   });
 }

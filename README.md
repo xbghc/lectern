@@ -141,6 +141,7 @@ Test a connection to verify the account and server identity before enabling it. 
 - **Pause sync** keeps credentials and queued changes.
 - **Disconnect** removes the local token and keeps records and their account binding.
 - **Clear this device's records** disconnects and clears local records and binding while preserving settings and model keys. It does not delete server data.
+- Clearing also invalidates reading sessions, queued article captures and resource downloads already in progress. Old pages must be reopened before recording into the new profile.
 - To switch accounts or servers, export a backup first, clear local records, then connect. Already-bound data cannot be silently uploaded to another identity.
 
 Reading and translation preferences sync by field, except explicitly device-local options such as the translation allowlist and progress-strip display. Model configuration, keys, consent, sync tokens, font size, bookmarks, update preferences, EPUB data and chat history remain local. Diagnostic logs and usage counts have separate upload endpoints when sync is enabled; they are not downloaded to other devices.
@@ -158,6 +159,8 @@ If one archive has missing or rejected resources, its upload stays pending with 
 Export JSON for a backup or to merge records on another device. Articles, sessions, translations, review cards and available review events merge by identity. Importing the same file twice does not duplicate records. Cards for the same word merge, using the latest review history or scheduling baseline. Book vocabulary backups include their pre-review baseline so importing them does not count the same review twice. Older files without individual review events retain their latest schedule as a baseline. Import commits records and review history together.
 
 Exports do not contain API keys, sync tokens, complete archive resources, local EPUB content or vocabulary chat history. They are not a substitute for a server database-and-file backup. Import does not replace settings or keys.
+
+Manual finished/unfinished choices survive reopening chapters and backup merges. Import preserves the newer explicit choice; you can change it immediately afterward, including on profiles restored by older releases.
 
 ### Diagnostics and usage counts
 

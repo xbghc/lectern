@@ -1,5 +1,5 @@
-import { localStorage } from "../sync/storage.ts";
-import { syncRequest } from "../sync/engine.ts";
+import { assertDataIdentity, dataIdentity, hasSyncStorage, localStorage, syncDriver } from "../sync/storage.ts";
+import { syncRequest, type SyncBinding } from "../sync/engine.ts";
 import { sanitizeArticle } from "../app/sanitize.ts";
 import { normalizeUrl } from "../lib/url.ts";
 import { cacheBlob, cachedBlob } from "./cache.ts";
@@ -14,27 +14,34 @@ export interface ArchivedArticle {
   archiveManifest: ArchiveManifest;
 }
 
-async function blobFor(hash: string): Promise<Blob> {
+async function readerState() {
+  if (hasSyncStorage()) return syncDriver().read();
+  return { data: await localStorage().get(ARCHIVES_KEY), deviceId: await dataIdentity(), config: { enabled: false, baseUrl: "", token: "" } };
+}
+
+async function blobFor(hash: string, binding: SyncBinding): Promise<Blob> {
   if (!ARCHIVE_HASH.test(hash)) throw new Error("Invalid article resource index");
   const existing = await cachedBlob(hash);
   if (existing) return existing;
-  const response = await syncRequest(`/v1/blobs/${hash}`);
+  const response = await syncRequest(`/v1/blobs/${hash}`, {}, binding);
   if (!response.ok) throw new Error(`Article resource download failed: HTTP ${response.status}`);
   if (Number(response.headers.get("content-length")) > MAX_RESOURCE_BYTES) throw new Error("Article resources exceed the size limit");
   const blob = new Blob([new Uint8Array(await readArchiveBytes(response))], { type: response.headers.get("content-type") ?? "application/octet-stream" });
-  await cacheBlob(hash, blob);
+  await cacheBlob(hash, blob, binding.deviceId);
   return blob;
 }
 
 /** No source-site request occurs when an archive is available. */
-export async function loadArchivedArticle(url: string): Promise<ArchivedArticle | null> {
-  const data = await localStorage().get(ARCHIVES_KEY);
+export async function loadArchivedArticle(url: string, expectedIdentity?: string): Promise<ArchivedArticle | null> {
+  const { data, config, deviceId } = await readerState();
+  if (expectedIdentity !== undefined && expectedIdentity !== deviceId) throw new Error("Local data was cleared. Reopen the article.");
   const archives = (data[ARCHIVES_KEY] ?? {}) as Record<string, ArchiveManifest>;
   const id = normalizeUrl(url);
   const manifest = archives[id] ?? Object.values(archives).find(item => normalizeUrl(item.url) === id);
   if (!manifest) return null;
   if (!/^https?:\/\//i.test(manifest.url) || !Array.isArray(manifest.resources)) throw new Error("Invalid article manifest");
-  const html = await (await blobFor(manifest.htmlHash)).text();
+  const html = await (await blobFor(manifest.htmlHash, { config, deviceId })).text();
+  await assertDataIdentity(deviceId);
   return {
     url, finalUrl: manifest.url, title: manifest.title, savedTs: manifest.createdTs,
     html: sanitizeArticle(html, manifest.url, document, true), archiveManifest: manifest,
@@ -42,7 +49,8 @@ export async function loadArchivedArticle(url: string): Promise<ArchivedArticle 
 }
 
 /** Create transient URLs only after sanitizing; never persist those URLs. */
-export async function hydrateArchiveImages(body: HTMLElement, manifest: ArchiveManifest): Promise<{ missing: number; release: () => void }> {
+export async function hydrateArchiveImages(body: HTMLElement, manifest: ArchiveManifest, expectedIdentity?: string): Promise<{ missing: number; release: () => void }> {
+  // Strip URLs before the first await: the caller can attach the body immediately.
   const resources = new Map(manifest.resources.map(resource => [resource.hash, resource]));
   const urls = new Map<string, Promise<string>>();
   const allocated = new Set<string>();
@@ -54,6 +62,8 @@ export async function hydrateArchiveImages(body: HTMLElement, manifest: ArchiveM
     img.removeAttribute("src");
     return { img, hash };
   });
+  const { config, deviceId } = await readerState();
+  if (expectedIdentity !== undefined && expectedIdentity !== deviceId) throw new Error("Local data was cleared. Reopen the article.");
   await Promise.all(Array.from({ length: 4 }, async () => {
     while (pending.length) {
       const { img, hash } = pending.shift()!;
@@ -63,7 +73,7 @@ export async function hydrateArchiveImages(body: HTMLElement, manifest: ArchiveM
         let loaded = urls.get(hash);
         if (!loaded) {
           loaded = (async () => {
-            const blob = await blobFor(hash);
+            const blob = await blobFor(hash, { config, deviceId });
             if (blob.size !== resource.size) throw new Error("Image size verification failed");
             const url = URL.createObjectURL(new Blob([blob], { type: resource.mime }));
             allocated.add(url);
@@ -80,5 +90,8 @@ export async function hydrateArchiveImages(body: HTMLElement, manifest: ArchiveM
       }
     }
   }));
-  return { missing, release: () => { for (const url of allocated) URL.revokeObjectURL(url); } };
+  const release = (): void => { for (const url of allocated) URL.revokeObjectURL(url); };
+  try { await assertDataIdentity(deviceId); }
+  catch (error) { release(); throw error; }
+  return { missing, release };
 }

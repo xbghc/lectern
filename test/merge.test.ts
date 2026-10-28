@@ -80,6 +80,20 @@ const dataset = (partial: Partial<DataSet>): DataSet => ({ ...emptyDataSet(), ..
 /** 数组按 id 排好序再比，两边合并的先后不同只影响顺序。 */
 const byId = <T extends { id: string }>(list: T[]): T[] => [...list].sort((a, b) => a.id.localeCompare(b.id));
 
+test('backup merge honors the newest manual completion choice in either order and excludes unfinished cards', () => {
+  const old = dataset({ articles: { [A]: article({ finished: true, finishedTs: 100, reachedBottom: true,
+    manualFinished: { value: true, stamp: { counter: 2, deviceId: 'a' } } }) }, articleCards: [{ articleId: A, ...newFsrs(100) }] });
+  const recent = dataset({ articles: { [A]: article({ manualFinished: { value: false, stamp: { counter: 3, deviceId: 'b' } } }) },
+    paragraphs: { [A]: Array.from({ length: 10 }, (_, i) => para(i, 200)) } });
+  for (const [left, right] of [[old, recent], [recent, old], [emptyDataSet(), recent]] as const) {
+    const { data } = mergeData(left, right, OPTS);
+    assert.equal(data.articles[A]!.manualFinished?.value, false);
+    assert.equal(data.articles[A]!.finished, false);
+    assert.equal(data.articles[A]!.finishedTs, null);
+    assert.equal(data.articleCards.length, 0);
+  }
+});
+
 test("空本机导入 = 拿到对方的全部记录", () => {
   const theirs = dataset({
     articles: { [A]: article() },

@@ -3,6 +3,7 @@ import test from "node:test";
 import { freshState, installStorage, memoryDriver, trackChanges } from "../src/sync/storage.ts";
 import { handle } from "../src/background/handle.ts";
 import { recoverOpen } from "../src/features/reading/background.ts";
+import { clearData } from "../src/background/store.ts";
 
 test("session recovery retains its checkpoint on a failed durable write and real-end retries reuse identity", async()=>{
   const id="https://example.com/recovery";
@@ -38,4 +39,45 @@ test("session recovery retains its checkpoint on a failed durable write and real
     assert.equal(final.data[`p:${id}`][0].dwellMs,500);
     assert.equal(final.data.articles[id].totalMs,20_000);
   }finally{if(prior===undefined)delete(globalThis as any).chrome;else(globalThis as any).chrome=prior;}
+});
+
+test('late page messages and recovery cannot restore reading data into a cleared profile', async () => {
+  const driver = memoryDriver(freshState()); installStorage(driver);
+  const prior = (globalThis as any).chrome, ephemeral: Record<string, any> = {};
+  (globalThis as any).chrome = { storage: { session: {
+    get: async (key: string) => structuredClone({ [key]: ephemeral[key] }),
+    set: async (values: Record<string, unknown>) => { Object.assign(ephemeral, structuredClone(values)); },
+    remove: async (key: string) => { delete ephemeral[key]; },
+  } } };
+  const articleId = 'https://example.com/private', sender = { tab: { id: 1 } };
+  try {
+    const identity = (await driver.read()).deviceId;
+    await handle({ type: 'article:meta', meta: { articleId, url: articleId, title: 'Private', totalWords: 100, trackedWords: 100, paragraphCount: 1, expectedMs: 10000 } }, sender);
+    await handle({ type: 'session:start', articleId, url: articleId, title: 'Private', startTs: 1000, dataIdentity: identity }, sender);
+    await handle({ type: 'session:heartbeat', articleId, now: 11000, wordsRead: 50, dataIdentity: identity }, sender);
+    const checkpoint = structuredClone(ephemeral.open);
+    await clearData();
+    const position = { articleId, hash: 'p1', index: 0, offset: 50, paragraphCount: 1, savedTs: 21000 };
+    await Promise.allSettled([
+      handle({ type: 'session:heartbeat', articleId, now: 21000, wordsRead: 100, position, dataIdentity: identity }, sender),
+      handle({ type: 'session:end', articleId, startTs: 1000, endTs: 21000, wordsRead: 100, endReason: 'hidden', discard: false,
+        reachedBottom: true, position, paragraphs: [{ index: 0, hash: 'p1', words: 100, firstSeenTs: 2000, dwellMs: 20000 }], dataIdentity: identity }, sender),
+      handle({ type: 'article:text', articleId, text: 'Old private text.', fullChars: 17, dataIdentity: identity }, sender),
+    ]);
+    // A worker may already hold a checkpoint when another context clears the profile.
+    ephemeral.open = checkpoint;
+    await recoverOpen(1);
+    const state = await driver.read();
+    assert.equal(state.data.sessions?.length ?? 0, 0);
+    for (const prefix of ['pos:', 'p:', 't:', 'r:']) assert.equal(state.data[prefix + articleId], undefined);
+    assert.equal(state.outbox.some(op => ['session', 'position', 'paragraph', 'articleText'].includes(op.record.type)), false);
+    assert.deepEqual(ephemeral.open ?? {}, {});
+    // A newly opened page can establish a new session normally.
+    await handle({ type: 'article:meta', meta: { articleId, url: articleId, title: 'New', totalWords: 100, trackedWords: 100, paragraphCount: 1, expectedMs: 10000 } }, sender);
+    const next = (await driver.read()).deviceId;
+    await handle({ type: 'session:start', articleId, url: articleId, title: 'New', startTs: 22000, dataIdentity: next }, sender);
+    await handle({ type: 'session:end', articleId, startTs: 22000, endTs: 32000, wordsRead: 10, endReason: 'hidden', discard: false,
+      reachedBottom: false, paragraphs: [], dataIdentity: next }, sender);
+    assert.equal((await driver.read()).data.sessions.length, 1);
+  } finally { (globalThis as any).chrome = prior; }
 });

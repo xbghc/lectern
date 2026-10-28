@@ -203,6 +203,13 @@ const equal = (a: unknown,b: unknown): boolean => JSON.stringify(a) === JSON.str
 /** Called inside the same transaction as local set/remove, never for remote application. */
 export function trackChanges(state: SyncState, before: Record<string, any>, after: Record<string, any>, legacy = false): void {
   const prev = entries(before), next = entries(after);
+  // Backups carry the manual choice's own stamp, independently of the article envelope.
+  // Observe both sides before assigning stamps, including a choice replaced by a new click.
+  for (const collection of [prev, next]) for (const entry of collection.values()) {
+    if (entry.type !== "article") continue;
+    const counter = entry.value.manualFinished?.stamp?.counter;
+    if (Number.isSafeInteger(counter) && counter >= 0) state.counter = Math.max(state.counter, counter);
+  }
   for(const id of Object.keys(object(after.deletedArticles)).filter(syncable)) {
     const key=recordKey({type:"article",id});
     if(!object(before.deletedArticles)[id]&&!prev.has(key)&&!next.has(key))prev.set(key,{type:"article",id,value:{id}});

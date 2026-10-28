@@ -195,19 +195,29 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   const title = article.title || document.title;
   opts.onTitle?.(title);
 
-  send({
-    type: "article:meta",
-    meta: {
-      articleId,
-      url: pageUrl,
-      title,
-      totalWords: article.totalWords,
-      trackedWords: article.trackedWords,
-      paragraphCount: article.paragraphs.length,
-      // 按一般速度读完全文要多久，分文种算好再送：估「还需多久」时它是先验
-      expectedMs: article.paragraphs.reduce((n, p) => n + p.expectedMs, 0),
-    },
-  });
+  let registration: { ok?: boolean; dataIdentity?: string; error?: string } | undefined;
+  try {
+    registration = await chrome.runtime.sendMessage({
+      type: "article:meta",
+      meta: {
+        articleId,
+        url: pageUrl,
+        title,
+        totalWords: article.totalWords,
+        trackedWords: article.trackedWords,
+        paragraphCount: article.paragraphs.length,
+        // 按一般速度读完全文要多久，分文种算好再送：估「还需多久」时它是先验
+        expectedMs: article.paragraphs.reduce((n, p) => n + p.expectedMs, 0),
+      },
+    });
+  } catch (error) { stopWatchingInput(); throw error; }
+  const afterRegistration = abandoned();
+  if (afterRegistration) return afterRegistration;
+  if (registration?.ok === false) {
+    stopWatchingInput();
+    return idle(registration.error || "Could not save this article. Reload and try again.");
+  }
+  const identity = registration?.dataIdentity;
 
   /*
    * 顶上的阅读情况条（focusBar.ts）。段落换了档、进出视口的段落变了、滚动了，都排到下一帧画一次；
@@ -242,7 +252,15 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
   // 顺带把位置记录也读出来（键名与 background/store.ts 的 posKey 一致），
   // 省一次往返——跳回上次位置这件事越早做越好。
   // 再带一份个人阅读速度的摘要（键名与 background/store.ts 的 KEY_SPEED 一致）：估「还需多久」要用。
-  const prior = await chrome.runtime.sendMessage({type:"article:local-state",articleId}) ?? {};
+  let prior: { [key: string]: unknown; ok?: boolean; error?: string };
+  try { prior = await chrome.runtime.sendMessage({type:"article:local-state",articleId,dataIdentity:identity}) ?? {}; }
+  catch (error) { stopWatchingInput(); throw error; }
+  const afterProgress = abandoned();
+  if (afterProgress) return afterProgress;
+  if (prior.ok === false) {
+    stopWatchingInput();
+    return idle(prior.error || "Could not load reading progress. Reload and try again.");
+  }
   const priorRecords = (prior[`p:${articleId}`] as ParagraphRecord[]) ?? [];
   const priorPosition = (prior[`pos:${articleId}`] as ReadingPosition | undefined) ?? null;
   const priorArticle = ((prior["articles"] as Record<string, Article> | undefined) ?? {})[articleId];
@@ -286,7 +304,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
     if (tracker.wordsRead / article.trackedWords < settings.finishRatio) return;
     textSent = true;
     // 截断交给后台做，这里送全的——省得两处都要知道上限是多少
-    send({ type: "article:text", articleId, text: body, fullChars: body.length });
+    send({ type: "article:text", articleId, text: body, fullChars: body.length, dataIdentity: identity });
   };
 
   /*
@@ -336,7 +354,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
     };
     try {
       void chrome.runtime
-        .sendMessage({ type: "article:finished", articleId, ts: Date.now() })
+        .sendMessage({ type: "article:finished", articleId, ts: Date.now(), dataIdentity: identity })
         .then((res: { marked?: boolean } | undefined) => {
           // 落盘期间可能已经拆了（切走触发 pagehide），别再挂一个孤儿角标上去
           if (torn) return;
@@ -417,6 +435,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
           sessionWords += tracker.takeNewWords();
           send({
             type: "session:heartbeat",
+            dataIdentity: identity,
             articleId,
             now: Date.now(),
             wordsRead: sessionWords,
@@ -425,7 +444,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
           maybeSendText();
           maybeShowFinished();
         }, HEARTBEAT_MS);
-        send({ type: "session:start", articleId, url: pageUrl, title, startTs });
+        send({ type: "session:start", articleId, url: pageUrl, title, startTs, dataIdentity: identity });
       },
       onEnd(ev) {
         tracker.setActive(false);
@@ -439,6 +458,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
         tickTimer = beatTimer = null;
         send({
           type: "session:end",
+          dataIdentity: identity,
           articleId,
           startTs: ev.startTs,
           endTs: ev.endTs,

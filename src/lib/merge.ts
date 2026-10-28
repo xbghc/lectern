@@ -12,6 +12,7 @@ import type {
 import { isFinished } from "./finish.ts";
 import { newFsrs } from "./review.ts";
 import { mergeEpisodes } from "./stats.ts";
+import { compareStamp } from "../sync/protocol.ts";
 
 /**
  * 把另一台设备导出的记录合并进本机。
@@ -280,7 +281,11 @@ export function mergeData(local: DataSet, incoming: DataSet, opts: MergeOptions)
     }
     // 静态元信息（字数、段落数、标题）以最近一次抽取为准：站点改版后旧的就过时了
     const latest = a.lastSeenTs > prev.lastSeenTs ? a : prev;
-    const finished = prev.finished || a.finished;
+    let manual = prev.manualFinished ?? a.manualFinished;
+    if (prev.manualFinished?.stamp && a.manualFinished?.stamp) {
+      manual = compareStamp(prev.manualFinished.stamp, a.manualFinished.stamp) >= 0 ? prev.manualFinished : a.manualFinished;
+    }
+    const finished = manual?.value ?? (prev.finished || a.finished);
     articles[a.id] = {
       ...prev,
       url: latest.url,
@@ -297,6 +302,7 @@ export function mergeData(local: DataSet, incoming: DataSet, opts: MergeOptions)
       reachedBottom: prev.reachedBottom || a.reachedBottom,
       finished,
       finishedTs: finished ? minNonNull(prev.finishedTs, a.finishedTs) : null,
+      ...(manual ? { manualFinished: { ...manual } } : {}),
     };
   }
   for (const s of incoming.sessions) touched.add(s.articleId);
@@ -331,7 +337,11 @@ export function mergeData(local: DataSet, incoming: DataSet, opts: MergeOptions)
       a.lastSeenTs = mine.reduce((n, s) => Math.max(n, s.endTs), a.lastSeenTs);
     }
     // 两台设备各读了一半，合起来才够读完：这里补上置位，和 session 结算时一样建回顾卡
-    if (!a.finished && isFinished({ ...a, finishRatio: opts.finishRatio })) {
+    if (typeof a.manualFinished?.value === "boolean") {
+      a.finished = a.manualFinished.value;
+      if (!a.finished) a.finishedTs = null;
+    }
+    if (!a.finished && a.manualFinished?.value !== false && isFinished({ ...a, finishRatio: opts.finishRatio })) {
       a.finished = true;
       a.finishedTs = mine.reduce((n, s) => Math.max(n, s.endTs), 0) || opts.now;
     }
@@ -346,7 +356,8 @@ export function mergeData(local: DataSet, incoming: DataSet, opts: MergeOptions)
   }
 
   return {
-    data: { articles, sessions, paragraphs, positions, snippets, cards, articleReviews, articleCards },
+    data: { articles, sessions, paragraphs, positions, snippets, cards, articleReviews,
+      articleCards: articleCards.filter(card => articles[card.articleId]?.finished !== false) },
     report,
   };
 }

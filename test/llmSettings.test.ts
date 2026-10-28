@@ -84,8 +84,17 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     assert.deepEqual(await driver.read(), beforeFailure);
     assert.equal(tests, 0, "未同意和保存失败都不能触发测试请求");
 
-    // 同意操作的失败也必须可见，不能乐观地改变页面状态。
+    // 带着模型草稿同意时，先保存选中的连接；保存失败不得授予同意。
     assertConsent(false);
+    for (const failure of ["reply", "throw"] as const) {
+      failSave = failure;
+      await consent("agree");
+      assert.match(doc.getElementById("llm-status")!.textContent!, /Could not save: synthetic/);
+      assertConsent(false);
+      assert.deepEqual(await driver.read(), beforeFailure);
+    }
+    // 没有草稿时只改变同意状态，失败同样不能乐观地改变页面。
+    (doc.getElementById("revert") as HTMLButtonElement).click();
     for (const failure of ["reply", "throw"] as const) {
       failSave = failure;
       await consent("agree");
@@ -98,6 +107,7 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     assertConsent(true);
     assert.ok((await getLlmConfig()).consentAt);
     const agreed = await driver.read();
+    input("model", "unsaved-model-after-consent");
     for (const failure of ["reply", "throw"] as const) {
       failSave = failure;
       await save();
@@ -111,6 +121,7 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
     }
     assert.equal(tests, 0, "已经同意时保存失败也不能触发测试请求");
     failSave = false;
+    (doc.getElementById("revert") as HTMLButtonElement).click();
     // 模拟升级前存下的公网 HTTP 和不可解析地址；撤回不得连带保存表单里的其它内容。
     for (const baseUrl of ["http://model.example/v1", "not a URL"]) {
       await driver.update(s => { s.data.llm = { ...initial, consentAt: 1, baseUrl }; });

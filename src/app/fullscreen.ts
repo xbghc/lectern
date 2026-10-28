@@ -53,13 +53,13 @@ export function startFullscreen(options: FullscreenOptions): FullscreenReading {
   };
   const onToggle = (): void => apply(!shown);
   const onMarginClick = (event: MouseEvent): void => {
-    if (event.defaultPrevented || event.detail > 1 || body.ownerDocument.getSelection()?.isCollapsed === false) return;
+    if (event.defaultPrevented || body.ownerDocument.getSelection()?.isCollapsed === false) return;
     // 只认容器自身的留白，不认段落内部的行间、文字、图片、链接或翻译浮层。
     const target = event.composedPath()[0];
     if (target === article || target === body || target === doc.documentElement) onToggle();
   };
   const onKey = (event: KeyboardEvent): void => {
-    if (event.key === "Escape" && !event.defaultPrevented && shown) apply(false);
+    if (event.key === "Escape" && !event.defaultPrevented && shown && !doc.querySelector('dialog[open]')) apply(false);
   };
 
   body.classList.add("immersive");

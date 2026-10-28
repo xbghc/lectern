@@ -10,6 +10,7 @@ import type {
   ArticleReviewView,
   ReviewCardView,
   ReviewStats,
+  ReviewUndoResult,
   Session,
   Snippet,
   SpeedSummary,
@@ -819,14 +820,22 @@ function renderWords(): void {
 
     const controls = el("div", "word-controls");
     while (row.children.length > 1) controls.append(row.children[1]!);
+    const actions = el("details", "word-actions");
+    const actionsToggle = tracked(el("summary"), "words.menu");
+    actionsToggle.setAttribute("aria-label", `More actions for ${s.text}`);
+    actionsToggle.append(icon("more"));
+    actions.append(actionsToggle, controls);
     const summary = el("div", "word-summary-row");
-    summary.append(row, tr, sub, controls);
+    summary.append(row, tr);
+    if (s.context) summary.append(el("p", "word-context-preview", s.context));
+    summary.append(sub);
     if (document.body.classList.contains("app") && s.kind !== "sentence") {
       const chat = tracked(el("a", "icon-btn word-chat-entry"), "chat.word");
       chat.href = `chat.html?word=${encodeURIComponent(s.id)}`;
       chat.setAttribute("aria-label", `Practice with AI: ${s.text}`); chat.append(icon("chat"));
       row.append(chat);
     }
+    row.append(actions);
     const detail = el("details", "word-detail");
     detail.append(tracked(el("summary", undefined, "Context and explanation"), "words.detail"));
     if (s.context) detail.append(el("blockquote", undefined, s.context));
@@ -854,6 +863,20 @@ function renderWords(): void {
     box.append(card);
   }
 }
+
+document.addEventListener("click", event => {
+  const target = event.target as Node | null;
+  for (const menu of document.querySelectorAll<HTMLDetailsElement>(".word-actions[open]")) {
+    if (!target || !menu.contains(target)) menu.open = false;
+  }
+});
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  for (const menu of document.querySelectorAll<HTMLDetailsElement>(".word-actions[open]")) {
+    menu.open = false;
+    menu.querySelector("summary")?.focus();
+  }
+});
 
 /** 从空到有字算一次搜索，清空之后再输才算下一次——和文章那边「每展开一次记一回」是同一个意思。 */
 let wordSearchCounted = false;
@@ -904,8 +927,25 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>(".seg")) {
 let queue: ReviewCardView[] = [];
 let cursor = 0;
 let revealed = false;
+type LastRating = { eventId: string; index: number } & (
+  | { kind: "words"; queue: ReviewCardView[] }
+  | { kind: "articles"; queue: ArticleReviewView[] }
+);
+let lastRating: LastRating | null = null;
+
+function paintReviewUndo(): void {
+  const button = $<HTMLButtonElement>("review-undo");
+  button.hidden = !lastRating || lastRating.kind !== queueKind;
+  button.disabled = grading;
+}
+function clearReviewUndo(): void {
+  lastRating = null;
+  $("review-action-status").textContent = "";
+  paintReviewUndo();
+}
 
 async function loadReview(): Promise<void> {
+  clearReviewUndo();
   if (queueKind === "articles") return loadArticleQueue();
   await guarded($("review-area"), async () => {
     const res = await send<{ cards: ReviewCardView[]; stats: ReviewStats }>({ type: "review:due", limit: 60 });
@@ -938,6 +978,7 @@ function renderStats(s: ReviewStats, kind: Queue): void {
 }
 
 function renderReview(): void {
+  paintReviewUndo();
   if (queueKind === "articles") {
     renderArticleReview();
     return;
@@ -1007,24 +1048,31 @@ function highlight(context: string, term: string): Node[] {
   ];
 }
 
-const GRADES: Array<{ g: 1 | 2 | 3 | 4; label: string; key: string }> = [
-  { g: 1, label: "Again", key: "1" },
-  { g: 2, label: "Hard", key: "2" },
-  { g: 3, label: "Good", key: "3" },
-  { g: 4, label: "Easy", key: "4" },
+const GRADES: Array<{ g: 1 | 2 | 3 | 4; label: string; key: string; hint: string }> = [
+  { g: 1, label: "Again", key: "1", hint: "I could not recall the answer" },
+  { g: 2, label: "Hard", key: "2", hint: "I recalled it with effort" },
+  { g: 3, label: "Good", key: "3", hint: "I recalled it correctly" },
+  { g: 4, label: "Easy", key: "4", hint: "I recalled it immediately" },
 ];
 
-function gradeBar(item: ReviewCardView): HTMLElement {
+function ratingControls(rate: (g: 1 | 2 | 3 | 4) => void): HTMLElement {
+  const wrap = el("div", "rating-controls");
   const bar = el("div", "grades");
-  for (const { g, label, key } of GRADES) {
+  const help = el("details", "rating-help");
+  help.append(tracked(el("summary", undefined, "How to rate your recall"), "review.rating-help"));
+  for (const { g, label, key, hint } of GRADES) {
     const btn = el("button");
+    btn.title = hint; btn.setAttribute("aria-label", `${label}: ${hint}`);
     // 键位提示只给有键盘的：手机上那个小数字按不了，徒增一行字
     btn.append(document.createTextNode(label), ...(coarsePointer() ? [] : [el("small", undefined, key)]));
-    btn.addEventListener("click", () => void grade(item, g));
+    btn.addEventListener("click", () => rate(g));
     bar.append(btn);
+    help.append(el("p", undefined, `${label} — ${hint}.`));
   }
-  return bar;
+  wrap.append(bar, help);
+  return wrap;
 }
+const gradeBar = (item: ReviewCardView): HTMLElement => ratingControls(g => void grade(item, g));
 
 /**
  * 评分在路上的时候不认第二下。连按两下「3」（或者按住不放）会让游标走两格：
@@ -1034,6 +1082,8 @@ let grading = false;
 async function graded(event: UiEvent, byKey: boolean, work: () => Promise<void>): Promise<void> {
   if (grading) return;
   grading = true;
+  paintReviewUndo();
+  $("review-action-status").textContent = "";
   // 记在这道闸后面：被挡掉的第二下不是一次评分
   track(event);
   if (byKey) track("review.by-key");
@@ -1044,21 +1094,55 @@ async function graded(event: UiEvent, byKey: boolean, work: () => Promise<void>)
     // 没记上就留在这张卡上，让人再评一次；评分条重画之前先把按钮放开
     for (const b of buttons) b.disabled = false;
     $("review-area").append(el("p", "muted small", `Could not save your rating: ${reason(err)}`));
-  } finally { grading = false; }
+  } finally { grading = false; paintReviewUndo(); }
 }
 
 async function grade(item: ReviewCardView, g: 1 | 2 | 3 | 4, byKey = false): Promise<void> {
   await graded("review.words.grade", byKey, () => gradeWord(item, g));
 }
 async function gradeWord(item: ReviewCardView, g: 1 | 2 | 3 | 4): Promise<void> {
-  await send({ type: "review:grade", cardId: item.card.id, grade: g });
+  const currentQueue = queue, index = cursor;
+  const result = await send<{ ok: boolean; eventId?: string; error?: string }>({ type: "review:grade", cardId: item.card.id, grade: g });
+  if (!result?.ok) throw new Error(result?.error ?? "This card no longer exists. Refresh the review queue.");
+  if (queue !== currentQueue || cursor !== index || queueKind !== "words") return;
+  lastRating = result.eventId ? { kind: "words", queue, index, eventId: result.eventId } : null;
   cursor += 1;
   revealed = false;
   renderReview();
   // 评分会改变到期分布，顺手刷新一下顶部统计
-  const stats = await send<ReviewStats>({ type: "review:stats" });
-  renderStats(stats, "words");
+  await refreshReviewStats("words");
 }
+
+async function refreshReviewStats(kind: Queue): Promise<void> {
+  try {
+    const stats = kind === "words" ? await send<ReviewStats>({ type: "review:stats" })
+      : (await send<{ stats: ReviewStats }>({ type: "article:review-due", limit: 0 })).stats;
+    if (kind === queueKind) renderStats(stats, kind);
+  } catch { $("review-action-status").textContent = "Your review was saved, but totals could not refresh."; }
+}
+
+$("review-undo").addEventListener("click", async () => {
+  if (grading || !lastRating) return;
+  const prior = lastRating;
+  grading = true; paintReviewUndo();
+  $("review-action-status").textContent = "Undoing rating…";
+  try {
+    const result = await send<ReviewUndoResult>({ type: "review:undo", eventId: prior.eventId });
+    if (!result.ok) throw new Error(result.error);
+    track("review.undo");
+    lastRating = null;
+    if (prior.kind === "words" && result.kind === "word" && queue === prior.queue && queueKind === "words") {
+      queue[prior.index] = { ...queue[prior.index]!, card: result.card };
+      cursor = prior.index; revealed = true; renderReview();
+    } else if (prior.kind === "articles" && result.kind === "article" && aQueue === prior.queue && queueKind === "articles") {
+      aQueue[prior.index] = { ...aQueue[prior.index]!, card: result.card };
+      aCursor = prior.index; aRevealed = true; renderArticleReview();
+    }
+    $("review-action-status").textContent = "Rating undone. Choose the rating you intended.";
+    await refreshReviewStats(prior.kind);
+  } catch (err) { $("review-action-status").textContent = `Could not undo: ${reason(err)}`; }
+  finally { grading = false; paintReviewUndo(); }
+});
 
 /** 翻卡本身不花 token（用的是划词时存下的内容），这几个按钮才会调 LLM。 */
 function assistBar(item: ReviewCardView): HTMLElement {
@@ -1141,6 +1225,7 @@ let aCursor = 0;
 let aRevealed = false;
 
 async function loadArticleQueue(): Promise<void> {
+  clearReviewUndo();
   await guarded($("review-area"), async () => {
     const res = await send<{ items: ArticleReviewView[]; stats: ReviewStats }>({
       type: "article:review-due",
@@ -1156,6 +1241,7 @@ async function loadArticleQueue(): Promise<void> {
 
 /** 打开某一篇的回顾：装好这一篇就切过去，不要被队列的自动加载覆盖。 */
 async function openArticleReview(articleId: string): Promise<void> {
+  clearReviewUndo();
   const res = await send<{ items: ArticleReviewView[]; stats: ReviewStats }>({
     type: "article:review-due",
     articleId,
@@ -1191,6 +1277,7 @@ function renderNoCard(st: ArticleReviewState): void {
 }
 
 function renderArticleReview(): void {
+  paintReviewUndo();
   const area = $("review-area");
   area.textContent = "";
 
@@ -1251,28 +1338,23 @@ function revealArticle(byKey = false): void {
 }
 
 function articleGradeBar(item: ArticleReviewView): HTMLElement {
-  const bar = el("div", "grades");
-  for (const { g, label, key } of GRADES) {
-    const btn = el("button");
-    // 键位提示只给有键盘的：手机上那个小数字按不了，徒增一行字
-    btn.append(document.createTextNode(label), ...(coarsePointer() ? [] : [el("small", undefined, key)]));
-    btn.addEventListener("click", () => void gradeArticle(item, g));
-    bar.append(btn);
-  }
-  return bar;
+  return ratingControls(g => void gradeArticle(item, g));
 }
 
 async function gradeArticle(item: ArticleReviewView, g: 1 | 2 | 3 | 4, byKey = false): Promise<void> {
   await graded("review.articles.grade", byKey, () => gradeArticleCard(item, g));
 }
 async function gradeArticleCard(item: ArticleReviewView, g: 1 | 2 | 3 | 4): Promise<void> {
-  await send({ type: "article:review-grade", articleId: item.article.id, grade: g });
+  const currentQueue = aQueue, index = aCursor;
+  const result = await send<{ ok: boolean; eventId?: string; error?: string }>({ type: "article:review-grade", articleId: item.article.id, grade: g });
+  if (!result?.ok) throw new Error(result?.error ?? "This article no longer exists. Refresh the review queue.");
+  if (aQueue !== currentQueue || aCursor !== index || queueKind !== "articles") return;
+  lastRating = result.eventId ? { kind: "articles", queue: aQueue, index, eventId: result.eventId } : null;
   aCursor += 1;
   aRevealed = false;
   renderArticleReview();
   // 评分改变了到期分布，重取统计而不是自己减——和生词那边一致
-  const res = await send<{ stats: ReviewStats }>({ type: "article:review-due", limit: 0 });
-  renderStats(res.stats, "articles");
+  await refreshReviewStats("articles");
 }
 
 /** 打开原文 + 生成/重新生成。这两个按钮是这一页唯一会花 token 的地方。 */

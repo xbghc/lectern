@@ -195,7 +195,7 @@ export async function ensureArticleCard(articleId: string, now: number): Promise
   });
 }
 
-export async function gradeArticleCard(articleId: string, grade: GradeValue, now: number): Promise<ArticleCard | null> {
+export async function gradeArticleCard(articleId: string, grade: GradeValue, now: number, eventId: string = crypto.randomUUID()): Promise<ArticleCard | null> {
   return serialize(async () => {
     const cards = await getArticleCards();
     const at = cards.findIndex((c) => c.articleId === articleId);
@@ -206,7 +206,7 @@ export async function gradeArticleCard(articleId: string, grade: GradeValue, now
     const baseKey = `article:${articleId}`;
     if (!bases[baseKey]) bases[baseKey] = cards[at]!;
     const events = (history.reviewEvents ?? []) as unknown[];
-    events.push({id:crypto.randomUUID(),kind:"article",cardKey:articleId,grade,ts:now,algorithm:"fsrs-5-default-v1"});
+    events.push({id:eventId,kind:"article",cardKey:articleId,grade,ts:now,algorithm:"fsrs-5-default-v1"});
     cards[at] = next;
     await local().set({ [KEY_ARTICLE_CARDS]: cards,reviewEvents:events,reviewBases:bases });
     return (await getArticleCards()).find(c=>c.articleId===articleId)??next;

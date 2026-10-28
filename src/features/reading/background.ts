@@ -295,7 +295,8 @@ export const readingHandlers = {
   },
   "article:review-state": (m) => articleReviewState(m.articleId),
   "article:review-grade": async (m) => {
-    const card = await gradeArticleCard(m.articleId, m.grade, Date.now());
-    return { ok: card !== null, card };
+    const eventId = crypto.randomUUID();
+    const card = await gradeArticleCard(m.articleId, m.grade, Date.now(), eventId);
+    return { ok: card !== null, card, eventId: card ? eventId : null };
   },
 } satisfies HandlerMap;

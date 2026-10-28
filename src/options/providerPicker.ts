@@ -49,6 +49,11 @@ export function setupProviderPicker(els: PickerElements): ProviderPicker {
     const query = els.search.value.trim();
     const { pinned, others } = searchProviders(query);
     els.list.replaceChildren();
+    els.list.append(option("", "Choose a provider"));
+    if (query && current && current !== CUSTOM_PROVIDER && ![...pinned, ...others].some(p => p.id === current)) {
+      const selected = findProvider(current);
+      if (selected) els.list.append(group("Selected provider", [selected]));
+    }
     if (query) {
       const hits = [...pinned, ...others];
       if (hits.length) els.list.append(group(`Matches: ${hits.length} providers`, hits));

@@ -279,12 +279,23 @@ async function main(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const from = params.get("from"); returnPane = from && ["articles", "books"].includes(from) ? from : null;
   const contents = $<HTMLDialogElement>("reader-contents");
+  const tools = $<HTMLDialogElement>("reader-tools");
+  const fontDialog = $<HTMLDialogElement>("reader-font-settings");
+  const intro = $<HTMLDialogElement>("reader-intro");
   $("reader-toc").addEventListener("click", () => { full?.reveal(); contents.showModal(); });
+  $("reader-more").addEventListener("click", () => { full?.reveal(); tools.showModal(); });
   $("contents-close").addEventListener("click", () => contents.close());
-  contents.addEventListener("close", () => full?.hide());
+  $("reader-tools-close").addEventListener("click", () => tools.close());
+  for (const dialog of [contents, tools, fontDialog]) dialog.addEventListener("close", () => full?.hide());
+  $("reader-intro-done").addEventListener("click", () => intro.close());
+  $("reader-gesture-help").addEventListener("click", () => { tools.close(); $("reader-intro-done").textContent = "Continue reading"; intro.showModal(); });
+  intro.addEventListener("close", () => {
+    full?.hide();
+    void chrome.storage.local.set({ 'reader:gestures-shown': true }).catch(() => undefined);
+  });
   const url = params.get("u")?.trim() ?? "";
   $("back").addEventListener("click", () => void leave());
-  $("shot").addEventListener("click", () => { contents.close(); requestAnimationFrame(() => requestAnimationFrame(() => page?.get("translation")?.screenshot())); });
+  $("shot").addEventListener("click", () => { tools.close(); requestAnimationFrame(() => requestAnimationFrame(() => page?.get("translation")?.screenshot())); });
   // 全屏先进：正文还在抓的时候系统栏就该让开，不必等正文回来才挪一次位置
   if (onPhone()) {
     full = startFullscreen({
@@ -311,6 +322,7 @@ async function main(): Promise<void> {
   hostHooks.beforeBack = () => {
     if (cancelRegion()) return true;
     if (page?.get("translation")?.dismiss()) return true;
+    for (const dialog of [intro, fontDialog, tools]) if (dialog.open) { dialog.close(); return true; }
     if (contents.open) { contents.close(); return true; }
     // 单子开着时先收单子：手机上"返回"关掉的是最上面那一层，不是整个页面
     if (!sheet.hidden) {
@@ -469,6 +481,10 @@ async function main(): Promise<void> {
 
   await setupReaderControls({ articleId, body, book, chapter: chapter?.index ?? null,
     openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")) });
+  if (full) {
+    const saved = await chrome.storage.local.get('reader:gestures-shown').catch(() => ({ 'reader:gestures-shown': true }));
+    if (!saved['reader:gestures-shown'] && document.visibilityState !== 'hidden') intro.showModal();
+  }
   await assertDataIdentity(identity);
   const title = cached.title;
   page = makePage(body, title, !!cached.archiveManifest || !!cached.book, () => renderMeta(pageUrl));
@@ -489,7 +505,7 @@ async function main(): Promise<void> {
     if (area === "local" && changes["snippets"]) void refreshCount();
   });
   $("words").addEventListener("click", async () => {
-    contents.close();
+    tools.close();
     try { renderWords(await refreshCount()); }
     catch (err) {
       const box = $("sheet-list");

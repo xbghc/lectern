@@ -13,6 +13,7 @@ import {
 } from "./vocab.ts";
 import { allowTranslationSite } from "../../background/store.ts";
 import type { HandlerMap } from "../../core/background/router.ts";
+import { undoReview } from "../../background/reviewUndo.ts";
 
 /*
  * 划词翻译的后台一半：翻译与追问的 port、截图翻译（截屏 + OCR）、划词记录、生词复习、翻译白名单。
@@ -70,9 +71,11 @@ export const translationHandlers = {
     return { cards: attachSnippets(dueCards(cards, now, m.limit), snippets), stats: reviewStats(cards, now) };
   },
   "review:grade": async (m) => {
-    const card = await gradeStoredCard(m.cardId, m.grade, Date.now());
-    return { ok: card !== null, card };
+    const eventId = crypto.randomUUID();
+    const card = await gradeStoredCard(m.cardId, m.grade, Date.now(), eventId);
+    return { ok: card !== null, card, eventId: card ? eventId : null };
   },
+  "review:undo": (m) => undoReview(m.eventId),
   "review:stats": async () => reviewStats(await getCards(), Date.now()),
   "review:assist": async (m) => {
     const [cards, snippets] = await Promise.all([getCards(), getSnippets()]);

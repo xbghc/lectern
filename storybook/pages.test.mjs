@@ -177,7 +177,10 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     type('apiKey', 'synthetic-unified-save-key');
     type('finishRatio', '85');
     assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), true);
-    assert.equal(document.getElementById('test-llm').disabled, true);
+    assert.equal(document.getElementById('test-llm').disabled, false);
+    assert.equal(document.getElementById('test-llm').textContent, 'Save changes and test');
+    assert.equal(document.getElementById('model-advanced').open, false);
+    assert.equal(document.getElementById('reset').closest('#savebar'), null);
     const leaving = new Event('beforeunload', { cancelable: true });
     app.dom.window.dispatchEvent(leaving);
     assert.equal(leaving.defaultPrevented, true);
@@ -191,6 +194,24 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     document.getElementById('test-llm').click();
     await settle();
     assert.equal(modelTests, 1);
+    type('model', 'saved-and-tested-together');
+    document.getElementById('test-llm').click();
+    await settle();
+    assert.equal((await chrome.runtime.sendMessage({ type: 'llm:get' })).model, 'saved-and-tested-together');
+    assert.equal(modelTests, 2);
+    assert.match(document.getElementById('llm-status').textContent, /Connected/);
+    assert.equal(document.getElementById('save').disabled, true);
+    document.getElementById('consent-revoke').click();await settle();
+    type('model', 'saved-without-consent');
+    document.getElementById('test-llm').click();await settle();
+    assert.equal((await chrome.runtime.sendMessage({type:'llm:get'})).model,'saved-without-consent');
+    assert.equal(modelTests,2,'Saving and testing must not bypass consent');
+    assert.match(document.getElementById('llm-status').textContent,/sharing notice/);
+    type('model','saved-when-consenting');
+    assert.equal(document.getElementById('consent-agree').textContent,'Save changes and agree');
+    document.getElementById('consent-agree').click();await settle();
+    assert.equal((await chrome.runtime.sendMessage({type:'llm:get'})).model,'saved-when-consenting');
+    assert.equal(modelTests,2);
     type('apiKey', 'unsaved-key');
     document.getElementById('revert').click();
     assert.equal(document.getElementById('apiKey').value, '');
@@ -444,6 +465,10 @@ test('Android reading entry, local reader preferences and chapter navigation use
   try {
     await settle();
     const { document, chrome } = dom.window;
+    assert.equal(document.getElementById('reader-intro').open, true);
+    document.getElementById('reader-intro-done').click();
+    await settle();
+    assert.equal((await chrome.storage.local.get('reader:gestures-shown'))['reader:gestures-shown'], true);
     assert.ok(document.querySelector('.atitle').textContent.includes("Introduction"));
     assert.equal(document.querySelectorAll('.reader-chapter').length, 2);
     assert.equal(document.querySelector('.reader-chapter[aria-current]').textContent.includes("Introduction"), true);
@@ -458,24 +483,86 @@ test('Android reading entry, local reader preferences and chapter navigation use
     assert.equal(document.getElementById('reader-toolbar').inert, false);
     const before = await chrome.runtime.sendMessage({ type: 'settings:get' });
     document.getElementById('reader-font').click();
+    assert.equal(document.getElementById('reader-font-settings').open, true);
+    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '18px');
+    document.getElementById('reader-font-larger').click();
+    document.getElementById('reader-font-larger').click();
+    document.getElementById('reader-font-smaller').click();
+    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '19px');
+    document.getElementById('reader-font-reset').click();
+    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '18px');
+    for (let i = 0; i < 20; i++) document.getElementById('reader-font-larger').click();
+    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '28px');
+    assert.equal(document.getElementById('reader-font-larger').disabled, true);
+    for (let i = 0; i < 20; i++) document.getElementById('reader-font-smaller').click();
+    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '14px');
+    assert.equal(document.getElementById('reader-font-smaller').disabled, true);
+    document.getElementById('reader-font-reset').click();
+    document.getElementById('reader-font-close').click();
+    document.getElementById('article').click();
+    document.getElementById('reader-more').click();
     document.getElementById('reader-bookmark').click();
     await settle();
-    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '20px');
-    assert.equal((await chrome.storage.local.get('reader:font-size'))['reader:font-size'], 20);
+    assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '18px');
+    assert.equal((await chrome.storage.local.get('reader:font-size'))['reader:font-size'], 18);
     assert.equal(document.getElementById('reader-bookmark').getAttribute('aria-pressed'), 'true');
     assert.equal(document.getElementById('bookmark-jump').hidden, false);
+    assert.equal(document.getElementById('reader-bookmark').closest('dialog').id, 'reader-tools');
+    document.getElementById('reader-tools-close').click();
+    document.getElementById('article').click();
     document.getElementById('reader-toc').click();
     assert.equal(document.getElementById('reader-contents').open, true);
     document.getElementById('contents-close').click();
     assert.equal(document.getElementById('reader-contents').open, false);
     assert.equal(document.body.classList.contains('chrome-hidden'), true);
     document.getElementById('article').click();
+    document.getElementById('reader-more').click();
     document.getElementById('reader-bookmark').click();
     await settle();
     assert.equal(document.getElementById('reader-bookmark').getAttribute('aria-pressed'), 'false');
     assert.deepEqual(await chrome.runtime.sendMessage({ type: 'settings:get' }), before);
     assert.deepEqual(Array.from(dom.window.__previewErrors), []);
   } finally { close(); }
+});
+
+test('review undo restores both the visible card and its saved schedule, and failed ratings do not advance', async () => {
+  const html = pages.app.replace('<!--PREVIEW_CONFIG-->', '<script>window.__PREVIEW__={page:"app",state:"populated",tab:"review"}</script>');
+  const dom = new JSDOM(html, { url:'https://preview.invalid/', runScripts:'dangerously', pretendToBeVisual:true,
+    beforeParse(window) {
+      window.structuredClone=structuredClone; window.TextEncoder=TextEncoder; window.TextDecoder=TextDecoder;
+      window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+    },
+  });
+  const settle=()=>new Promise(resolve=>setTimeout(resolve,50));
+  try {
+    await settle();
+    const {document,chrome}=dom.window;
+    const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+    const firstWord=document.querySelector('#review-area .word').textContent;
+    const before=(await original({type:'review:due'})).cards.find(item=>item.card.key===firstWord).card;
+    document.querySelector('#review-area .reveal').click();
+    document.querySelectorAll('.grades button')[2].click();await settle();
+    assert.equal(document.getElementById('review-undo').hidden,false);
+    assert.notEqual(document.querySelector('#review-area .word')?.textContent,firstWord);
+    document.getElementById('review-undo').click();await settle();
+    assert.equal(document.querySelector('#review-area .word').textContent,firstWord);
+    assert.equal(document.querySelectorAll('.grades button').length,4);
+    assert.equal(document.getElementById('review-undo').hidden,true);
+    assert.deepEqual((await original({type:'review:due'})).cards.find(item=>item.card.key===firstWord).card,before);
+    chrome.runtime.sendMessage=msg=>msg.type==='review:grade'?Promise.resolve({ok:false,error:'Card removed elsewhere'}):original(msg);
+    document.querySelectorAll('.grades button')[2].click();await settle();
+    assert.equal(document.querySelector('#review-area .word').textContent,firstWord);
+    assert.match(document.getElementById('review-area').textContent,/Card removed elsewhere/);
+    document.querySelector('.seg[data-queue="articles"]').click();await settle();
+    const articleBefore=(await original({type:'article:review-due'})).items[0];
+    document.querySelector('#review-area .reveal').click();
+    document.querySelectorAll('.grades button')[3].click();await settle();
+    assert.equal(document.getElementById('review-undo').hidden,false);
+    document.getElementById('review-undo').click();await settle();
+    assert.deepEqual((await original({type:'article:review-due'})).items.find(item=>item.article.id===articleBefore.article.id).card,articleBefore.card);
+    assert.equal(document.querySelectorAll('.grades button').length,4);
+    assert.deepEqual(Array.from(dom.window.__previewErrors),[]);
+  } finally { dom.window.close(); }
 });
 
 function chatPreview(state = 'populated') {

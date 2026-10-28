@@ -136,6 +136,7 @@
        * 吸上去的那一下版面才不会跳。
        */
       .savebar { margin: 6px 0; padding: 12px 0; border-block: 1px solid transparent; }
+      .savebar[hidden], body.mobile-settings .settings-savebar[hidden] { display:none; }
       .savebar.is-dirty { position: sticky; top: 0; bottom: 0; z-index: 5; background: var(--bg); border-block-color: var(--line); }
 
       /*
@@ -210,6 +211,13 @@
       .status-panel { background:var(--card); border-radius: var(--radius-md); }
       @media(min-width:960px) { body.has-nav{ --nav-left:max(24px,calc(50% - 490px)); margin-left:calc(var(--nav-left) + 210px); } .section-nav{ top:48px; width:180px; } }
       @media(max-width:560px) { body{padding-top:14px} .field{grid-template-columns:1fr} .field.check{grid-template-columns:1fr auto} h1{font-size:28px} fieldset{padding:18px 0;margin:20px 0} .field .wide{grid-column:auto} .field.check input[type="checkbox"]{width:39px;height:25px} .field.check input[type="checkbox"]::before{width:19px;height:19px} }
+      .provider-search-options { margin-top:8px; }
+      .provider-search-options summary, .model-advanced > summary { cursor:pointer; padding:12px 0; }
+      .model-advanced { margin:18px 0; border-block:1px solid var(--line); }
+      #llm-status:empty, #model-save-state:empty { display:none; }
+      #llm-status { overflow-wrap:anywhere; }
+      #test-llm { min-height:48px; }
+      #provider-doc { color:var(--primary); text-underline-offset:3px; }
     </style>
     <link rel="stylesheet" href="theme.css" />
   </head>
@@ -219,28 +227,6 @@
     <p class="muted small">
       Reading records are stored on this device and, when sync is enabled, on your configured server. <strong>After you consent, opened pages are sent to your model provider for article detection</strong> (except pages on your reading blocklist). <strong>Text translation sends the selected text and its surrounding paragraph to your model provider</strong>. It starts automatically only on sites in your translation allowlist; enable it manually from the popup elsewhere.
     </p>
-
-    <section id="consent" class="consent" hidden>
-      <h2>Before you start: sharing content with your model provider</h2>
-      <p>
-        Lectern uses your own API key to connect directly to the provider selected below. After you consent, it sends:
-      </p>
-      <ul>
-        <li>
-          <strong>Automatically: </strong>The URL, title and page text (up to about 30,000 characters) of opened pages for article detection. Sites on your reading blocklist are excluded.
-        </li>
-        <li>
-          <strong>When you use a feature: </strong>Text and screenshot translation, explanations, follow-up questions, vocabulary chat, article review, AI filtering and rule editing send the text involved in that action: selected text and its paragraph, chat messages and recent conversation, article titles or text, or rules and the current page URL.
-        </li>
-      </ul>
-      <p class="muted small">
-        These requests go directly to your provider, whose privacy policy applies. Lectern sends nothing to a model provider before you consent.
-        <a href="https://xbghc.github.io/lectern/privacy/" target="_blank" rel="noreferrer">Privacy policy</a>
-      </p>
-      <div class="row">
-        <button id="consent-agree" class="primary">Agree and start</button>
-      </div>
-    </section>
 
     <fieldset id="sync-settings" data-nav-group="Connections">
       <legend>Device sync<button type="button" class="info" aria-label="About device sync" aria-expanded="false" aria-controls="sync-about">i</button></legend>
@@ -282,60 +268,63 @@
     </fieldset>
 
     <fieldset id="sec-llm" data-nav="Model">
-      <legend>Model provider for article detection, translation and review</legend>
+      <legend>Model connection</legend>
+      <p class="muted small">Choose your provider, enter its API key and select a model.</p>
       <div class="field tall">
-        <label for="provider-search">Provider</label>
+        <label for="provider">Provider</label>
         <div class="wide provider-picker">
-          <input id="provider-search" type="search" autocomplete="off" spellcheck="false" />
-          <select id="provider" size="7" aria-label="Model provider"></select>
+          <select id="provider" aria-label="Model provider"></select>
+          <details class="provider-search-options"><summary>Find a provider</summary><input id="provider-search" type="search" aria-label="Search model providers" autocomplete="off" spellcheck="false" /></details>
         </div>
       </div>
       <div class="field">
-        <label for="protocol">Protocol</label>
-        <select id="protocol" class="wide">
-          <option value="openai">OpenAI compatible (Chat Completions)</option>
-          <option value="anthropic">Anthropic compatible (Messages)</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="baseUrl">Base URL</label>
-        <input id="baseUrl" type="text" class="wide" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.example.com/v1" />
+        <label for="apiKey">API key</label>
+        <input id="apiKey" type="password" placeholder="Leave blank to keep the current key" class="wide" autocomplete="off" />
       </div>
       <div class="field">
         <label for="model">Model</label>
         <input id="model" type="text" class="wide" list="model-list" autocomplete="off" spellcheck="false" />
         <datalist id="model-list"></datalist>
       </div>
-      <div class="field">
-        <label for="apiKey">API Key</label>
-        <input id="apiKey" type="password" placeholder="Leave blank to keep the current key" class="wide" autocomplete="off" />
-      </div>
-      <div class="field">
-        <label for="maxTokens">max_tokens</label>
-        <input id="maxTokens" type="number" min="256" max="8192" step="64" />
-        <span class="hint">This is a limit, not a cost estimate. A low limit may truncate responses.</span>
-      </div>
-      <div class="field">
-        <label for="timeout">Timeout (seconds)</label>
-        <input id="timeout" type="number" min="5" max="120" step="1" />
-        <span class="hint">Total time limit for a streamed response. Long selections and explanations may take longer.</span>
-      </div>
-      <p class="muted small">
-        Provider catalog from  <a href="https://models.dev" target="_blank" rel="noreferrer">models.dev</a>. Selecting a provider fills its URL and protocol; both can be edited. Choose Custom URL for an unlisted provider. Include the API version in the base URL (for example,  <code>https://api.openai.com/v1</code>). You can also type a model ID. HTTPS is required, except for localhost, 127.0.0.1 and [::1]. Use the final URL without redirects, query parameters or fragments.
-        <a id="provider-doc" target="_blank" rel="noreferrer" hidden>Provider models and documentation</a>
+      <a id="provider-doc" target="_blank" rel="noreferrer" hidden>Provider models and documentation</a>
+      <details id="model-advanced" class="model-advanced">
+        <summary>Advanced connection settings</summary>
+        <div class="field">
+          <label for="protocol">Protocol</label>
+          <select id="protocol" class="wide"><option value="openai">OpenAI compatible (Chat Completions)</option><option value="anthropic">Anthropic compatible (Messages)</option></select>
+        </div>
+        <div class="field"><label for="baseUrl">Base URL</label><input id="baseUrl" type="text" class="wide" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.example.com/v1" /></div>
+        <div class="field"><label for="maxTokens">Response limit (tokens)</label><input id="maxTokens" type="number" min="256" max="8192" step="64" /><span class="hint">A low limit may truncate responses. This is not a cost estimate.</span></div>
+        <div class="field"><label for="timeout">Timeout (seconds)</label><input id="timeout" type="number" min="5" max="120" step="1" /><span class="hint">Maximum time for the complete response.</span></div>
+        <p class="muted small">Selecting a provider fills its URL and protocol. Choose Custom endpoint for another service. Include the API version, such as https://api.example.com/v1. HTTPS is required except on localhost. Redirects, query parameters and fragments are not supported.</p>
+        <p class="muted small">Provider catalog: <a href="https://models.dev" target="_blank" rel="noreferrer">models.dev</a>. API keys stay on this device and are excluded from exports. Changing the protocol, host or port requires a new key; the previous key is never sent to the new destination.</p>
+      </details>
+    <section id="consent" class="consent" hidden>
+      <h2>Before you start: sharing content with your model provider</h2>
+      <p>
+        Lectern uses your own API key to connect directly to the provider configured in this section. After you consent, it sends:
       </p>
+      <ul>
+        <li>
+          <strong>Automatically: </strong>The URL, title and page text (up to about 30,000 characters) of opened pages for article detection. Sites on your reading blocklist are excluded.
+        </li>
+        <li>
+          <strong>When you use a feature: </strong>Text and screenshot translation, explanations, follow-up questions, vocabulary chat, article review, AI filtering and rule editing send the text involved in that action: selected text and its paragraph, chat messages and recent conversation, article titles or text, or rules and the current page URL.
+        </li>
+      </ul>
       <p class="muted small">
-        Create an API key in your provider's console. Keys are stored separately, excluded from exports and kept out of page processes. Changing the protocol, host or port requires a different key; the previous key is never sent to the new destination. Changing only the path does not require a new key.
+        These requests go directly to your provider, whose privacy policy applies. Lectern sends nothing to a model provider before you consent.
+        <a href="https://xbghc.github.io/lectern/privacy/" target="_blank" rel="noreferrer">Privacy policy</a>
       </p>
       <div class="row">
-        <button id="test-llm">Test saved connection</button>
-        <span id="llm-status" class="muted small"></span>
+        <button id="consent-agree" class="primary">Agree and start</button>
       </div>
-      <p class="muted small">Use Save to apply all changes, including your API key and model, before testing.</p>
+    </section>
+      <div class="row"><button id="test-llm" type="button">Test connection</button></div>
+      <p id="model-save-state" class="muted small"></p>
+      <p id="llm-status" class="muted small" role="status" aria-live="polite"></p>
       <p id="usage" class="muted small"></p>
-      <p id="consent-state" class="muted small" hidden>
-        Consent granted on  <span id="consent-date"></span>  for sharing content with the model provider.<button id="consent-revoke" type="button" class="linklike">Withdraw consent</button>
-      </p>
+      <p id="consent-state" class="muted small" hidden>Consent granted on <span id="consent-date"></span> for sharing content with the model provider. <button id="consent-revoke" type="button" class="linklike">Withdraw consent</button></p>
     </fieldset>
 
     <fieldset id="sec-translate" data-nav-group="Preferences">
@@ -489,11 +478,16 @@
     <div id="savebar" class="row savebar">
       <button id="save" type="button" class="primary">Save</button>
       <button id="revert" type="button" hidden>Discard changes</button>
-      <button id="reset" type="button">Restore defaults</button>
       <span id="status" role="status"></span>
     </div>
 
-    <fieldset id="sec-data" data-nav-group="Maintenance">
+    <fieldset id="sec-reset" data-nav="Reset preferences" data-nav-group="Maintenance">
+      <legend>Reset preferences</legend>
+      <p class="muted small">Restore reading preferences to their defaults. Your provider, API key, sync connection, lists and reading data are kept. Save to apply, or discard to cancel.</p>
+      <button id="reset" type="button">Restore reading defaults</button>
+    </fieldset>
+
+    <fieldset id="sec-data">
       <legend>Data</legend>
       <p class="muted small">
         Export JSON to back up your records, merge them on another device, or analyze them with other tools.

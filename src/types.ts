@@ -283,6 +283,7 @@ export type PopupToBg =
   | { type: "article:finish"; articleId: string; finished: boolean }
   | { type: "review:due"; limit?: number }
   | { type: "review:grade"; cardId: string; grade: 1 | 2 | 3 | 4 }
+  | { type: "review:undo"; eventId: string }
   | { type: "review:stats" }
   | { type: "review:assist"; cardId: string; mode: AssistMode }
   /* ---- 文章回顾 ---- */
@@ -331,6 +332,11 @@ export type BgToContent = { type: "page:url-changed"; url: string };
 export type BgToPage = { type: "sync:updated" };
 
 export type AnyMessage = ContentToBg | PopupToBg | PopupToContent;
+
+export type ReviewUndoResult =
+  | { ok: true; kind: "word"; card: StoredCard }
+  | { ok: true; kind: "article"; card: ArticleCard }
+  | { ok: false; error: string };
 
 export interface ReadState {
   /** 已读段落的文本指纹，用于跨刷新去重。 */

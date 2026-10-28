@@ -1418,12 +1418,6 @@ button.mini.reveal {
   #articles.grid-view {
     grid-template-columns: minmax(0, 1fr);
   }
-  #words .row1 {
-    flex-wrap: wrap;
-  }
-  #words .title {
-    flex-basis: calc(100% - 60px);
-  }
   #words-review {
     padding: 9px 12px;
     font-size: 11px;
@@ -1637,3 +1631,27 @@ button.mini.reveal {
     margin: 0;
   }
 }
+
+/* Words lead with meaning and context; management is available on demand. */
+.word-summary-row { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
+.word-card .word-summary-row > .row1 { display:flex; flex-wrap:nowrap; align-items:center; gap:8px; }
+.word-summary-row > .row1 .title { flex:1; min-width:0; font-size:21px; }
+.word-summary-row > .sub { flex-direction:row; flex-wrap:wrap; font-size:12px; column-gap:12px; }
+.word-context-preview { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin:0; font-size:14px; line-height:1.7; color:var(--fg-soft); }
+.word-actions { position:relative; flex:none; }
+.word-actions > summary { list-style:none; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:var(--radius-md); }
+.word-actions > summary::-webkit-details-marker { display:none; }
+.word-actions > summary svg { width:20px; height:20px; }
+.word-actions[open] > summary { background:var(--muted); }
+.word-actions .word-controls { position:absolute; z-index:4; top:100%; right:0; width:240px; max-width:calc(100vw - 48px); padding:12px; display:flex; justify-content:flex-start; gap:10px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--card); box-shadow:var(--shadow-sm); }
+.word-actions .word-controls .pill { font-size:12px; }
+.word-actions .word-controls button { flex-basis:100%; text-align:left; font-size:13px; }
+.word-detail { font-size:14px; }
+.word-detail > summary { display:list-item; width:fit-content; padding:10px 0; }
+.review-actions { max-width:610px; margin:0 auto 12px; display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px; }
+.review-actions:has(#review-undo[hidden]):has(#review-action-status:empty) { display:none; }
+.review-actions p { flex-basis:100%; margin:0; }
+.rating-help { margin-top:12px; font-size:13px; color:var(--muted-foreground); }
+.rating-help summary { width:fit-content; padding:10px 0; cursor:pointer; }
+.rating-help p { margin:8px 0; }
+.grades button:nth-child(3) { background:var(--card); border-color:var(--border); color:var(--fg); }

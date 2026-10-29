@@ -7,6 +7,8 @@ import { updateLocalOnly } from "../src/background/store.ts";
 import { streamTranslate } from "../src/features/translation/translate.ts";
 import { freshState, installStorage, memoryDriver, onLocalMutation } from "../src/sync/storage.ts";
 import { LEGACY_MINIMAX } from "../src/types.ts";
+import { judgeSelection } from "../src/lib/lang.ts";
+import { getCards } from "../src/features/translation/vocab.ts";
 
 /*
  * 后台翻译整条路：模型答完 → 存划词 → 回复 → 随后记账。盯的是诊断日志里量出来的那一秒——
@@ -67,6 +69,37 @@ beforeEach(async () => {
   await bookkeepingSettled();
   area = fakeArea();
   await setLlmConfig({ ...LEGACY_MINIMAX, apiKey: "k", consentAt: 1 });
+});
+
+test("文言整句保存翻译但不进复习队列，单字保留原字并生成卡片", async () => {
+  const sentence = judgeSelection("學而時習之，不亦說乎？", { minSelectionChars: 2, maxAutoSelectionWords: 200 });
+  serve(JSON.stringify({ translation: "学习后常常温习，不也很愉快吗？" }));
+  const passage = await streamTranslate({ ...req(), text: sentence.text, kind: sentence.kind, context: sentence.text }, () => {}).done;
+  assert.ok(passage.ok);
+  assert.equal(passage.snippet.cardId, null);
+  assert.equal((await getCards()).length, 0);
+  serve(JSON.stringify({ translation: "愉快", lemma: "悦", phonetic: "yuè", pos: "形容词" }));
+  const word = await streamTranslate({ ...req(), text: "說", kind: "word", context: sentence.text }, () => {}).done;
+  assert.ok(word.ok);
+  assert.equal(word.snippet.lemma, "說");
+  assert.ok(word.snippet.cardId);
+  assert.equal((await getCards())[0]!.key, "說");
+});
+
+test("同一文言字的不同语境分别翻译，同语境重复选中才命中缓存", async () => {
+  const served = serve(JSON.stringify({ translation: "它" }), JSON.stringify({ translation: "到、往" }));
+  const first = { ...req(), text: "之", context: "學而時習之。", kind: "word" as const };
+  const second = { ...first, context: "吾欲之南海，何如？" };
+  const a = await streamTranslate(first, () => {}).done;
+  const b = await streamTranslate(second, () => {}).done;
+  const again = await streamTranslate(second, () => {}).done;
+  assert.ok(a.ok && b.ok && again.ok);
+  assert.equal(a.snippet.translation, "它");
+  assert.equal(b.snippet.translation, "到、往");
+  assert.equal(b.snippet.context, second.context);
+  assert.equal(again.cached, true);
+  assert.equal(again.snippet.id, b.snippet.id);
+  assert.equal(served.calls, 2);
 });
 
 test("模型答完、划词存好就回复；用量和耗时随后一笔记上，不让人等", async () => {

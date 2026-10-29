@@ -79,7 +79,7 @@ if (bridge?.ocrStart) setOcrBackend({
   async recognize(png) {
     try {
       const text = cleanOcrLines(await recognizeNative(png));
-      return text ? { ok: true, text } : { ok: false, error: "No English text was detected in the image" };
+      return text ? { ok: true, text } : { ok: false, error: "No English or Chinese text was detected in the image" };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }

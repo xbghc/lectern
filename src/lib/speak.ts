@@ -8,8 +8,7 @@
  * 而「哪一段可点、点了念什么」正是这个模块的知识。
  */
 
-/** 朗读的语言。选区判定已经保证含拉丁字母，一律按英语读。 */
-const LANG = "en-US";
+import { hasHan } from "./lang.ts";
 
 /**
  * 比默认稍慢。默认语速是给整句设计的，单个生词一闪而过，
@@ -54,7 +53,7 @@ export function speak(word: string): boolean {
     // 连点两个词时后一个应当立刻顶掉前一个，而不是排队等它念完
     stopSpeaking();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = LANG;
+    u.lang = hasHan(text) ? "zh-CN" : "en-US";
     u.rate = RATE;
     // 认对象而不是认标志位：cancel() 触发的 onerror 是异步到的，
     // 那时 mine 可能已经指向新的一条了，认标志位会把新的误清掉。

@@ -2,6 +2,7 @@ import type { PartialTranslation, Snippet, SnippetKind, VocabNote } from "../../
 import { coarsePointer } from "../../lib/pointer.ts";
 import { fillMeta, stopSpeaking } from "../../lib/speak.ts";
 import { Typewriter, type TypewriterDeps } from "./typewriter.ts";
+import { hasHan, hasLatin } from "../../lib/lang.ts";
 
 /**
  * 选区旁的翻译浮层。
@@ -718,10 +719,11 @@ export class Popover {
 
   /** 长选区不自动翻译，先问一句——"选中即翻译"不该把整段几百字直接发出去。 */
   showConfirm(rect: DOMRect, term: string, words: number, source: "selection" | "image" = "selection"): void {
+    const unit = hasHan(term) ? (hasLatin(term) ? "characters and words" : "characters") : "words";
     this.render(
       rect,
       `<div class="head"><span class="term"></span></div>
-       <div class="meta">${source === "image" ? "Recognized" : "Selected"} ${words} words. Confirm to translate this longer passage.</div>
+       <div class="meta">${source === "image" ? "Recognized" : "Selected"} ${words} ${unit}. Confirm to translate this longer passage.</div>
        <div class="ctx"><button data-act="go">Translate passage</button></div>`,
       (box) => {
         this.fillTerm(box.querySelector(".term")!, term, 80);

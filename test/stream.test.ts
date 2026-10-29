@@ -70,6 +70,28 @@ function fetchOf(chunks: string[], status = 200): typeof fetch {
     })) as unknown as typeof fetch;
 }
 
+test("文言流式输出保留原文词条和拼音，译文先于讲解可见", async () => {
+  const text = "學而時習之，不亦說乎？";
+  const translation = "学习后常常温习，不也很愉快吗？";
+  const payload = JSON.stringify({ translation, phonetic: null, pos: null, lemma: null, context_note: "說在此通悅。",
+    vocab: [{ word: "說", phonetic: "yuè", pos: "形容词", meaning: "愉快", note: "通悅。" }] });
+  const partials: PartialTranslation[] = [];
+  const fetch = fetchOf(textStream(payload));
+  const { result } = await translateStream({ ...REQ, text, context: text, kind: "sentence" }, CFG, p => partials.push(p), undefined, {
+    fetch: async (url, init) => {
+      const body = JSON.parse(String(init!.body));
+      assert.match(body.system, /现代白话文/);
+      assert.ok(body.messages[0].content.includes(text));
+      return fetch(url, init);
+    },
+  });
+  assert.equal(result.translation, translation);
+  assert.equal(result.vocab[0]!.word, "說");
+  assert.equal(result.vocab[0]!.phonetic, "yuè");
+  assert.ok(partials.some(p => p.translation === translation && p.vocab.length === 0));
+  assert.deepEqual(partials.at(-1)!.vocab, result.vocab);
+});
+
 /* ---------- 内容审核拒答 ---------- */
 
 test("流式：HTTP 500 的审核拒答、流里报的审核错误都认成 refused", async () => {

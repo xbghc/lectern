@@ -891,6 +891,8 @@ test("长文本确认按来源区分选中和识别", () => {
   assert.equal(txt(".meta"), "Selected 201 words. Confirm to translate this longer passage.");
   pop.showConfirm(RECT, "hello", 201, "image");
   assert.equal(txt(".meta"), "Recognized 201 words. Confirm to translate this longer passage.");
+  pop.showConfirm(RECT, "學而時習之", 5);
+  assert.equal(txt(".meta"), "Selected 5 characters. Confirm to translate this longer passage.");
 });
 
 /* ---- 原文：长了只露开头，点一下展开全文，再点收起 ---- */

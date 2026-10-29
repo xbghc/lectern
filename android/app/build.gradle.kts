@@ -91,8 +91,8 @@ val buildWeb = tasks.register<Exec>("buildWeb") {
 tasks.named("preBuild") { dependsOn(buildWeb) }
 
 dependencies {
-    // 拉丁模型随 APK 打包（原生库 11MB + 模型 1.6MB + 未裁剪的 dex 约 10MB），没有 Google Play 服务也能离线识别。
-    implementation("com.google.mlkit:text-recognition:16.0.1")
+    // 中文（含拉丁字母）模型随 APK 打包，没有 Google Play 服务也能离线识别。
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     // OnBackPressedDispatcher：Android 13+ 的预测式返回不再调 onBackPressed()
     implementation("androidx.activity:activity:1.10.1")
     // WebViewAssetLoader：把 assets 用 https://appassets.androidplatform.net 端出来，页面才有一个真实的 origin

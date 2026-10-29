@@ -1,4 +1,5 @@
 import type { TranslationInputTiming } from "../../lib/translationDiagnostics.ts";
+import { hasHan } from "../../lib/lang.ts";
 
 /** App 正文的点词 / 双击整句；扩展仍使用原生划词。 */
 const DOUBLE_TAP_MS = 150;
@@ -28,10 +29,13 @@ export function textRangeAtPoint(root: HTMLElement, x: number, y: number, kind: 
     if (index < 0 || index >= (node.textContent?.length ?? 0)) continue;
     if (/\s/.test(node.textContent![index]!)) continue;
     const char = doc.createRange();
-    char.setStart(node, index);
-    char.setEnd(node, index + 1);
+    // DOM 偏移按 UTF-16；点到扩展区汉字的任意半个代理对都要取完整字形。
+    const start = index > 0 && /[\uDC00-\uDFFF]/.test(node.textContent![index]!) && /[\uD800-\uDBFF]/.test(node.textContent![index - 1]!) ? index - 1 : index;
+    const length = String.fromCodePoint(node.textContent!.codePointAt(start)!).length;
+    char.setStart(node, start);
+    char.setEnd(node, start + length);
     if (Array.from(char.getClientRects()).some(r => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)) {
-      hit = index;
+      hit = start;
       break;
     }
   }
@@ -60,7 +64,8 @@ export function textRangeAtPoint(root: HTMLElement, x: number, y: number, kind: 
   let start = -1;
   let end = -1;
   if (kind === "word") {
-    for (const match of text.matchAll(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu)) {
+    // 文言词多为单字；用现代汉语分词或连续字母正则会把一句古文当成一个词。
+    for (const match of text.matchAll(/\p{Script=Han}|[\p{Script=Latin}\p{N}]+(?:['’\-][\p{Script=Latin}\p{N}]+)*/gu)) {
       if (match.index <= at && at < match.index + match[0].length) {
         start = match.index;
         end = start + match[0].length;
@@ -71,7 +76,7 @@ export function textRangeAtPoint(root: HTMLElement, x: number, y: number, kind: 
     const lineStart = text.lastIndexOf("\n", at - 1) + 1;
     const nextLine = text.indexOf("\n", at);
     const line = text.slice(lineStart, nextLine < 0 ? text.length : nextLine);
-    for (const segment of new Intl.Segmenter("en", { granularity: "sentence" }).segment(line)) {
+    for (const segment of new Intl.Segmenter(hasHan(line) ? "zh" : "en", { granularity: "sentence" }).segment(line)) {
       if (lineStart + segment.index <= at && at < lineStart + segment.index + segment.segment.length) {
         start = lineStart + segment.index;
         end = start + segment.segment.length;

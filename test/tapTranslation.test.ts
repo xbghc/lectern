@@ -134,6 +134,58 @@ test("明确点击单字母 I 也翻译", t => {
   assert.equal(requests[0]!.text, "I");
 });
 
+test("点文言字只取单字；双击取跨内联标签的整句，保留繁体", t => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  root.innerHTML = "<p>學而<em>時習之</em>，不亦說乎？有朋自遠方來。</p>";
+  hitNode = root.querySelector("em")!.firstChild!;
+  tap();
+  t.mock.timers.tick(150);
+  assert.equal(requests[0]!.text, "習");
+  assert.equal(requests[0]!.kind, "word");
+  assert.equal(requests[0]!.context, "學而時習之，不亦說乎？有朋自遠方來。");
+  translator.dismiss();
+  tap(); t.mock.timers.tick(100); tap(); t.mock.timers.tick(1000);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1]!.text, "學而時習之，不亦說乎？");
+  assert.equal(requests[1]!.kind, "sentence");
+});
+
+test("中英混排不把汉字粘在英文单词上，扩展区汉字保持完整", () => {
+  root.innerHTML = "<p>读React文档。𠮷字。</p>";
+  hitNode = root.querySelector("p")!.firstChild!;
+  assert.equal(textRangeAtPoint(root, 5, 25, "word")?.toString(), "读");
+  assert.equal(textRangeAtPoint(root, 15, 25, "word")?.toString(), "React");
+  assert.equal(textRangeAtPoint(root, 95, 25, "word")?.toString(), "𠮷");
+  assert.equal(textRangeAtPoint(root, 65, 25, "sentence")?.toString(), "读React文档。");
+});
+
+test("桌面划选文言单字和整句都发起请求，并保留段落语境", t => {
+  translator.stop();
+  translator = new SelectionTranslator({
+    articleId: "article", articleTitle: "论语", url: "https://example.com",
+    settings: () => DEFAULT_SETTINGS, contextOf: paragraphContext,
+    recognize: async () => ({ ok: false, error: "unused" }),
+    translate: async req => { requests.push(req); return new Promise(() => {}); },
+    ask: async () => ({ ok: true, text: "" }), warm: () => {}, openOptions: () => {},
+  });
+  translator.start();
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  root.innerHTML = "<p>學而時習之，不亦說乎？</p>";
+  const node = root.querySelector("p")!.firstChild!;
+  for (const [start, end, expectedKind] of [[8, 9, "word"], [0, node.textContent!.length, "sentence"]] as const) {
+    const range = document.createRange();
+    range.setStart(node, start); range.setEnd(node, end);
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    document.dispatchEvent(new dom.window.MouseEvent("mouseup", { bubbles: true, button: 0 }));
+    t.mock.timers.tick(160);
+    assert.equal(requests.at(-1)!.text, range.toString());
+    assert.equal(requests.at(-1)!.kind, expectedKind);
+    assert.equal(requests.at(-1)!.context, node.textContent);
+  }
+  assert.equal(requests.length, 2);
+  window.getSelection()!.removeAllRanges();
+});
+
 test("滚动、拖动、长按、取消手势和多指触摸不触发翻译", t => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
   tap(); document.dispatchEvent(new dom.window.Event("scroll"));

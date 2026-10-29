@@ -6,7 +6,7 @@ import type { OcrReply } from "../types.ts";
 // v7 加载语言失败时不一定拒绝 createWorker 的 promise，需把 errorHandler 也接到就绪结果。
 let rejectInitialization!: (error: unknown) => void;
 const initializationError = new Promise<never>((_resolve, reject) => { rejectInitialization = reject; });
-const ready = Promise.race([createWorker("eng", OEM.LSTM_ONLY, {
+const ready = Promise.race([createWorker(["eng", "chi_sim", "chi_tra"], OEM.LSTM_ONLY, {
   workerPath: chrome.runtime.getURL("tesseract/worker.min.js"),
   corePath: chrome.runtime.getURL("tesseract/"),
   langPath: chrome.runtime.getURL("tesseract/"),
@@ -34,7 +34,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const lines = (data.blocks ?? []).flatMap((block) => block.paragraphs.flatMap((paragraph) =>
         paragraph.lines.map((line) => ({ text: line.text, confidence: line.confidence }))));
       const text = cleanOcrLines(lines);
-      return text ? { ok: true, text } : { ok: false, error: "No English text was detected in the image" };
+      return text ? { ok: true, text } : { ok: false, error: "No English or Chinese text was detected in the image" };
     } catch (err) {
       return { ok: false, error: String(err) };
     }

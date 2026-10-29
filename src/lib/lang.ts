@@ -1,4 +1,5 @@
 import type { SnippetKind } from "../types.ts";
+import { countWords } from "./wordcount.ts";
 
 /**
  * 选区的语言学判定。
@@ -13,18 +14,24 @@ export function normalizeSelection(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/**
- * 拉丁字母检测。
- * 用户是在读英文文章、复习英文，选中中文（比如页面里的中文注释）不该触发翻译，
- * 更不该进复习队列。
- */
+/** 拉丁字母检测；不能再用它单独决定是否翻译，文言文也需要释义。 */
 export function hasLatin(text: string): boolean {
   return /[A-Za-z]/.test(text);
 }
 
-/** 按空白切出的词数。带连字符的算一个词。 */
+/** 包含繁体及扩展区汉字，不靠简体字表猜测是否为文言文。 */
+export function hasHan(text: string): boolean {
+  return /\p{Script=Han}/u.test(text);
+}
+
+export function hasTranslatableText(text: string): boolean {
+  return hasLatin(text) || hasHan(text);
+}
+
+/** 英文沿用空白分词；有汉字时按汉字数加其它词数，避免整段古文只算一词。 */
 export function wordCountOf(text: string): number {
   const t = normalizeSelection(text);
+  if (hasHan(t)) return countWords(t);
   return t ? t.split(" ").length : 0;
 }
 
@@ -34,6 +41,9 @@ export function wordCountOf(text: string): number {
  * 再长就是句子，只记录不排期。
  */
 export function classifyKind(text: string): SnippetKind {
+  // 无空格的古文不能按英文分词。单字可复习，其余保守地记为片段，
+  // 不用字数猜词组，更不能把「学而时习之」这类短句自动塞进词汇卡。
+  if (hasHan(text)) return /^\p{Script=Han}$/u.test(normalizeSelection(text)) ? "word" : "sentence";
   const n = wordCountOf(text);
   if (n <= 1) return "word";
   if (n <= 4) return "phrase";
@@ -46,7 +56,7 @@ export interface SelectionVerdict {
   reason?: string;
   text: string;
   kind: SnippetKind;
-  /** 词数。判定与浮层文案共用一次计算。 */
+  /** 英文词数 + 汉字数。判定与浮层文案共用一次计算。 */
   words: number;
   /** 超过自动阈值：弹浮层但不自动请求，由用户点按钮确认。 */
   needsConfirm: boolean;
@@ -70,9 +80,12 @@ export function judgeSelection(raw: string, limits: SelectionLimits): SelectionV
   const kind = classifyKind(text);
   const words = wordCountOf(text);
   const base = { text, kind, words, needsConfirm: false };
-  if (text.length < Math.max(1, limits.minSelectionChars)) return { ...base, ok: false, reason: "The selection is too short" };
+  // 默认的两个字符防误触阈值适用于英文；一个汉字就可能是完整的文言词。
+  // 用户显式设得更高时仍尊重该阈值。
+  const minimum = hasHan(text) && limits.minSelectionChars <= 2 ? 1 : Math.max(1, limits.minSelectionChars);
+  if ([...text].length < minimum) return { ...base, ok: false, reason: "The selection is too short" };
   if (text.length > HARD_MAX_CHARS) return { ...base, ok: false, reason: "The selection is too long" };
-  if (!hasLatin(text)) return { ...base, ok: false, reason: "No English text found" };
+  if (!hasTranslatableText(text)) return { ...base, ok: false, reason: "No English or Chinese text found" };
   return { ...base, ok: true, needsConfirm: words > limits.maxAutoSelectionWords };
 }
 

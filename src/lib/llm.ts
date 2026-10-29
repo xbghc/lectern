@@ -11,6 +11,7 @@ import type {
 import { MAX_VOCAB } from "../types.ts";
 import { endpoint, isTruncated, readEvent, readReply, requestBody, requestHeaders } from "./llmWire.ts";
 import { parseLlmBaseUrl } from "./llmUrl.ts";
+import { hasHan } from "./lang.ts";
 
 /**
  * 向用户选的那家模型服务发请求。说两种协议——Anthropic 的 Messages 和 OpenAI 的 Chat Completions，
@@ -465,41 +466,56 @@ export async function callMessagesStream(
  * 单词没有"其中的生词"——整条记录讲的就是它自己；
  * 整句没有"这个词怎么用"——那是词的属性，不是句子的。
  */
-export function translateSystem(kind: SnippetKind, explainVocab: boolean): string {
+export function translateSystem(kind: SnippetKind, explainVocab: boolean, selection = ""): string {
+  const chinese = hasHan(selection);
   const lines = [
-    "你是浏览器里的英语阅读助手，读者是中文母语者。",
+    chinese ? "你是浏览器里的文言文阅读助手，读者是中文母语者。" : "你是浏览器里的英语阅读助手，读者是中文母语者。",
+    ...(chinese ? [
+      "文言文（含繁体）译为通顺、准确的现代白话文；夹杂英文时译为中文；现代中文按本义解释，不强套古义。",
+      "保留原意、人名地名与语气，结合上下文理解省略、倒装和指代，不逐字硬译、不扩写情节；断句或古义有歧义时在 context_note 中说明，不编造出处。",
+    ] : []),
     "只输出一个 JSON 对象，不要代码块，不要前言。",
     // 模型写中文时爱拿半角引号引术语（…做"细致"的效果…）又不转义，一处就废掉整份输出。
     // extractJson 那边有 repairJson 兜底，但能不坏最好。
     "字符串值里不要出现半角双引号：要引用某个词就用「」。",
     "字段严格按此顺序：",
-    "- translation：中文翻译。单词只给本文语境下最贴合的那个义项，不罗列词典义项。",
+    chinese
+      ? "- translation：现代汉语译文。字词只给本文语境下最贴合的那个义项，不罗列词典义项。"
+      : "- translation：中文翻译。单词只给本文语境下最贴合的那个义项，不罗列词典义项。",
     // 只说"含首尾斜杠"，模型真出过 "phonetic": /frɔːt/ 这种连引号一起省掉的输出
-    '- phonetic：国际音标，连首尾斜杠一起写成字符串（"/frɔːt/"，不是裸的 /frɔːt/）；非英语词或整句为 null。',
-    "- pos：词性（noun/verb/adj 等）；整句为 null。",
-    "- lemma：原形（leaks→leak）；整句为 null。",
+    chinese
+      ? "- phonetic：文言字词可给符合此处读音的带声调拼音，不确定则 null；整句为 null。"
+      : '- phonetic：国际音标，连首尾斜杠一起写成字符串（"/frɔːt/"，不是裸的 /frɔːt/）；非英语词或整句为 null。',
+    chinese ? "- pos：词性（动词、代词、语气助词等）；整句为 null。" : "- pos：词性（noun/verb/adj 等）；整句为 null。",
+    chinese
+      ? "- lemma：保留选中的原字，不改简繁、不改成通假本字或现代释义；整句为 null。"
+      : "- lemma：原形（leaks→leak）；整句为 null。",
     "- context_note：一两句话，说明它在本文这个语境里指什么。要具体到本文，不写通用废话。",
   ];
   if (explainVocab && kind !== "sentence") {
-    lines.push(
-      "- usage：像老师那样补一句用法——常见搭配、词根构词、或和近义词的区别，" +
+    lines.push(chinese
+      ? "- usage：优先讲古今异义、通假字、词类活用或虚词用法，挑最值得知道的一条，40 字以内；确实没什么可说就给 null。"
+      : "- usage：像老师那样补一句用法——常见搭配、词根构词、或和近义词的区别，" +
         "挑最值得知道的一条，40 字以内；确实没什么可说就给 null。",
     );
   }
   if (explainVocab && kind !== "word") {
     lines.push(
       `- vocab：数组，讲解选中内容里的生词，按它们在原文出现的顺序，最多 ${MAX_VOCAB} 条。每条形如`,
-      '  {"word": 原文里的形式, "phonetic": 音标, "pos": 词性, "meaning": 它在这里的意思（20 字以内）,' +
-        ' "note": 搭配/词根/辨析这类一句话提示，没有就 null}。',
-      // 实测模型会把 tacit endorsement 这类固定搭配当成一条（这是对的，那本来就该整个教），
-      // 但接着给两个音标拼在一起；in hindsight 更糟——给的是 hindsight 一个词的音标，
-      // 却挂在整条短语上。多词条目干脆不要音标。
+      `  {"word": 原文里的形式, "phonetic": ${chinese ? "拼音" : "音标"}, "pos": 词性, "meaning": 它在这里的意思（20 字以内）,` +
+        ' "note": 一句话用法提示，没有就 null}。',
+      // 上下文只用来判断义项，不能被模型当作另一份讲解材料。
+      "  **只讲「选中文本」里出现的词**：所在段落只用来判断义项，选区之外的词一律不列；",
+    );
+    if (chinese) lines.push(
+      "  重点解释实词古义、虚词、通假字、古今异义和词类活用；word 必须保留选区原字形，不改简繁，不能以现代释义代替原词。",
+      "  文言字词可给带声调拼音，不确定则 null。特殊句式可在 context_note 中简要解释。没有依据的通假或活用不要硬编。",
+      "  只列影响理解的字词，没有值得讲解的内容就给空数组 []。",
+    );
+    else lines.push(
+      // 多词条目容易被模型拼错音标，干脆不要音标。
       "  word 可以是固定搭配或习语（tacit endorsement、in hindsight 这类本来就该整个记）；",
       "  但**多词条目的 phonetic 一律给 null**，音标只给单个词。",
-      // 上下文是喂给模型判断义项的，可模型常常顺手把段落里的生词也一并讲了：
-      // 用户明明只选了半句，浮层里却冒出没选中的词。prompt 里说死一遍，
-      // vocabEntry 那里再按选区文本挡一道——光靠 prompt 约束不住。
-      "  **只讲「选中文本」里出现的词**：所在段落只用来判断义项，选区之外的词一律不列；",
       "  挑词像老师划重点：只列中文母语读者可能不认识、或在这里是熟词僻义／习语的词；",
       "  the、make、take 这类常见词除非构成固定搭配否则不要列；专有名词只在影响理解时列。",
       "  全是常见词就给空数组 []。",
@@ -776,7 +792,7 @@ export function normalizeTranslation(raw: unknown, kind: SnippetKind, selection:
     // 整句不该有词性和音标，模型硬给也丢掉，免得污染卡片
     pos: kind === "sentence" ? null : str(o["pos"]),
     phonetic: kind === "sentence" ? null : str(o["phonetic"]),
-    lemma: kind === "sentence" ? null : str(o["lemma"]),
+    lemma: kind === "sentence" ? null : hasHan(selection) ? selection.trim() : str(o["lemma"]),
     // 同一条规矩用在讲解上：整句没有"这个词怎么用"，单词没有"其中的生词"
     usage: kind === "sentence" ? null : str(o["usage"]),
     vocab: kind === "word" ? [] : normalizeVocab(o["vocab"], selection),
@@ -813,7 +829,7 @@ export async function translate(
   config: LlmConfig,
   deps?: LlmDeps,
 ): Promise<{ result: TranslationResult; usage: RawUsage; timing: CallTiming }> {
-  const system = translateSystem(req.kind, req.explainVocab);
+  const system = translateSystem(req.kind, req.explainVocab, req.text);
   const res = await callMessages(config, system, buildTranslatePrompt(req), deps);
   return { result: finishTranslation(res, req, config), usage: res.usage, timing: res.timing };
 }
@@ -957,7 +973,7 @@ const OPEN_STEP = 16;
 export function salvageTranslation(text: string, kind: SnippetKind, selection: string): TranslationResult | null {
   const p = partialOf(text, kind, selection);
   if (!p.translation) return null;
-  const lemma = kind === "sentence" ? null : str(closedFields(topLevelSlice(text))["lemma"]);
+  const lemma = kind === "sentence" ? null : hasHan(selection) ? selection.trim() : str(closedFields(topLevelSlice(text))["lemma"]);
   return { translation: p.translation, contextNote: p.contextNote ?? "", pos: p.pos, phonetic: p.phonetic, lemma, usage: p.usage, vocab: p.vocab };
 }
 
@@ -1008,7 +1024,7 @@ export async function translateStream(
   const t0 = now();
   /** 浮层第一次真显示出译文的时刻——用户感知的"等了多久"就是这个数，不是 totalMs。 */
   let firstFieldMs: number | null = null;
-  const system = translateSystem(req.kind, req.explainVocab);
+  const system = translateSystem(req.kind, req.explainVocab, req.text);
   const prompt = buildTranslatePrompt(req);
   let first: LlmError | undefined;
 
@@ -1079,7 +1095,8 @@ export async function translateStream(
 
 /* ==================== 复习助手 ==================== */
 
-const ASSIST_SYSTEM = `你在帮一位中文母语者复习他读英文文章时划下的生词。
+const ASSIST_SYSTEM = `你在帮一位中文母语者复习他读英文文章或文言文时划下的字词。
+文言字词结合原文解释古义与用法，不套用英语词根或现代汉语词义；自拟的文言例句要标明自拟，不伪造古籍出处。
 直接输出内容本身，不要开场白，不要 markdown 标题，不要代码块。控制在 120 字以内。`;
 
 export interface AssistInput {
@@ -1095,11 +1112,15 @@ export function buildAssistPrompt(mode: "example" | "explain" | "quiz", input: A
 已知中文释义：${input.translation}
 当初划到它的原句：${input.originalText}
 出处：《${input.articleTitle || "未命名"}》`;
-  const ask = {
+  const ask = (hasHan(input.key) ? {
+    example: "请给两个文言例句，体现这个字词在原文中的古义，每句附现代汉语译文。自拟例句明确标明自拟，不编造出处。",
+    explain: "请换一个角度解释这个文言字词的古义、虚词用法、通假或词类活用，结合原文说明；不确定的说法不要硬编。",
+    quiz: "请出一道文言字词释义或文言译白话题来考我。题目后另起一行写：答案：<答案>。",
+  } : {
     example: "请再造两个英文例句，场景要和上面那句不同，每句后面附中文翻译。",
     explain: "请换一个角度讲这个词：词根词缀、和近义词的区别、或者母语者什么时候会用它。",
     quiz: "请出一道英译中或填空题来考我，只给题目，不要给答案。最后一行单独写一行：答案：<答案>。",
-  }[mode];
+  })[mode];
   return `${head}\n\n${ask}`;
 }
 
@@ -1127,7 +1148,8 @@ export const ASK_HISTORY_TURNS = 3;
 /** 单条历史答案带过去的字数上限。留个梗概就够模型接上话，全文照搬纯属浪费。 */
 export const ASK_HISTORY_ANSWER_CHARS = 200;
 
-const ASK_SYSTEM = `你在帮一位中文母语者读英文文章。他刚划下一段原文、看过你给的译文，现在就着它追问一句。
+const ASK_SYSTEM = `你在帮一位中文母语者读英文文章或文言文。他刚划下一段原文、看过你给的译文，现在就着它追问一句。
+文言文追问结合原文说明古义、虚词、通假、活用或句式，不强套现代词义；有歧义就说明，不编造典故与出处。
 用中文回答，直接说答案，不要开场白，不要 markdown 标记，不要代码块。控制在 150 字以内。
 问题与这段原文无关时，直接说不知道，不要编。`;
 

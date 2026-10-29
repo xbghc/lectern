@@ -101,7 +101,8 @@ test("未 start 的 OCR 只挂关闭组，识别后使用同一骨架并保留�
   assert.equal(root(), undefined); assert.equal(count("keydown"), 0);
 });
 
-for (const [text, kind] of [["hello", "word"], ["This is a complete English sentence.", "sentence"]]) test(`OCR 按词数判定 ${kind}`, async () => {
+for (const [text, kind] of [["hello", "word"], ["This is a complete English sentence.", "sentence"],
+  ["之", "word"], ["學而時習之，不亦說乎？", "sentence"]]) test(`OCR 判断粒度：${text}`, async () => {
   const pending = translator.translateImage("png", rect);
   reply({ ok: true, text: text! }); await pending;
   assert.equal(requests[0]!.kind, kind); assert.equal(requests[0]!.explainVocab, true);
@@ -119,13 +120,25 @@ test("长文本先确认，按钮点击后才翻译", async () => {
 
 for (const [answer, error] of [
   [{ ok: false, error: "识别器失败" }, "识别器失败"],
-  [{ ok: true, text: "只有中文" }, "No English text"],
-  [{ ok: true, text: "" }, "No English text"],
+  [{ ok: true, text: "，。！？" }, "No English or Chinese text"],
+  [{ ok: true, text: "" }, "No English or Chinese text"],
   [{ ok: true, text: "a".repeat(2001) }, "Too much text was detected"],
 ] as const) test(`识别错误：${error}`, async () => {
   const pending = translator.translateImage("png", rect); reply(answer); await pending;
   assert.ok(root()!.textContent!.includes(error)); assert.equal(requests.length, 0);
   assert.equal(root()!.querySelector('[data-act="opt"]'), null);
+});
+
+test("文言截图按汉字数确认后再翻译，保留原文为语境", async () => {
+  settings.maxAutoSelectionWords = 3;
+  const pending = translator.translateImage("png", rect);
+  reply({ ok: true, text: "學而時習之" }); await pending;
+  assert.equal(requests.length, 0);
+  assert.match(root()!.textContent!, /Recognized 5 characters/);
+  root()!.querySelector<HTMLElement>('[data-act="go"]')!.click(); await tick();
+  assert.equal(requests[0]!.text, "學而時習之");
+  assert.equal(requests[0]!.context, "學而時習之");
+  assert.equal(requests[0]!.kind, "sentence");
 });
 
 test("Esc 作废迟到的识别并摘掉关闭组", async () => {

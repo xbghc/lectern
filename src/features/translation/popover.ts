@@ -70,7 +70,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #a1a1aa; outline-
  */
 .box.scrolls { overscroll-behavior: contain; }
 .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; margin-bottom: 5px; }
-.term { font-weight: 600; font-size: 23px; letter-spacing: -0.01em; }
+.term { font-weight: 600; font-size: 16px; letter-spacing: -0.01em; }
 /*
  * 截断过的原文可以点：点一下展开全文，再点收起（见 fillTerm）。没截断的不挂 aria-expanded，不可点也不变色。
  * 不学音标描虚线：一整段粗体原文底下拖一道线太吵，结尾那个「…」本身就在说后面还有。

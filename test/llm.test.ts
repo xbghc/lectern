@@ -277,6 +277,16 @@ test("assist prompt 三种模式各不相同且都带原句", () => {
   for (const m of modes) assert.ok(m.includes("Every abstraction leaks."));
 });
 
+test("文言复习按古义练习，不要求英文造句", () => {
+  const input = { key: "說", translation: "愉快", originalText: "不亦說乎？", context: "學而時習之，不亦說乎？", articleTitle: "论语" };
+  for (const mode of ["example", "explain", "quiz"] as const) {
+    const prompt = buildAssistPrompt(mode, input);
+    assert.match(prompt, /文言/);
+    assert.ok(prompt.includes("不亦說乎？"));
+    assert.doesNotMatch(prompt, /英文例句|英译中|词根词缀/);
+  }
+});
+
 /* ---------- 浮层里的追问 ---------- */
 
 const ASK: AskRequest = {
@@ -677,6 +687,35 @@ test("关掉讲解后 prompt 里一个字都不提", async () => {
 test("prompt 里说死只讲选中文本里的词", async () => {
   const s = await systemOf({ ...REQ, kind: "sentence" });
   assert.ok(s.includes("只讲「选中文本」里出现的词"));
+});
+
+test("文言翻译请求要求现代白话、语境古义和有依据的讲解", async () => {
+  const s = await systemOf({ ...REQ, text: "學而時習之，不亦說乎？", kind: "sentence" });
+  assert.match(s, /文言文（含繁体）.*现代白话文/);
+  assert.match(s, /古今异义/);
+  assert.match(s, /不编造出处/);
+  assert.match(s, /现代中文按本义解释/);
+  assert.match(s, /只讲「选中文本」里出现的词/);
+});
+
+test("英文请求不增加文言讲解要求，文言也尊重关闭教学讲解的设置", async () => {
+  const english = await systemOf({ ...REQ, kind: "sentence" });
+  assert.match(english, /英语阅读助手/);
+  assert.doesNotMatch(english, /文言|通假|拼音/);
+  const chinese = await systemOf({ ...REQ, text: "說", explainVocab: false });
+  assert.match(chinese, /文言文阅读助手/);
+  assert.doesNotMatch(chinese, /- usage|- vocab/);
+});
+
+test("文言词元保留原字，繁体和通假字不被模型的现代释义替换", () => {
+  const word = normalizeTranslation({ translation: "愉快", lemma: "悦", phonetic: "yuè" }, "word", "說");
+  assert.equal(word.lemma, "說");
+  assert.equal(word.phonetic, "yuè");
+  const sentence = normalizeTranslation({ translation: "学习后常常温习，不也很愉快吗？", lemma: "学习", vocab: [
+    { word: "說", meaning: "愉快" }, { word: "愠", meaning: "生气" }, { word: "说", meaning: "愉快" },
+  ] }, "sentence", "學而時習之，不亦說乎？");
+  assert.equal(sentence.lemma, null);
+  assert.deepEqual(sentence.vocab.map(v => v.word), ["說"], "讲解保留原字，选区外或改了字形的词丢掉");
 });
 
 const ENTRY = { word: "scrutiny", phonetic: "/ˈskruːtəni/", pos: "noun", meaning: "审视", note: "常搭配 under ~" };

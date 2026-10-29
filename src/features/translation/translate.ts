@@ -26,7 +26,7 @@ import { assertDataIdentity, dataIdentity, onDataReset } from "../../sync/storag
  */
 
 /**
- * 同一篇文章内、同一段文本重复选中不再请求。
+ * 同一篇文章内、同一段文本在同一语境重复选中不再请求。
  * 读文章时反复划同一个词是常态（回头再看一眼），每次都发请求纯属浪费。
  * 只在内存里，service worker 被回收就没了——这正合适，缓存本来就是尽力而为。
  */
@@ -37,9 +37,10 @@ const MAX_CACHE = 500;
 /*
  * 讲解开关也进缓存键：刚在设置里打开「英语老师模式」，回头再划同一个词，
  * 命中的若是关着时存下的那条，看起来就像开关没生效。
+ * 粒度和语境也必须一致：「之」在同篇古文里可以是不同的词义，点词与双击句子的入队规则也不同。
  */
 const keyOf = (req: TranslateRequest): string =>
-  `${req.articleId}\0${req.explainVocab ? "t" : "f"}\0${req.text.toLowerCase()}`;
+  `${req.articleId}\0${req.explainVocab ? "t" : "f"}\0${req.kind}\0${req.text.toLowerCase()}\0${req.context}`;
 
 function remember(key: string, snippet: Snippet): void {
   if (cache.size >= MAX_CACHE) {

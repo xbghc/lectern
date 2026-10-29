@@ -46,6 +46,8 @@ function copyTesseract() {
     ["node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js", "tesseract-core-relaxedsimd-lstm.wasm.js"],
     ["node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js", "tesseract-core-simd-lstm.wasm.js"],
     ["vendor/tesseract/eng.traineddata.gz", "eng.traineddata.gz"],
+    ["vendor/tesseract/chi_sim.traineddata.gz", "chi_sim.traineddata.gz"],
+    ["vendor/tesseract/chi_tra.traineddata.gz", "chi_tra.traineddata.gz"],
   ]) copyFileSync(from, join(OUT, "tesseract", to));
 }
 

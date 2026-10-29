@@ -332,17 +332,17 @@
       <div class="field check">
         <label for="translateEnabled">Enable text translation</label>
         <input id="translateEnabled" type="checkbox" style="width: auto" />
-        <span class="hint">When disabled, Lectern stops listening for text selections.</span>
+        <span class="hint">Translate English and Classical Chinese into modern Chinese. When disabled, Lectern stops listening for text selections.</span>
       </div>
       <div class="field">
         <label for="minSel">Minimum selection (characters)</label>
         <input id="minSel" type="number" min="1" max="20" step="1" />
-        <span class="hint">Ignore shorter selections to avoid accidental requests.</span>
+        <span class="hint">Ignore shorter selections to avoid accidental requests. The default also accepts single Chinese characters.</span>
       </div>
       <div class="field">
-        <label for="maxAuto">Auto-translate limit (words)</label>
+        <label for="maxAuto">Auto-translate limit</label>
         <input id="maxAuto" type="number" min="3" max="360" step="1" />
-        <span class="hint">Longer selections show a confirmation button before sending a request.</span>
+        <span class="hint">Counts English words and Chinese characters. Longer selections require confirmation.</span>
       </div>
       <div class="field">
         <label for="ctxChars">Context length (characters)</label>
@@ -352,7 +352,7 @@
       <div class="field check">
         <label for="explainVocab">Include teaching notes</label>
         <input id="explainVocab" type="checkbox" style="width: auto" />
-        <span class="hint">Add usage notes; for sentences, explain unfamiliar words.</span>
+        <span class="hint">Explain unfamiliar words and usage, including classical meanings and grammar.</span>
       </div>
       <p class="muted small">
         Teaching notes can roughly double output tokens and add a second or two. The translation still appears first. Disable this if you only need the translation.

@@ -52,6 +52,14 @@ test("空词不发声", () => {
   assert.equal(spoken.length, 0);
 });
 
+test("文言字词使用中文语音，切回英文时恢复英文语音", () => {
+  speak("學");
+  assert.equal(last().text, "學");
+  assert.equal(last().lang, "zh-CN");
+  speak("learn");
+  assert.equal(last().lang, "en-US");
+});
+
 test("连点两个词时后一个顶掉前一个", () => {
   speak("first");
   assert.equal(cancels, 0, "本来就没在念，不必打断");

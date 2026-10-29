@@ -121,6 +121,7 @@ async function offscreenListener(makeWorker: (...args: any[]) => Promise<unknown
 
 test("offscreen 忽略无关消息，预热等就绪，识别清洗行信息并传回空图与异常", async () => {
   const listener = await offscreenListener(async (_lang, _oem, options) => {
+    assert.equal(Array.from(_lang).join("+"), "eng+chi_sim+chi_tra");
     assert.equal(options.workerBlobURL, false);
     assert.equal(options.corePath, "chrome-extension://test/tesseract/");
     return {
@@ -130,7 +131,7 @@ test("offscreen 忽略无关消息，预热等就绪，识别清洗行信息并�
         if (image.endsWith("bad")) throw new Error("识别失败");
         return { data: { blocks: [{ paragraphs: [{ lines: image.endsWith("empty") ? [] : [
           { text: "inten-", confidence: 90 }, { text: "sity", confidence: 90 },
-          { text: "noise", confidence: 10 },
+          { text: "noise", confidence: 10 }, { text: "學而時習之", confidence: 90 },
         ] }] }] } };
       },
     };
@@ -142,8 +143,8 @@ test("offscreen 忽略无关消息，预热等就绪，识别清洗行信息并�
     assert.equal(listener({ target: "offscreen", type, png }, {}, resolve), true);
   });
   assert.equal((await send("ocr:warm")).ok, true);
-  assert.equal((await send("ocr:recognize", "abc")).text, "intensity");
-  assert.equal((await send("ocr:recognize", "empty")).error, "No English text was detected in the image");
+  assert.equal((await send("ocr:recognize", "abc")).text, "intensity 學而時習之");
+  assert.equal((await send("ocr:recognize", "empty")).error, "No English or Chinese text was detected in the image");
   assert.equal((await send("ocr:recognize", "bad")).error, "Error: 识别失败");
 });
 

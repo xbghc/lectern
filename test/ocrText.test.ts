@@ -33,3 +33,12 @@ test("压缩连续空白并裁掉两端空白", () => {
 test("弯引号是原文的一部分，清洗不替换", () => {
   assert.equal(cleanOcrLines([{ text: "“It’s fine,”" }, { text: "she said." }]), "“It’s fine,” she said.");
 });
+
+test("保留简繁体文言文，合并汉字间 OCR 空格与折行，空行仍分段", () => {
+  assert.equal(cleanOcrLines([
+    { text: "学 而 时 习 之，", confidence: 90 }, { text: "不亦说乎？", confidence: 95 },
+    { text: "" }, { text: "學而時習之，" }, { text: "不 亦 說 乎？" },
+    { text: "误识别", confidence: 10 },
+  ]), "学而时习之，不亦说乎？\n學而時習之，不亦說乎？");
+  assert.equal(cleanOcrLines([{ text: "读 React" }, { text: "文档" }]), "读 React 文档");
+});

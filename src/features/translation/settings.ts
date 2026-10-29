@@ -13,10 +13,10 @@ export interface TranslationSettings {
   translationAllowedUrls: string[];
   /** 划词翻译总开关。关掉后 content script 不再挂选区监听。 */
   translateEnabled: boolean;
-  /** 短于此长度的选区不翻译（避免误点选到一两个字符）。 */
+  /** 短于此长度的选区不翻译；默认阈值允许一个有意义的文言汉字。 */
   minSelectionChars: number;
   /**
-   * 超过此词数不自动翻译，改为在浮层里给一个"翻译"按钮。
+   * 超过此词数（中文按汉字数）不自动翻译，改为在浮层里给一个"翻译"按钮。
    *
    * 这道闸只拦**离谱的量**（顺手整段整节地选中），不拦"有点长"。
    * 实测一段 130 词的选区连讲解一起也才 400 多个输出 token、十秒内出完，
@@ -29,7 +29,7 @@ export interface TranslationSettings {
   /** 发给 LLM 的上下文段落最多截取多少字符。 */
   contextChars: number;
   /**
-   * 「英语老师模式」：除了翻译，再讲一句用法，并把多词选区里的生词逐个讲开。
+   * 教学讲解：除了翻译，再讲一句用法，并把多词选区里的生词或文言字词逐个讲开。
    *
    * 关掉能省掉一半左右的输出 token，也让浮层早一两秒定住。
    * 只想要个译文的时候，这两样都是噪音。

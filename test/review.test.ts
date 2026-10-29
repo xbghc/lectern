@@ -6,6 +6,7 @@ import {
   HARD_MAX_CHARS,
   cardKeyOf,
   classifyKind,
+  hasHan,
   hasLatin,
   judgeSelection,
   normalizeSelection,
@@ -29,9 +30,12 @@ test("按词数划分粒度", () => {
   assert.equal(classifyKind("the question is not whether it leaks"), "sentence");
 });
 
-test("hasLatin 拦掉纯中文选区", () => {
+test("按 Unicode 识别汉字，兼容简繁体和扩展区", () => {
   assert.equal(hasLatin("每个抽象都会泄漏"), false);
   assert.equal(hasLatin("抽象 leak 泄漏"), true);
+  assert.equal(hasHan("學而時習之"), true);
+  assert.equal(hasHan("𠮷"), true);
+  assert.equal(hasHan("hello 123"), false);
 });
 
 test("wordCountOf 空串为 0", () => {
@@ -44,8 +48,33 @@ test("太短的选区不翻译", () => {
   assert.equal(v.reason, "The selection is too short");
 });
 
-test("纯中文选区不翻译", () => {
-  assert.equal(judgeSelection("抽象泄漏", LIMITS).ok, false);
+test("简繁体文言片段可以翻译，无标点短句也不自动进词汇卡", () => {
+  for (const text of ["学而时习之，不亦说乎？", "學而時習之", "学而不思", "子曰", "读 React 文档"]) {
+    const verdict = judgeSelection(text, LIMITS);
+    assert.equal(verdict.ok, true, text);
+    assert.equal(verdict.kind, "sentence", text);
+  }
+});
+
+test("默认长度阈值支持查一个文言字，仍尊重更高的自定义阈值", () => {
+  for (const text of ["之", "學", "𠮷"]) {
+    assert.deepEqual(judgeSelection(text, LIMITS), { text, kind: "word", words: 1, needsConfirm: false, ok: true });
+    assert.equal(judgeSelection(text, { ...LIMITS, minSelectionChars: 3 }).ok, false);
+  }
+});
+
+test("汉字按字数触发确认，标点不计，中英混排各自计数", () => {
+  const atLimit = "学，".repeat(40);
+  assert.equal(judgeSelection(atLimit, LIMITS).needsConfirm, false);
+  const verdict = judgeSelection(atLimit + "之", LIMITS);
+  assert.equal(verdict.words, 41);
+  assert.equal(verdict.needsConfirm, true);
+  assert.equal(wordCountOf("读 React 文档"), 4);
+  assert.equal(judgeSelection("學".repeat(HARD_MAX_CHARS + 1), LIMITS).ok, false);
+});
+
+test("标点、数字和不支持的文字仍不发起翻译", () => {
+  for (const text of ["，。！？", "1234", "---", "こんにちは"]) assert.equal(judgeSelection(text, LIMITS).ok, false);
 });
 
 test("正常英文选区通过且不需确认", () => {

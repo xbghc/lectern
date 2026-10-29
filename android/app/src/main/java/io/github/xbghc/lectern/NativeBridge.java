@@ -32,7 +32,7 @@ import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -169,7 +169,8 @@ public class NativeBridge {
     @JavascriptInterface
     public synchronized void ocrWarm() {
         if (closed) throw new IllegalStateException("Text recognizer is closed");
-        if (recognizer == null) recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+        // 中文识别器同时支持拉丁字母；简繁体古文与英文共用离线识别入口。
+        if (recognizer == null) recognizer = TextRecognition.getClient(new ChineseTextRecognizerOptions.Builder().build());
     }
 
     @JavascriptInterface
@@ -202,7 +203,8 @@ public class NativeBridge {
                                     for (Text.Line line : block.getLines()) {
                                         JSONObject value = new JSONObject().put("text", line.getText());
                                         Float confidence = line.getConfidence();
-                                        if (confidence != null) value.put("confidence", confidence.doubleValue());
+                                        // ML Kit 是 0–1，前端与 Tesseract 共用 0–100 的置信度口径。
+                                        if (confidence != null) value.put("confidence", confidence.doubleValue() * 100);
                                         lines.put(value);
                                     }
                                 }

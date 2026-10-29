@@ -94,13 +94,17 @@ Android statistics offer Today, Last 7 days and Last 30 days. Select a bar to se
 
 Select text on an enabled page for a context-aware translation. Short selections are ignored; selections over the automatic word limit require confirmation. The surrounding paragraph helps choose the meaning. Teaching notes add usage, collocations or word distinctions, and can explain unfamiliar words within a selected sentence. They increase response length and latency; translation appears first.
 
-On Android, tap an English word to translate it, or double-tap for its sentence. A short delay distinguishes the gestures. Links keep working, and scrolling does not translate. Tapping outside an open translation panel closes it; another deliberate tap is needed for a new translation.
+Classical Chinese, in simplified or traditional characters, translates into modern Chinese without a separate language switch. Teaching notes explain classical meanings, function words, borrowed characters and grammar in context. A single Chinese character can be looked up with the default selection limit. Multi-character Chinese selections are treated as passages, so an unspaced sentence does not become a vocabulary card. The automatic limit counts Chinese characters and English words; punctuation does not add to the Chinese count.
 
-The translation panel supports streamed output, pronunciation where available, source context and follow-up questions. Explanations can remain in Chinese while examples use English. Speech availability depends on voices installed on the device.
+On Android, tap an English word or a Chinese character to translate it, or double-tap for its sentence. A short delay distinguishes the gestures. Links keep working, and scrolling does not translate. Tapping outside an open translation panel closes it; another deliberate tap is needed for a new translation.
+
+The translation panel supports streamed output, pronunciation where available, source context and follow-up questions. Explanations use Chinese; examples and review exercises follow the source language. Chinese pronunciation uses Mandarin voices, and speech availability depends on voices installed on the device.
 
 ### Screenshot translation
 
 Use **Alt+Shift+S** in the extension, or the Android reader's tools, and select a region. OCR runs locally with bundled Tesseract in the extension and ML Kit in Android. The screenshot is not uploaded; recognized text is sent to your configured model. Because this is an explicit action, it does not depend on the selection-translation switch or allowlist.
+
+Both hosts recognize English and simplified/traditional Chinese. OCR can mix simplified and traditional forms or misread individual characters, even in clear print. Check the recognized source text when meaning depends on a particular character. Horizontal printed text works best; vertical layouts, handwriting and damaged historical scans may require selecting the original page text instead.
 
 ### Review
 

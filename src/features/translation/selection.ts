@@ -259,7 +259,7 @@ export class SelectionTranslator {
     const verdict = judgeSelection(reply.text, settings);
     if (!verdict.ok) {
       this.popover.showError(here, verdict.reason === "The selection is too long"
-        ? "Too much text was detected. Select a smaller area." : "No English text was detected. Select a clearer area.", false);
+        ? "Too much text was detected. Select a smaller area." : "No English or Chinese text was detected. Select a clearer area.", false);
       this.trace?.complete("error", verdict.reason);
       return;
     }
@@ -373,8 +373,8 @@ export class SelectionTranslator {
      */
     if (this.popover.asking) return;
     /*
-     * 选区在浮层里：人正在浮层里选字复制。照常判下去，浮层自己的字就成了一段新选区——中文译文判不成英文，
-     * 浮层直接收掉；选中的是原文里的英文，就被拿去再翻一遍、把浮层顶掉。拖选拖出浮层的边（松手落在页面上）、
+     * 选区在浮层里：人正在浮层里选字复制。照常判下去，浮层自己的字就成了一段新选区，
+     * 被拿去再翻一遍、把浮层顶掉。拖选拖出浮层的边（松手落在页面上）、
      * 在浮层里按 shift+方向键，都会走到这里。
      */
     if (this.popover.holdsSelection()) return;

@@ -488,7 +488,7 @@ function renderArticles(): void {
         result.classList.add(classification.ok ? classification.isArticle ? "is-article" : "not-article" : "failed");
         result.append(el("strong", undefined, classification.ok ? classification.isArticle ? "AI: article" : "AI: not an article" : "AI: classification failed"),
           el("p", undefined, classification.reason));
-        if (classification.ok) result.append(el("span", "muted small", classification.source === "saved" ? "Source: saved article text" : "Source: fetched page"));
+        if (classification.ok) result.append(el("span", "muted small", "Source: URL only"));
       }
       card.append(result);
     }

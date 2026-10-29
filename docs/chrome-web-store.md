@@ -36,7 +36,7 @@ Lectern brings your reading tools together in a calm workspace.
 
 Before you start:
 • Bring your own model-provider API key. Choose a provider, model and key in Settings; OpenAI-compatible Chat Completions and Anthropic-compatible Messages are supported. A model connection is required for article detection and translation.
-• Read and confirm the content-sharing notice in Model settings. After consent and setup, opened pages' URLs, titles and text are automatically sent directly to your chosen provider to identify articles. Exclude sites with the Reading blocklist.
+• Read and confirm the content-sharing notice in Model settings. After consent and setup, only opened pages' URLs are automatically sent directly to your chosen provider to identify articles. Usernames, passwords, query strings and fragments are removed; titles and page text are not sent for detection. URL paths may still contain sensitive information. Exclude sites with the Reading blocklist.
 • Translation sends selected text and its context. Other AI features send the material involved in the requested action. Automatic article review, when enabled, also sends article text at the reading threshold.
 • Sync is optional and off by default. Enabling it sends records, diagnostic logs and daily button counts to your configured server. Model API keys stay on your device.
 • The interface is English. AI translations, explanations, reviews and vocabulary coaching can still use Chinese.
@@ -63,7 +63,7 @@ Permission justifications:
 | `activeTab` | Capture a screenshot only after an explicit user action. |
 | `http://*/*`, `https://*/*` | Run reading features on user-visited sites, fetch article resources and call the configured model/sync endpoints. |
 
-Disclose website content, browsing activity and user-provided content according to the actual implementation. Page URLs, titles and text are sent for article detection only after consent and model setup. Selected text, its paragraph and related material are sent for requested AI features. OCR screenshots stay local. Reading records, diagnostic content and usage counts go to the configured server only when sync is enabled. API keys remain local and are excluded from record exports. There is no third-party advertising or analytics integration.
+Disclose website content, browsing activity and user-provided content according to the actual implementation. Only HTTP(S) URLs, with usernames, passwords, query strings and fragments removed, are sent for article detection after consent and model setup. Page titles and text are not sent for detection. AI filtering of saved records uses the same cleaned URLs without reading saved text or fetching source pages; classification failure diagnostics also use cleaned URLs. Domains and paths may still contain sensitive information. Selected text, its paragraph and related material are sent for requested AI features. OCR screenshots stay local. Reading records, diagnostic content and usage counts go to the configured server only when sync is enabled. API keys remain local and are excluded from record exports. There is no third-party advertising or analytics integration.
 
 Keep the settings consent notice, this listing and `site/privacy/index.html` consistent. Do not claim all data always stays local or that a configured server operator cannot access uploaded records.
 

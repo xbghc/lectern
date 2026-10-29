@@ -187,7 +187,7 @@ export type ContentToBg =
   | { type: "ocr:warm" }
   /** 只传 PNG 的 base64，两个宿主各自决定如何交给识别器。 */
   | { type: "ocr:recognize"; png: string }
-  | { type: "article:classify"; url: string; title: string; text: string }
+  | { type: "article:classify"; url: string }
   | { type: "article:classify-history"; articleId: string }
   | { type: "articles:delete"; articleIds: string[] }
   | { type: "articles:blacklist-suggest"; articleIds: string[] }

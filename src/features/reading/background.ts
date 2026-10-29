@@ -141,7 +141,7 @@ export const readingHandlers = {
   "article:classify": (msg) => {
     // 判别要问模型，少说一两秒。同步趁这会儿先跑起来，等轮到上面那条读位置时多半已经是新的了，不用再等
     void syncBefore();
-    return classifyPage(msg.url, msg.title, msg.text);
+    return classifyPage(msg.url);
   },
   "article:classify-history": (msg) => classifyHistoryArticle(msg.articleId),
   "articles:blacklist-suggest": (msg) => suggestBlacklist(msg.articleIds),

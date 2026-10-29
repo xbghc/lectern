@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseDecision, parseSuggestions, samplePage } from "../src/lib/articleFilter.ts";
+import { classificationUrl, parseDecision, parseSuggestions } from "../src/lib/articleFilter.ts";
 import { isUrlExcluded, matchesUrlRule } from "../src/lib/url.ts";
 
 test("文章判断严格接受布尔值，错误响应不会默认收录", () => {
@@ -11,11 +11,21 @@ test("文章判断严格接受布尔值，错误响应不会默认收录", () =>
   }
 });
 
-test("长页送头中尾，短文不因长度被排除", () => {
-  assert.equal(samplePage("短文"), "短文");
-  const sample = samplePage("头".repeat(15_000) + "中".repeat(15_000) + "尾".repeat(15_000));
-  assert.ok(sample.startsWith("头") && sample.includes("中") && sample.endsWith("尾"));
-  assert.ok(sample.length < 31_000);
+test("分类 URL 去掉凭据、所有查询参数和片段，保留域名与路径", () => {
+  assert.equal(classificationUrl("https://private-user:private-password@Example.com:8443/Articles/hello%20world?token=secret&q=private#access_token=secret"), "https://example.com:8443/Articles/hello%20world");
+  assert.equal(classificationUrl("http://example.com/?unrecognized_secret=private"), "http://example.com/");
+  assert.equal(classificationUrl("https://example.com/article"), "https://example.com/article");
+});
+
+test("不合法或非 HTTP(S) 地址不能直接回退为原串发给模型", () => {
+  for (const raw of ["private text", "/relative/path", "file:///private/report", "data:text/plain,secret", "javascript:alert('secret')", "chrome://settings", "book:private-chapter"]) {
+    assert.throws(() => classificationUrl(raw), /valid HTTP\(S\) URL/);
+  }
+});
+
+test("URL 无法判断的结果不能归为文章或非文章", () => {
+  assert.throws(() => parseDecision({ unavailable: true }), /URL alone is not enough/);
+  assert.throws(() => parseDecision({ unavailable: true, isArticle: false, reason: "不确定" }), /URL alone is not enough/);
 });
 
 test("黑名单匹配域名边界、路径边界、协议，保留路径大小写", () => {

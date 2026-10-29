@@ -81,9 +81,9 @@ export const shim = installChromeShim({
       case 'article:classify-history':
         if (options.state === 'loading') return new Promise(() => {});
         await new Promise(resolve => setTimeout(resolve, 200));
-        if (options.state === 'error' || msg.articleId.endsWith('article-2')) return { ok: false, reason: "Could not fetch the article (HTTP 403). Open the original page and try again." };
-        return { ok: true, isArticle: msg.articleId !== ARTICLE_URL, source: 'saved',
-          reason: msg.articleId === ARTICLE_URL ? '这是目录和推荐链接集合，不是独立文章。（模拟结果）' : '正文围绕同一主题展开说明，是独立文章。（模拟结果）' };
+        if (options.state === 'error' || msg.articleId.endsWith('article-2')) return { ok: false, reason: "The URL alone is not enough to classify this page. No page content was sent." };
+        return { ok: true, isArticle: msg.articleId !== ARTICLE_URL, source: 'url',
+          reason: msg.articleId === ARTICLE_URL ? 'URL 路径指向目录页面。（模拟结果）' : 'URL 路径指向一篇独立文章。（模拟结果）' };
       case 'article:classify':
         if (options.state === 'loading') return new Promise(() => {});
         return options.state === 'error' ? { ok: false, reason: "Article detection failed: the model timed out. Refresh to try again." }

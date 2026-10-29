@@ -36,7 +36,7 @@ Lectern brings your reading tools together in a calm workspace.
 
 Before you start:
 • Bring your own model-provider API key. Choose a provider, model and key in Settings; OpenAI-compatible Chat Completions and Anthropic-compatible Messages are supported. A model connection is required for article detection and translation.
-• Read the content-sharing notice and choose “Agree and start.” After consent and setup, opened pages' URLs, titles and text are automatically sent directly to your chosen provider to identify articles. Exclude sites with the Reading blocklist.
+• Read and confirm the content-sharing notice in Model settings. After consent and setup, opened pages' URLs, titles and text are automatically sent directly to your chosen provider to identify articles. Exclude sites with the Reading blocklist.
 • Translation sends selected text and its context. Other AI features send the material involved in the requested action. Automatic article review, when enabled, also sends article text at the reading threshold.
 • Sync is optional and off by default. Enabling it sends records, diagnostic logs and daily button counts to your configured server. Model API keys stay on your device.
 • The interface is English. AI translations, explanations, reviews and vocabulary coaching can still use Chinese.
@@ -73,8 +73,8 @@ Provide a dedicated, limited-use model credential only through an appropriate pr
 
 ```text
 A model-provider API key is required for AI features.
-1. The settings page opens after installation. Read the notice and click “Agree and start.”
-2. In Model, choose a provider, enter a model ID and API key, click “Save,” then click “Test saved connection.”
+1. The settings page opens after installation. In Model, choose a provider, enter its API key and select a model. Protocol, endpoint and limits are under Advanced connection settings.
+2. Read the sharing notice and choose “Save changes and agree” (or “Agree and start” when the configuration is already saved). Click “Test connection.” Later changes can be applied with “Save changes and test”; the global “Save” button also saves model configuration without making a test request.
 3. Open an English article, such as https://en.wikipedia.org/wiki/Reading. The popup shows reading progress after article detection.
 4. In the popup's Translate tab, enable translation for this page. Select English text to view its translation and notes.
 5. Alt+Shift+S starts screenshot translation; select a region containing English text.
@@ -84,7 +84,7 @@ Sync is optional and disabled by default. AI explanations may be Chinese even th
 
 ## Consent behavior
 
-From version 0.3.18, the settings page displays a prominent notice before the first model request. It explains automatic page classification, explicitly used features and the chosen recipient. No model request is made until **Agree and start** is selected.
+From version 0.3.18, the settings page displays a prominent notice before the first model request. It explains automatic page classification, explicitly used features and the chosen recipient. No model request is made before explicit consent. When model settings have unsaved changes, **Save changes and agree** saves the displayed connection before granting consent; a save failure does not grant consent.
 
 Earlier installations with existing keys also open settings once after upgrading and wait for consent. Consent can be withdrawn in Model settings. It belongs to the installation and is excluded from exports.
 

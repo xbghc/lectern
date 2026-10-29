@@ -111,6 +111,29 @@ const { startTracking } = await import("../src/features/reading/track.ts");
 const { readingPlugin } = await import("../src/features/reading/page.ts");
 const { extractFromContainer } = await import("../src/features/reading/paragraphs.ts");
 
+test('文章判断只发送 URL，肯定结果前不读取标题、正文或抽取文章', async () => {
+  const requests: unknown[] = [];
+  const messages = mock.method(chrome.runtime, 'sendMessage', async (msg: unknown) => {
+    requests.push(msg);
+    return { ok: true, isArticle: false, reason: 'URL is not an article' };
+  });
+  const unreadable = { configurable: true, get: () => { throw new Error('Page content must not be read for classification'); } };
+  Object.defineProperty(doc, 'title', unreadable);
+  Object.defineProperty(doc.body, 'innerText', unreadable);
+  Object.defineProperty(doc.body, 'textContent', unreadable);
+  try {
+    const ctl = await startTracking({ url: FIRST, extract: () => { throw new Error('Extraction must wait for approval'); } });
+    assert.deepEqual(ctl.state(), { tracked: false, reason: 'URL is not an article' });
+    assert.deepEqual(requests, [{ type: 'article:classify', url: FIRST }]);
+    ctl.stop();
+  } finally {
+    delete (doc as Partial<Document>).title;
+    delete (doc.body as Partial<HTMLElement>).innerText;
+    delete (doc.body as Partial<HTMLElement>).textContent;
+    messages.mock.restore();
+  }
+});
+
 /** 让所有定时器跑够 ms，再把 sendMessage 的应答（微任务）也放行。 */
 async function run(ms: number): Promise<void> {
   mock.timers.tick(ms);

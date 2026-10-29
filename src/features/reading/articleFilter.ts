@@ -1,6 +1,5 @@
-import { localStorage, dataIdentity, assertDataIdentity } from "../../sync/storage.ts";
-import { decodeWith, pickCharset } from "../../lib/charset.ts";
-import { ARTICLE_SYSTEM, parseDecision, parseSuggestions, samplePage } from "../../lib/articleFilter.ts";
+import { dataIdentity, assertDataIdentity } from "../../sync/storage.ts";
+import { ARTICLE_SYSTEM, classificationUrl, parseDecision, parseSuggestions } from "../../lib/articleFilter.ts";
 import { callMessages, extractJson, LlmError } from "../../lib/llm.ts";
 import { getLlmConfig } from "../../core/background/llm.ts";
 import { later, recordCall, recordFailure } from "../../background/llmLog.ts";
@@ -22,7 +21,7 @@ export interface FilterDeps {
 }
 const DEFAULT_DEPS: FilterDeps = { wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now: Date.now };
 
-/** request 是失败时留进诊断日志的现场：只留网址标题这类能认出是哪一页的，不留正文。 */
+/** request 是失败时留进诊断日志的现场：文章分类只留清理后的 URL，不留标题或正文。 */
 async function query(system: string, input: unknown, source: "articleFilter" | "blacklistSuggestion", request: LlmFailure["request"], deps: FilterDeps = DEFAULT_DEPS): Promise<unknown> {
   const identity = await dataIdentity();
   const saved = await getLlmConfig();
@@ -68,7 +67,8 @@ async function query(system: string, input: unknown, source: "articleFilter" | "
  * 被内容审核拒掉的页，一小时内再打开不再去问：拒答看的是内容，重发只会再被拒一次，还在诊断日志里多占一格
  * （日志里的拒答多是两两成对、隔几十秒）。放 storage.session：service worker 被回收了还在，浏览器关掉就没了。
  */
-const KEY_REFUSED = "articleRefused";
+// 不复用旧正文分类的拒答缓存，也不把原 URL 中的凭据、查询参数或片段留在新缓存里。
+const KEY_REFUSED = "articleUrlRefused";
 export const REFUSAL_TTL_MS = 60 * 60_000;
 const MAX_REFUSED = 50;
 type Refusals = Record<string, { until: number; reason: string }>;
@@ -96,19 +96,26 @@ async function rememberRefusal(url: string, reason: string, now: number): Promis
   }
 }
 
-export async function classifyPage(url: string, title: string, text: string, deps: FilterDeps = DEFAULT_DEPS) {
+export async function classifyPage(url: string, deps: FilterDeps = DEFAULT_DEPS) {
   if (isUrlExcluded(url, (await getSettings()).articleExcludedUrls)) {
     return { ok: true, isArticle: false, reason: "Matched the reading blocklist" };
   }
-  const earlier = await refusedEarlier(url, deps.now());
+  let cleanUrl: string;
+  try {
+    cleanUrl = classificationUrl(url);
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+  const earlier = await refusedEarlier(cleanUrl, deps.now());
   if (earlier) return { ok: false, reason: earlier };
   try {
-    const decision = parseDecision(await query(ARTICLE_SYSTEM, { url, title, text: samplePage(text) }, "articleFilter", { url, title }, deps));
+    const input = { url: cleanUrl };
+    const decision = parseDecision(await query(ARTICLE_SYSTEM, input, "articleFilter", input, deps));
     return { ok: true, ...decision };
   } catch (err) {
     if (err instanceof LlmError && err.kind === "refused") {
       const reason = `${err.message}; this page is not tracked`;
-      await rememberRefusal(url, reason, deps.now());
+      await rememberRefusal(cleanUrl, reason, deps.now());
       return { ok: false, reason };
     }
     return { ok: false, reason: "Article classification failed: " + (err instanceof Error ? err.message : String(err)) };
@@ -120,35 +127,10 @@ export async function classifyHistoryArticle(articleId: string): Promise<History
   const article = (await getArticles())[articleId];
   if (!article) return { ok: false, reason: "This record was deleted. Refresh the list." };
   try {
-    const stored = await localStorage().get([`t:${articleId}`, `rh:${articleId}`]);
-    const saved = (stored[`t:${articleId}`] as { text?: string } | undefined)?.text
-      || (stored[`rh:${articleId}`] as { html?: string } | undefined)?.html;
-    let text = saved?.trim() ?? "";
-    let source: "saved" | "fetched" = "saved";
-    if (!text) {
-      const url = new URL(article.url);
-      if (!/^https?:$/.test(url.protocol)) throw new Error("Article extraction is unavailable for this URL");
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20_000);
-      try {
-        const response = await fetch(url.href, { signal: controller.signal, credentials: "omit" });
-        if (!response.ok) throw new Error(`Article fetch failed (HTTP ${response.status})`);
-        const type = response.headers.get("content-type") ?? "";
-        if (type && !/text\/|application\/xhtml\+xml/i.test(type)) throw new Error("The URL did not return a text page");
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        text = decodeWith(bytes, pickCharset(type, bytes).charset).text;
-        // 移除脚本等无正文内容；保留标签以便模型辨别目录、链接和文章结构。
-        text = text.replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
-        source = "fetched";
-      } finally { clearTimeout(timeout); }
-    }
-    if (!text.trim()) throw new Error("No article text is available. The title alone is not enough to classify it reliably.");
-    const raw = await query(ARTICLE_SYSTEM + "\n如果文本是登录页、验证码、访问拒绝或加载占位页，无法确认原文类型，请输出 {\"unavailable\":true}，不要把抓取失败当成非文章。", {
-      url: article.url, title: article.title, text: samplePage(text), source,
-    }, "articleFilter", { url: article.url, title: article.title, source });
-    if ((raw as { unavailable?: boolean } | null)?.unavailable) throw new Error("The response is a sign-in, verification or loading page. Open the original page and try again.");
+    const input = { url: classificationUrl(article.url) };
+    const raw = await query(ARTICLE_SYSTEM, input, "articleFilter", input);
     const decision = parseDecision(raw);
-    return { ok: true, ...decision, source };
+    return { ok: true, ...decision, source: "url" };
   } catch (err) {
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }

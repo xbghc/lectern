@@ -225,7 +225,7 @@
     <a class="settings-back" href="dashboard.html">‹ Back to workspace</a>
     <h1>Preferences</h1>
     <p class="muted small">
-      Reading records are stored on this device and, when sync is enabled, on your configured server. <strong>After you consent, opened pages are sent to your model provider for article detection</strong> (except pages on your reading blocklist). <strong>Text translation sends the selected text and its surrounding paragraph to your model provider</strong>. It starts automatically only on sites in your translation allowlist; enable it manually from the popup elsewhere.
+      Reading records are stored on this device and, when sync is enabled, on your configured server. <strong>After you consent, only opened pages' URLs are sent to your model provider for article detection</strong>, with usernames, passwords, query strings and fragments removed (except pages on your reading blocklist). Page titles and text are not sent for detection. <strong>Text translation sends the selected text and its surrounding paragraph to your model provider</strong>. It starts automatically only on sites in your translation allowlist; enable it manually from the popup elsewhere.
     </p>
 
     <fieldset id="sync-settings" data-nav-group="Connections">
@@ -306,10 +306,10 @@
       </p>
       <ul>
         <li>
-          <strong>Automatically: </strong>The URL, title and page text (up to about 30,000 characters) of opened pages for article detection. Sites on your reading blocklist are excluded.
+          <strong>Automatically: </strong>Only the HTTP(S) URL of opened pages for article detection, with usernames, passwords, query strings and fragments removed. No page title or text is sent for detection. URL paths may still contain sensitive information. Sites on your reading blocklist are excluded.
         </li>
         <li>
-          <strong>When you use a feature: </strong>Text and screenshot translation, explanations, follow-up questions, vocabulary chat, article review, AI filtering and rule editing send the text involved in that action: selected text and its paragraph, chat messages and recent conversation, article titles or text, or rules and the current page URL.
+          <strong>When you use a feature: </strong>AI filtering of saved records also sends only cleaned URLs, without reading saved text or fetching pages. Text and screenshot translation, explanations, follow-up questions, vocabulary chat, article review, blocklist suggestions and rule editing send the material involved in that action: selected text and its paragraph, chat messages and recent conversation, article titles or text, or rules and page URLs.
         </li>
       </ul>
       <p class="muted small">

@@ -1,4 +1,3 @@
-import { samplePage } from "../../lib/articleFilter.ts";
 import type {
   Article,
   EndReason,
@@ -152,17 +151,13 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
     return idle("Matched the reading blocklist");
   }
 
-  const supplied = opts.extract?.();
   if (!opts.approvedArticle) opts.onClassifying?.();
   let pageLeft = false;
   const left = (): void => { pageLeft = true; };
   window.addEventListener("pagehide", left, { once: true });
   let decision: { ok: boolean; isArticle?: boolean; reason: string };
   try {
-    decision = opts.approvedArticle ? {ok:true,isArticle:true,reason:"Saved article"} : await chrome.runtime.sendMessage({ type: "article:classify", url: pageUrl,
-      title: supplied?.title || document.title,
-      text: samplePage(supplied ? supplied.paragraphs.map(p => p.text).join("\n\n") : (document.body?.innerText || document.body?.textContent || "")),
-    });
+    decision = opts.approvedArticle ? {ok:true,isArticle:true,reason:"Saved article"} : await chrome.runtime.sendMessage({ type: "article:classify", url: pageUrl });
   } catch { decision = { ok: false, reason: "Article classification failed. Reload and try again." }; }
   window.removeEventListener("pagehide", left);
   if (pageLeft) { stopWatchingInput(); return idle("Page left"); }
@@ -180,7 +175,7 @@ export async function startTracking(opts: TrackOptions): Promise<TrackController
       ? "Matched the reading blocklist" : decision?.reason || "Article classification failed. Reload and try again.");
   }
   // Readability 只负责正文定位，不再决定页面是否属于文章。
-  const article = supplied || await extractWithRetry(opts.signal)
+  const article = opts.extract?.() || await extractWithRetry(opts.signal)
     || (document.body ? extractFromContainer(document.body, document.title) : null);
   // 抽正文那几秒里页面可能又换了一篇。必须赶在 article:meta 之前：那条消息会替
   // 这个 articleId 建卡，慢一步就在**旧**那篇名下留一张没人读过的孤儿卡。

@@ -48,11 +48,13 @@ Update the catalog with `npm run providers:update`, review the diff, then commit
 
 ## Article detection and rules
 
-After consent and model setup, opened pages outside the **Reading blocklist** are sent to the model for classification. The request includes the URL, title and up to 30,000 characters of page text, sampling the beginning, middle and end for longer pages. Classification considers the content type, not quality, interest, word count or reading duration. Tracking begins only after an affirmative result. Readability locates the body text; it does not decide whether a page is an article.
+After consent and model setup, opened pages outside the **Reading blocklist** are classified using only their URL. Before sending, Lectern removes URL usernames, passwords, query strings and fragments. The model receives the remaining HTTP(S) URL, with no page title or text, and infers the page type from its domain and path. URL paths can still contain sensitive information; use the reading blocklist for sites you do not want classified. Classification requests and their failure diagnostics use the same cleaned URL.
+
+URL-only classification is less reliable for ambiguous paths or sites whose routes depend on query strings or fragments. An inconclusive answer leaves the page untracked; Lectern does not fall back to sending content or fetching the page for classification. Tracking and local body extraction begin only after an affirmative result. Readability locates the body text; it does not decide whether a page is an article.
 
 Network failures retry after 5 and 20 seconds. Content-policy refusals do not retry; the extension suppresses repeated requests for the same URL for one hour within its browser session. Errors appear in page status and diagnostics. Existing history is not deleted automatically.
 
-**AI filter** rechecks selected saved records and shows the result, reason and text source for each. When saved text is missing it may fetch the original URL. Fetch failures, login pages and model failures remain errors, rather than being treated as non-articles. You can stop new requests, retry failures and select non-articles, then explicitly delete selected records. Results last only for the current panel session.
+**AI filter** rechecks selected saved records using the same cleaned URL alone and labels the source as **URL only**. It does not read saved article text or fetch the original page. Inconclusive answers and model failures remain errors, rather than being treated as non-articles. You can stop new requests, retry failures and select non-articles, then explicitly delete selected records. Results last only for the current panel session.
 
 Bulk deletion removes the selected articles' sessions, paragraphs, positions, cached text, review material and article review cards, and recalculates reading speed. It preserves translations and vocabulary cards. Deletion propagates through sync and cannot be undone. To prevent future tracking, add a reading blocklist rule.
 

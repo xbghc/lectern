@@ -16,8 +16,8 @@ test("历史页选择筛选结果、建议经勾选采用、批量删除仅发�
   // 书架（App 才有）：扩展里这个键永远是空的，历史页据此不折叠任何东西
   g["chrome"] = { storage: { local: { get: async () => ({}) } }, runtime: { sendMessage: async (msg: typeof requests[number]) => {
     requests.push(msg);
-    if (msg.type === "article:classify-history" && msg.articleId === "locked" && lockedAttempts++ === 0) return { ok: false, reason: "HTTP 403" };
-    if (msg.type === "article:classify-history") return { ok: true, isArticle: msg.articleId !== "search", reason: "内容类型判断", source: "saved" };
+    if (msg.type === "article:classify-history" && msg.articleId === "locked" && lockedAttempts++ === 0) return { ok: false, reason: "The model timed out" };
+    if (msg.type === "article:classify-history") return { ok: true, isArticle: msg.articleId !== "search", reason: "URL 类型判断", source: "url" };
     if (msg.type === "articles:list") return { articles, speed: null };
     if (msg.type === "review:stats") return { dueNow: 0 };
     if (msg.type === "article:review-due") return { items: [], stats: { dueNow: 0 } };
@@ -37,6 +37,7 @@ test("历史页选择筛选结果、建议经勾选采用、批量删除仅发�
   assert.match(doc.getElementById("classification-progress")!.textContent!, /processed 3 \/ 3/);
   assert.equal(requests.some(r => r.type === "articles:delete"), false, "筛选不会自动删除");
   assert.match(doc.getElementById("classification-progress")!.textContent!, /failed: 1/);
+  assert.match(doc.body.textContent!, /Source: URL only/);
   (doc.getElementById("select-nonarticles") as HTMLButtonElement).click();
   assert.equal(doc.getElementById("selection-count")!.textContent, "Selected: 1");
   assert.equal((doc.querySelector('input[aria-label="Select essay"]') as HTMLInputElement).checked, false);

@@ -166,9 +166,8 @@ let returnPane: string | null = null;
 let bookContext: { book: Book; articleId: string; records: Article[] } | null = null;
 
 /**
- * 在不在手机上。全屏阅读只在这儿成立：在宿主里（这个 App 只装在手机上），或者窄屏——
- * 720px 是 app.css 里"手机"那道线，Storybook 的阅读器预览（390px 的 iframe）也就照着
- * 手机上真实的样子显示。宽屏浏览器里调试 www/ 时照旧留着顶栏。
+ * 手机包括原生宿主和窄屏预览；这里才隐藏系统栏并提供首次手势引导。
+ * 720px 与 app.css 的手机断点一致。宽屏也保留沉浸式排版，但不操作系统栏或显示手势引导。
  */
 function onPhone(): boolean {
   if (inApp()) return true;
@@ -286,7 +285,8 @@ async function main(): Promise<void> {
   $("reader-more").addEventListener("click", () => { full?.reveal(); tools.showModal(); });
   $("contents-close").addEventListener("click", () => contents.close());
   $("reader-tools-close").addEventListener("click", () => tools.close());
-  for (const dialog of [contents, tools, fontDialog]) dialog.addEventListener("close", () => full?.hide());
+  for (const dialog of [contents, tools]) dialog.addEventListener("close", () => full?.hide());
+  $("reader-font-close").addEventListener("click", () => full?.hide());
   $("reader-intro-done").addEventListener("click", () => intro.close());
   $("reader-gesture-help").addEventListener("click", () => { tools.close(); $("reader-intro-done").textContent = "Continue reading"; intro.showModal(); });
   intro.addEventListener("close", () => {
@@ -297,16 +297,15 @@ async function main(): Promise<void> {
   $("back").addEventListener("click", () => void leave());
   $("shot").addEventListener("click", () => { tools.close(); requestAnimationFrame(() => requestAnimationFrame(() => page?.get("translation")?.screenshot())); });
   // 全屏先进：正文还在抓的时候系统栏就该让开，不必等正文回来才挪一次位置
-  if (onPhone()) {
-    full = startFullscreen({
-      body: document.body,
-      bar: document.querySelector<HTMLElement>(".rbar")!,
-      article: $("article"),
-      toggle: $<HTMLButtonElement>("reader-toggle"),
-      host: window,
-      systemBars: systemBars(),
-    });
-  } else document.body.classList.remove("chrome-hidden");
+  full = startFullscreen({
+    body: document.body,
+    bar: document.querySelector<HTMLElement>(".rbar")!,
+    panel: fontDialog,
+    article: $("article"),
+    toggle: $<HTMLButtonElement>("reader-toggle"),
+    host: window,
+    systemBars: onPhone() ? systemBars() : undefined,
+  });
   $("translate-here").addEventListener("click", () => { page?.get("translation")?.translateHere(); renderMeta(url); });
 
   /* 本文生词那张单子的开合。返回键要先问它，所以在 beforeBack 之前就备好。 */
@@ -322,7 +321,7 @@ async function main(): Promise<void> {
   hostHooks.beforeBack = () => {
     if (cancelRegion()) return true;
     if (page?.get("translation")?.dismiss()) return true;
-    for (const dialog of [intro, fontDialog, tools]) if (dialog.open) { dialog.close(); return true; }
+    for (const dialog of [intro, tools]) if (dialog.open) { dialog.close(); return true; }
     if (contents.open) { contents.close(); return true; }
     // 单子开着时先收单子：手机上"返回"关掉的是最上面那一层，不是整个页面
     if (!sheet.hidden) {
@@ -414,7 +413,7 @@ async function main(): Promise<void> {
   const pageUrl = cached.finalUrl || url;
   const articleId = normalizeUrl(pageUrl);
   document.title = cached.title;
-  $("rtitle").textContent = book?.title || hostnameOf(pageUrl);
+  $("rtitle").textContent = cached.title;
   const box = $("article");
   const heading = el("h1", "atitle", cached.title);
   const byline = $("reader-source");
@@ -481,7 +480,7 @@ async function main(): Promise<void> {
 
   await setupReaderControls({ articleId, body, book, chapter: chapter?.index ?? null,
     openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")) });
-  if (full) {
+  if (onPhone()) {
     const saved = await chrome.storage.local.get('reader:gestures-shown').catch(() => ({ 'reader:gestures-shown': true }));
     if (!saved['reader:gestures-shown'] && document.visibilityState !== 'hidden') intro.showModal();
   }

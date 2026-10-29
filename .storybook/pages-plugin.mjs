@@ -13,7 +13,7 @@ export const pages = {
   appOptions: ['src/options/options.html', 'src/app/options.ts'],
 };
 const root = resolve(import.meta.dirname, '..');
-const cssFiles = { 'popup.css': 'src/popup/popup.css', 'dashboard.css': 'src/dashboard/dashboard.css', 'app.css': 'src/app/app.css', 'theme.css': 'src/ui/theme.css' };
+const cssFiles = { 'popup.css': 'src/popup/popup.css', 'dashboard.css': 'src/dashboard/dashboard.css', 'app.css': 'src/app/app.css', 'theme.css': 'src/ui/theme.css', 'reader.css': 'src/app/reader.css' };
 const script = text => `<script>${text.replace(/<\/script/gi, '<\\/script')}</script>`;
 
 /** Bundle the real page entry; only the platform boot and transport are replaced. */

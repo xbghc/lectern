@@ -8,26 +8,52 @@
     <link rel="stylesheet" href="popup.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="reader.css" />
   </head>
   <body class="reader chrome-hidden">
-    <button id="reader-toggle" class="reader-toggle" aria-controls="reader-toolbar" aria-expanded="false">Show reading tools</button>
-    <header id="reader-toolbar" class="rbar">
-      <button id="back" class="iconbtn" aria-label="Back"><span data-icon="back"></span></button>
-      <div class="rinfo"><div id="rtitle" class="rtitle">Opening…</div><div id="rmeta" class="rmeta"></div></div>
-      <button id="reader-font" class="iconbtn" aria-label="Adjust text size" aria-haspopup="dialog" aria-controls="reader-font-settings" disabled><span data-icon="type"></span></button>
-      <button id="reader-toc" class="iconbtn" aria-label="Open contents" title="Contents" aria-haspopup="dialog" aria-controls="reader-contents" hidden><span data-icon="list"></span></button>
-      <button id="reader-more" class="iconbtn" aria-label="Open reading tools" title="Reading tools" aria-haspopup="dialog" aria-controls="reader-tools"><span data-icon="more"></span></button>
-    </header>
+    <button id="reader-toggle" class="reader-toggle" aria-controls="reader-font-settings" aria-haspopup="dialog" aria-expanded="false">Show reading tools</button>
     <div id="reader-feedback" class="reader-feedback" role="status" aria-live="polite"></div>
     <main id="article" class="article"><p class="status">Fetching article…</p></main>
 
-    <div id="reader-progress" class="reader-progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="rprogress-fill"></span></div>
-    <dialog id="reader-font-settings" class="reader-contents reader-font-settings" aria-labelledby="reader-font-title">
-      <div class="reader-dialog-heading"><h2 id="reader-font-title">Text size</h2><button id="reader-font-close" class="iconbtn" aria-label="Close text size settings">×</button></div>
-      <div class="reader-font-stepper"><button id="reader-font-smaller" type="button" aria-label="Decrease text size">A−</button><output id="reader-font-value" aria-live="polite" aria-atomic="true">18 px</output><button id="reader-font-larger" type="button" aria-label="Increase text size">A+</button></div>
-      <p id="reader-font-preview" class="reader-font-preview">Keep your attention on the words you are reading.</p>
-      <button id="reader-font-reset" class="mini" type="button">Restore default · 18 px</button>
+    <dialog id="reader-font-settings" class="reader-settings" aria-labelledby="reader-font-title">
+    <h2 id="reader-font-title" class="visually-hidden" tabindex="-1" autofocus>Reading settings</h2>
+    <header id="reader-toolbar" class="rbar">
+      <button id="back" class="iconbtn" aria-label="Back to library"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
+      <div class="rinfo"><div id="rtitle" class="rtitle">Opening…</div><div id="rmeta" class="rmeta"></div></div>
+      <button id="reader-toc" class="iconbtn" aria-label="Open contents" title="Contents" aria-haspopup="dialog" aria-controls="reader-contents" hidden><span data-icon="list"></span></button>
+      <button id="reader-more" class="iconbtn" aria-label="Open reading tools" title="Reading tools" aria-haspopup="dialog" aria-controls="reader-tools"><span data-icon="more"></span></button>
+      <div id="reader-progress" class="reader-progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="rprogress-fill"></span></div>
+    </header>
+    <section class="reader-settings-panel" aria-label="Reading appearance">
+      <button id="reader-font-close" class="reader-panel-handle" type="button" aria-label="Close reading settings"><span></span></button>
+      <fieldset id="reader-preferences" disabled>
+        <div class="reader-setting-row">
+          <span id="reader-size-label" class="reader-setting-label">Size</span>
+          <button id="reader-font-smaller" class="reader-size-change" type="button" aria-label="Decrease text size">A</button>
+          <div id="reader-size-steps" class="reader-size-steps" role="group" aria-labelledby="reader-size-label"></div>
+          <button id="reader-font-larger" class="reader-size-change" type="button" aria-label="Increase text size">A</button>
+          <output id="reader-font-value" class="visually-hidden" aria-live="polite" aria-atomic="true">18 px</output>
+        </div>
+        <div class="reader-setting-row reader-theme-row">
+          <span id="reader-theme-label" class="reader-setting-label">Theme</span>
+          <div class="reader-themes" role="group" aria-labelledby="reader-theme-label">
+            <button type="button" data-reader-theme="auto" aria-label="Automatic background" aria-pressed="true"><span class="reader-swatch" aria-hidden="true"></span><span>Auto</span></button>
+            <button type="button" data-reader-theme="white" aria-label="White background" aria-pressed="false"><span class="reader-swatch" aria-hidden="true">Aa</span><span>White</span></button>
+            <button type="button" data-reader-theme="sepia" aria-label="Sepia background" aria-pressed="false"><span class="reader-swatch" aria-hidden="true">Aa</span><span>Sepia</span></button>
+            <button type="button" data-reader-theme="dark" aria-label="Dark background" aria-pressed="false"><span class="reader-swatch" aria-hidden="true">Aa</span><span>Dark</span></button>
+          </div>
+        </div>
+        <div class="reader-setting-row">
+          <span id="reader-face-label" class="reader-setting-label">Font</span>
+          <div class="reader-fonts" role="group" aria-labelledby="reader-face-label">
+            <button type="button" data-reader-font="serif" aria-pressed="true">Serif</button>
+            <button type="button" data-reader-font="sans" aria-pressed="false">Sans</button>
+            <button type="button" data-reader-font="kai" aria-pressed="false">Kai</button>
+          </div>
+        </div>
+      </fieldset>
       <p id="reader-font-status" class="muted small" role="status" aria-live="polite"></p>
+    </section>
     </dialog>
     <dialog id="reader-contents" class="reader-contents" aria-labelledby="contents-title"><div class="reader-dialog-heading"><h2 id="contents-title">Contents</h2><button id="contents-close" class="iconbtn" aria-label="Close table of contents">×</button></div>
       <p id="contents-book-title"></p><div class="reader-details"><span id="reader-location"></span></div>
@@ -42,8 +68,8 @@
     </dialog>
     <dialog id="reader-intro" class="reader-contents" aria-labelledby="reader-intro-title">
       <h2 id="reader-intro-title">Your screen is for reading</h2>
-      <p>Tap the space on either side of the text to show text size, contents and reading tools.</p>
-      <p>Scroll to hide the tools again. Text stays in the same place.</p>
+      <p>Tap the space on either side of the text to adjust size, background and font, or open contents and reading tools.</p>
+      <p>Tap the shaded area or the panel handle to return to reading. Text stays in the same place.</p>
       <p>Tap a word to translate it when translation is enabled, or press and hold to select text.</p>
       <button id="reader-intro-done" class="primary">Start reading</button>
     </dialog>

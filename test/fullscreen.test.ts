@@ -143,3 +143,32 @@ test("老宿主没有系统栏桥时仍可用留白调出工具", () => {
   click(article);
   assert.equal(hidden(), false);
 });
+
+test("设置面板保持排版调整后的打开状态，遮罩和取消键都收起顶栏与面板", () => {
+  full.stop();
+  const doc = body.ownerDocument;
+  const panel = doc.createElement('dialog');
+  const close = doc.createElement('button');
+  panel.append(close); body.append(panel);
+  panel.showModal = () => { panel.open = true; };
+  panel.close = () => { panel.open = false; panel.dispatchEvent(new dom.window.Event('close')); };
+  full = startFullscreen({ body, bar, panel, article, toggle, host });
+  try {
+    click(article);
+    assert.equal(panel.open, true);
+    close.focus();
+    host.scrollTo(400);
+    assert.equal(panel.open, true, 'preserving the paragraph during reflow must not close settings');
+    panel.dispatchEvent(new dom.window.Event('cancel', { cancelable: true }));
+    assert.equal(panel.open, false);
+    assert.equal(hidden(), true);
+    assert.equal(doc.activeElement, toggle);
+    full.reveal();
+    click(panel);
+    assert.equal(panel.open, false);
+    assert.equal(hidden(), true);
+    full.reveal();
+    panel.close();
+    assert.equal(full.shown(), false);
+  } finally { full.stop(); panel.remove(); }
+});

@@ -28,8 +28,8 @@ Category: Productivity / Tools, where available.
 Lectern brings your reading tools together in a calm workspace.
 
 • Reading progress: identify article pages, track focus time and paragraphs read, and return to where you stopped.
-• Context-aware translation: select English text for a translation, usage notes and explanations of unfamiliar words.
-• Screenshot translation: select text in an image; text recognition runs locally before the recognized text is translated.
+• Context-aware translation: select English or Classical Chinese text for a modern Chinese translation and explanations of unfamiliar words, classical meanings and grammar.
+• Screenshot translation: select English or simplified/traditional Chinese text in an image; text recognition runs locally before the recognized text is translated. Check the recognized text for OCR errors.
 • Spaced review: turn looked-up words into vocabulary cards scheduled with FSRS.
 • Vocabulary practice: use words you have read in explanations, sentence practice and short AI conversations.
 • Optional device sync: connect to a server you operate or trust to merge records across computers and the Android app.
@@ -76,8 +76,8 @@ A model-provider API key is required for AI features.
 1. The settings page opens after installation. In Model, choose a provider, enter its API key and select a model. Protocol, endpoint and limits are under Advanced connection settings.
 2. Read the sharing notice and choose “Save changes and agree” (or “Agree and start” when the configuration is already saved). Click “Test connection.” Later changes can be applied with “Save changes and test”; the global “Save” button also saves model configuration without making a test request.
 3. Open an English article, such as https://en.wikipedia.org/wiki/Reading. The popup shows reading progress after article detection.
-4. In the popup's Translate tab, enable translation for this page. Select English text to view its translation and notes.
-5. Alt+Shift+S starts screenshot translation; select a region containing English text.
+4. In the popup's Translate tab, enable translation for this page. Select English text or a Classical Chinese passage to view its modern Chinese translation and notes. A single Chinese character can also be selected for a contextual meaning.
+5. Alt+Shift+S starts screenshot translation; select a region containing English or simplified/traditional Chinese text.
 6. Open Vocabulary and Review to inspect saved words and review cards.
 Sync is optional and disabled by default. AI explanations may be Chinese even though the interface is English.
 ```

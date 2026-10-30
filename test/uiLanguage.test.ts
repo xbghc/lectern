@@ -17,7 +17,11 @@ test("static interface text and accessible labels are English", () => {
       assert.equal(doc.documentElement.lang, "en", String(file));
       doc.querySelectorAll("script, style").forEach(el => el.remove());
       const walker = doc.createTreeWalker(doc, dom.window.NodeFilter.SHOW_TEXT);
-      while (walker.nextNode()) assert.equal(han.test(walker.currentNode.textContent ?? ""), false, `${file}: ${walker.currentNode.textContent}`);
+      while (walker.nextNode()) {
+        // Native font names double as glyph previews; the surrounding interface and labels stay English.
+        if (String(file) === 'app/read.html' && walker.currentNode.parentElement?.closest('.reader-fonts[lang="zh"]')) continue;
+        assert.equal(han.test(walker.currentNode.textContent ?? ""), false, `${file}: ${walker.currentNode.textContent}`);
+      }
       for (const el of doc.querySelectorAll("*")) {
         for (const name of ["title", "aria-label", "placeholder", "alt", "data-nav-group"]) {
           assert.equal(han.test(el.getAttribute(name) ?? ""), false, `${file}: ${name}`);

@@ -107,6 +107,7 @@ export function bindTapTranslation(root: HTMLElement, translate: (range: Range, 
   let pending: { x: number; y: number; time: number; range: Range; timing: TranslationInputTiming; timer: ReturnType<typeof setTimeout> } | null = null;
   /** 关掉浮层的那一下在哪、什么时候抬的指。 */
   let closed: { x: number; y: number; time: number } | null = null;
+  const selecting = (): boolean => root.ownerDocument.getSelection()?.isCollapsed === false;
   const cancel = (): void => {
     down = null;
     if (pending) clearTimeout(pending.timer);
@@ -117,7 +118,7 @@ export function bindTapTranslation(root: HTMLElement, translate: (range: Range, 
     const followUp = closed !== null && now - closed.time <= DOUBLE_TAP_MS &&
       Math.hypot(e.clientX - closed.x, e.clientY - closed.y) <= DOUBLE_TAP_PX;
     closed = null;
-    if (!e.isPrimary || e.button !== 0 || followUp) { cancel(); return; }
+    if (!e.isPrimary || e.button !== 0 || followUp || selecting()) { cancel(); return; }
     // 链接、按钮、输入框：不点词，先前等着的单词也作废；手势照记，浮层开着时这一下同样先关浮层
     const interactive = (e.target as Element).closest(INTERACTIVE) !== null;
     if (interactive) cancel();
@@ -133,6 +134,7 @@ export function bindTapTranslation(root: HTMLElement, translate: (range: Range, 
     const gesture = down;
     down = null;
     if (!gesture || gesture.id !== e.pointerId) return;
+    if (selecting()) { cancel(); return; }
     if (Date.now() - gesture.time > 500 || Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > MOVE_PX) { cancel(); return; }
     if (dismiss()) {
       cancel();
@@ -156,7 +158,7 @@ export function bindTapTranslation(root: HTMLElement, translate: (range: Range, 
     pending = { x: e.clientX, y: e.clientY, time: Date.now(), range, timing,
       timer: setTimeout(() => {
         pending = null;
-        if (root.isConnected && root.contains(range.startContainer)) translate(range, "word", { ...timing, debounceEnded: performance.now() });
+        if (!selecting() && root.isConnected && root.contains(range.startContainer)) translate(range, "word", { ...timing, debounceEnded: performance.now() });
       }, DOUBLE_TAP_MS),
     };
   };

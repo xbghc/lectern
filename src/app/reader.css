@@ -10,7 +10,9 @@ body.reader {
   --reader-segment: #ffffff;
   --reader-serif: "Source Serif 4", "Noto Serif SC", "Songti SC", "Noto Serif CJK SC", SimSun, serif;
   --reader-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --reader-kai: "Kaiti SC", STKaiti, KaiTi, "Noto Serif CJK SC", cursive;
+  --reader-kai: "Kaiti SC", STKaiti, KaiTi, "Noto Serif CJK SC", serif;
+  --reader-mono: ui-monospace, "Roboto Mono", "Droid Sans Mono", Menlo, Consolas, monospace;
+  --reader-chinese-family: "Noto Serif SC", "Songti SC", "Noto Serif CJK SC", SimSun, serif;
   --reader-font-family: var(--reader-serif);
   --bg: var(--background);
   --fg: var(--foreground);
@@ -67,8 +69,15 @@ body.reader[data-reader-theme="dark"] {
     color-scheme: dark;
   }
 }
-body.reader[data-reader-font="sans"] { --reader-font-family: var(--reader-sans); }
-body.reader[data-reader-font="kai"] { --reader-font-family: var(--reader-kai); }
+body.reader[data-reader-english="sans"] { --reader-font-family: system-ui, sans-serif; }
+body.reader[data-reader-english="mono"] { --reader-font-family: var(--reader-mono); }
+body.reader[data-reader-chinese="sans"] { --reader-chinese-family: var(--reader-sans); }
+body.reader[data-reader-chinese="kai"] { --reader-chinese-family: var(--reader-kai); }
+body.reader .article [data-reader-script="zh"] { font-family: var(--reader-chinese-family); }
+/* Translation's close button restores focus to .body (tabindex=-1). Chromium's
+ * default focus outline then frames the whole article. Keep focus for keyboard
+ * and screen readers, but only interactive controls need a visible focus ring. */
+body.reader .article .body:focus { outline: none; }
 body.reader .visually-hidden {
   position: absolute;
   width: 1px;
@@ -169,7 +178,7 @@ body.reader .reader-panel-handle {
 .reader-panel-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--border); }
 .reader-settings-panel fieldset { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .reader-setting-row { display: flex; align-items: center; gap: 8px; min-height: 52px; }
-.reader-setting-label { width: 44px; flex: 0 0 44px; color: var(--muted-foreground); }
+.reader-setting-label { width: 48px; flex: 0 0 48px; color: var(--muted-foreground); }
 .reader-settings-panel button { border: 0; box-shadow: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .reader-settings-panel button:disabled { cursor: default; opacity: .4; }
 body.reader .reader-size-change { flex: 0 0 44px; min-width: 44px; min-height: 44px; padding: 0; background: transparent; color: var(--foreground); font: 14px var(--reader-sans); }
@@ -195,6 +204,7 @@ body.reader .reader-fonts button { min-width: 0; height: 38px; min-height: 38px;
 .reader-fonts [data-reader-font="serif"] { font-family: var(--reader-serif); }
 .reader-fonts [data-reader-font="sans"] { font-family: var(--reader-sans); }
 .reader-fonts [data-reader-font="kai"] { font-family: var(--reader-kai); }
+.reader-fonts [data-reader-font="mono"] { font-family: var(--reader-mono); }
 body.reader .reader-fonts button[aria-pressed="true"] { background: var(--reader-segment); color: var(--foreground); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
 .reader-settings button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .reader-settings-panel #reader-font-status { margin: 8px 0 0; background: transparent; }

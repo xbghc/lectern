@@ -1,15 +1,14 @@
 import { icon, decorateIcons } from '../ui/icons.ts';
 import { chapterId, type Book } from '../books/types.ts';
 import { createUiTracker } from '../lib/uiUsage.ts';
+import { ENGLISH_FONT_KEY, CHINESE_FONT_KEY, LEGACY_FONT_KEY, readerFonts, prepareReaderTypography, type EnglishFont, type ChineseFont } from './readerTypography.ts';
 
 const FONT_KEY = 'reader:font-size';
 const THEME_KEY = 'reader:theme';
-const FACE_KEY = 'reader:font-family';
 const BOOKMARK_PREFIX = 'reader:bookmark:';
 export const FONT_SIZES = [15, 16, 17, 18, 20, 22, 24] as const;
 const DEFAULT_SIZE = 18;
 type ReaderTheme = 'auto' | 'white' | 'sepia' | 'dark';
-type ReaderFont = 'serif' | 'sans' | 'kai';
 interface Bookmark { ratio: number; savedTs: number; paragraph?: number; offset?: number }
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
 export function scrollRatio(top: number, height: number, viewport: number): number {
@@ -38,7 +37,11 @@ export async function setupReaderControls(options: {
   const fontStatus = doc.getElementById('reader-font-status')!;
   const jump = doc.getElementById('bookmark-jump') as HTMLButtonElement;
   const key = BOOKMARK_PREFIX + articleId;
-  let size = DEFAULT_SIZE, theme: ReaderTheme = 'auto', face: ReaderFont = 'serif', mark: Bookmark | null = null;
+  let size = DEFAULT_SIZE, theme: ReaderTheme = 'auto', mark: Bookmark | null = null;
+  let english: EnglishFont = 'serif', chinese: ChineseFont = 'serif';
+  prepareReaderTypography(body);
+  const title = doc.querySelector<HTMLElement>('.article h1.atitle');
+  if (title) prepareReaderTypography(title);
   let busy = false;
   let preferenceSaves = Promise.resolve();
   let saveRevision = 0;
@@ -66,7 +69,8 @@ export async function setupReaderControls(options: {
     style.setProperty('--reader-paragraph-gap', `${Math.round(size * .55)}px`);
     style.colorScheme = theme === 'auto' ? 'light dark' : theme === 'dark' ? 'dark' : 'light';
     doc.body.dataset.readerTheme = theme;
-    doc.body.dataset.readerFont = face;
+    doc.body.dataset.readerEnglish = english;
+    doc.body.dataset.readerChinese = chinese;
     doc.getElementById('reader-font-value')!.textContent = `${size} px`;
     smaller.disabled = index === 0;
     larger.disabled = index === FONT_SIZES.length - 1;
@@ -75,7 +79,7 @@ export async function setupReaderControls(options: {
       button.classList.toggle('is-filled', i <= index);
     }
     for (const button of themes) button.setAttribute('aria-pressed', String(button.dataset.readerTheme === theme));
-    for (const button of fonts) button.setAttribute('aria-pressed', String(button.dataset.readerFont === face));
+    for (const button of fonts) button.setAttribute('aria-pressed', String(button.dataset.readerFont === (button.dataset.readerLanguage === 'en' ? english : chinese)));
     markButton.setAttribute('aria-pressed', String(!!mark));
     markButton.setAttribute('aria-label', mark ? "Remove reading bookmark" : "Add reading bookmark");
     markButton.classList.toggle('bookmarked', !!mark);
@@ -84,20 +88,20 @@ export async function setupReaderControls(options: {
     if (mark) jump.textContent = `Go to bookmark · ${Math.round(mark.ratio * 100)}%`;
   };
   // Optional preferences must not prevent the article and its tracker from opening.
-  const saved = await chrome.storage.local.get([FONT_KEY, THEME_KEY, FACE_KEY, key]).catch(() => {
+  const saved = await chrome.storage.local.get([FONT_KEY, THEME_KEY, LEGACY_FONT_KEY, ENGLISH_FONT_KEY, CHINESE_FONT_KEY, key]).catch(() => {
     fontStatus.textContent = "Could not load reading preferences. Using the defaults.";
     return {} as Record<string, unknown>;
   });
   size = fontSize(saved[FONT_KEY]);
   if (['white', 'sepia', 'dark'].includes(saved[THEME_KEY] as string)) theme = saved[THEME_KEY] as ReaderTheme;
-  if (['sans', 'kai'].includes(saved[FACE_KEY] as string)) face = saved[FACE_KEY] as ReaderFont;
+  ({ english, chinese } = readerFonts(saved));
   const raw = saved[key] as Partial<Bookmark> | undefined;
   if (typeof raw?.ratio === 'number' && Number.isFinite(raw.ratio)) mark = { ratio: clamp(raw.ratio), savedTs: raw.savedTs ?? 0,
     ...(Number.isInteger(raw.paragraph) && raw.paragraph! >= 0 && typeof raw.offset === 'number' && Number.isFinite(raw.offset) ? { paragraph: raw.paragraph, offset: raw.offset } : {}) };
   paint(); preferences.disabled = markButton.disabled = false;
   const save = (): void => {
     const revision = ++saveRevision;
-    const snapshot = { [FONT_KEY]: size, [THEME_KEY]: theme, [FACE_KEY]: face };
+    const snapshot = { [FONT_KEY]: size, [THEME_KEY]: theme, [ENGLISH_FONT_KEY]: english, [CHINESE_FONT_KEY]: chinese };
     fontStatus.textContent = '';
     preferenceSaves = preferenceSaves.then(() => chrome.storage.local.set(snapshot)).then(() => {
       if (revision === saveRevision) fontStatus.textContent = '';
@@ -128,8 +132,11 @@ export async function setupReaderControls(options: {
     save();
   });
   for (const button of fonts) button.addEventListener('click', () => {
-    const next = button.dataset.readerFont as ReaderFont;
-    if (face !== next) { reflow(() => { face = next; }); tracker.track('reader.font'); }
+    reflow(() => {
+      if (button.dataset.readerLanguage === 'en') english = button.dataset.readerFont as EnglishFont;
+      else chinese = button.dataset.readerFont as ChineseFont;
+    });
+    tracker.track('reader.font');
     save();
   });
   markButton.addEventListener('click', () => {

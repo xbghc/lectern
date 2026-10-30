@@ -298,10 +298,11 @@ async function importBook(uri?: string): Promise<void> {
     const handle = await openEpub(picked.uri);
     try {
       const existing = await getBook(handle.hash);
-      const book = existing ?? await importEpub(
+      const hasCover = existing?.coverHash ? !!await cachedBlob(existing.coverHash).catch(() => undefined) : false;
+      const imported = existing && hasCover ? existing : await importEpub(
         { names: handle.names, bytes: handle.bytes },
         handle.hash,
-        picked.name || "Untitled book.epub",
+        picked.name || existing?.fileName || "Untitled book.epub",
         {
           parse: (text, mime) => new DOMParser().parseFromString(text, mime),
           doc: document,
@@ -310,10 +311,10 @@ async function importBook(uri?: string): Promise<void> {
           onProgress: (done, total) => say(`Importing…${done}/${quantity(total, "chapter")}`),
         },
       );
-      if (!existing) await saveBook(book);
+      const book = imported === existing ? existing : await saveBook(imported);
       openBookId = book.id;
       await renderBooks();
-      say(existing ? `“${book.title}” is already on your bookshelf` : `“${book.title}” imported: ${quantity(book.chapters.length, "chapter")}`);
+      say(existing ? !hasCover && book.coverHash ? `Cover restored for “${book.title}”` : `“${book.title}” is already on your bookshelf` : `“${book.title}” imported: ${quantity(book.chapters.length, "chapter")}`);
     } finally {
       handle.close();
     }

@@ -44,14 +44,23 @@
           </div>
         </div>
         <div class="reader-setting-row">
-          <span id="reader-face-label" class="reader-setting-label">Font</span>
-          <div class="reader-fonts" role="group" aria-labelledby="reader-face-label">
-            <button type="button" data-reader-font="serif" aria-pressed="true">Serif</button>
-            <button type="button" data-reader-font="sans" aria-pressed="false">Sans</button>
-            <button type="button" data-reader-font="kai" aria-pressed="false">Kai</button>
+          <span id="reader-english-label" class="reader-setting-label">English</span>
+          <div class="reader-fonts" role="group" aria-labelledby="reader-english-label">
+            <button type="button" data-reader-language="en" data-reader-font="serif" aria-pressed="true">Serif</button>
+            <button type="button" data-reader-language="en" data-reader-font="sans" aria-pressed="false">Sans</button>
+            <button type="button" data-reader-language="en" data-reader-font="mono" aria-pressed="false">Mono</button>
+          </div>
+        </div>
+        <div class="reader-setting-row">
+          <span id="reader-chinese-label" class="reader-setting-label">Chinese</span>
+          <div class="reader-fonts" role="group" aria-labelledby="reader-chinese-label" lang="zh">
+            <button type="button" data-reader-language="zh" data-reader-font="serif" aria-label="Chinese Songti font" aria-pressed="true">宋体</button>
+            <button type="button" data-reader-language="zh" data-reader-font="sans" aria-label="Chinese Heiti font" aria-pressed="false">黑体</button>
+            <button type="button" data-reader-language="zh" data-reader-font="kai" aria-label="Chinese Kaiti font" aria-pressed="false">楷体</button>
           </div>
         </div>
       </fieldset>
+      <p class="muted small">Chinese fonts use the fonts available on your device.</p>
       <p id="reader-font-status" class="muted small" role="status" aria-live="polite"></p>
     </section>
     </dialog>

@@ -28,9 +28,20 @@ export async function getBook(id: string): Promise<Book | null> {
   return (await read())[id] ?? null;
 }
 
-export async function saveBook(book: Book): Promise<void> {
+export async function saveBook(book: Book): Promise<Book> {
   if (!BOOK_ID.test(book.id)) throw new Error("Invalid book identifier");
-  await localStorage().set({ [BOOKS_KEY]: { ...(await read()), [book.id]: book } });
+  return serialize(async () => {
+    const books = await read();
+    const previous = books[book.id];
+    // Re-importing an identical EPUB repairs its cover without replacing its
+    // existing bookshelf metadata or any chapter reading records.
+    const saved = previous ? { ...previous,
+      ...(book.coverHash ? { coverHash: book.coverHash } : {}),
+      resources: [...new Set([...previous.resources, ...book.resources])],
+    } : book;
+    await localStorage().set({ [BOOKS_KEY]: { ...books, [book.id]: saved } });
+    return saved;
+  });
 }
 
 /** 正文与图片都存本机，没有网络这一步；写完才算导入成功。 */

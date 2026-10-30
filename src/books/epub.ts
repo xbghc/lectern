@@ -68,6 +68,9 @@ export interface EpubPackage {
   navHref: string | null;
   ncxHref: string | null;
   coverHref: string | null;
+  guideCoverHref: string | null;
+  /** Older producers sometimes identify the cover only by its manifest id. */
+  namedCoverHrefs: string[];
 }
 
 /** OPF：元信息、manifest（有什么文件）、spine（正文按什么顺序读）。 */
@@ -108,6 +111,7 @@ export function parsePackage(opfXml: string, opfPath: string, parse: ParseXml): 
     [...items.values()].find(i => i.properties.split(/\s+/).includes(name))?.href ?? null;
   const ncxFromSpine = items.get(tags(doc, "spine")[0]?.getAttribute("toc") ?? "")?.href ?? null;
   const coverMeta = tags(doc, "meta").find(m => m.getAttribute("name") === "cover")?.getAttribute("content");
+  const guideCover = tags(doc, "reference").find(el => (el.getAttribute("type") ?? '').split(/\s+/).includes('cover'))?.getAttribute('href');
 
   return {
     title: dc("title"),
@@ -118,7 +122,19 @@ export function parsePackage(opfXml: string, opfPath: string, parse: ParseXml): 
     navHref: byProperty("nav"),
     ncxHref: ncxFromSpine ?? [...items.values()].find(i => i.mediaType === "application/x-dtbncx+xml")?.href ?? null,
     coverHref: byProperty("cover-image") ?? (coverMeta ? items.get(coverMeta)?.href ?? null : null),
+    guideCoverHref: guideCover ? resolvePath(opfPath, guideCover) : null,
+    namedCoverHrefs: [...items].filter(([id]) => /^(?:cover|cover[-_]?image|cover[-_]?page)$/i.test(id)).map(([, item]) => item.href),
   };
+}
+
+/** EPUB 3 navigation can identify a cover page in its landmarks list. */
+export function navigationCover(source: string, path: string, parse: ParseXml): string | null {
+  try {
+    const doc = parsed(source, 'text/html', parse);
+    const link = tags(doc, 'a').find(el => (el.getAttribute('epub:type') ?? el.getAttribute('type') ?? '').split(/\s+/).includes('cover'));
+    const href = link?.getAttribute('href');
+    return href ? resolvePath(path, href) : null;
+  } catch { return null; }
 }
 
 /**

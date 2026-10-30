@@ -195,7 +195,7 @@ body.reader .reader-size-steps button { position: relative; flex: 1; min-width: 
 .reader-size-steps button[aria-pressed="true"] span { width: 16px; height: 16px; }
 .reader-theme-row { min-height: 64px; }
 .reader-themes { flex: 1; min-width: 0; display: flex; justify-content: space-between; padding: 0 8px; }
-body.reader .reader-themes button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 36px; min-height: 56px; padding: 0; background: transparent; color: var(--muted-foreground); font: 11px/1.4 var(--reader-sans); }
+body.reader .reader-themes button { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 48px; padding: 0; background: transparent; color: var(--muted-foreground); font: 11px/1.4 var(--reader-sans); }
 .reader-swatch { display: grid; place-items: center; box-sizing: border-box; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 50%; font: 13px var(--reader-serif); }
 [data-reader-theme="auto"] > .reader-swatch { background: linear-gradient(135deg, #fbfaf7 50%, #141414 50%); }
 [data-reader-theme="white"] > .reader-swatch { background: #ffffff; color: #1f1f1f; }
@@ -212,6 +212,8 @@ body.reader .reader-fonts button { min-width: 0; height: 38px; min-height: 38px;
 body.reader .reader-fonts [data-reader-font="literata"] { font-family: var(--reader-literata); font-size: 13px; }
 .reader-fonts [data-reader-font="wenkai"] { font-family: var(--reader-wenkai); }
 body.reader .reader-fonts button[aria-pressed="true"] { background: var(--reader-segment); color: var(--foreground); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+body.reader .reader-bookmark-actions { display:flex; align-items:center; gap:8px; }
+body.reader .reader-bookmark-actions #reader-bookmark { width:48px; min-height:48px; padding:0; flex:none; justify-content:center; }
 .reader-settings button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .reader-settings-panel #reader-font-status { margin: 8px 0 0; background: transparent; }
 @media (min-width: 721px) {

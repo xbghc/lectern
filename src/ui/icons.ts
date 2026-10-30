@@ -23,6 +23,10 @@ const paths = {
   back: '<path d="m14 5-7 7 7 7M7 12h14"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
+  filter: '<path d="M4 6h16M7 12h10m-7 6h4"/>',
+  select: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>',
+  trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
+  close: '<path d="m6 6 12 12M18 6 6 18"/>',
 } as const;
 export type IconName = keyof typeof paths;
 export function icon(name: IconName): SVGSVGElement {
@@ -40,4 +44,13 @@ export function decorateIcons(root: ParentNode = document): void {
     const name = node.dataset.icon as IconName;
     if (name in paths) node.replaceChildren(icon(name));
   }
+}
+
+/** Icon actions always retain a name for touch, keyboard and screen-reader users. */
+export function iconButton(name: IconName, label: string, className = 'icon-btn'): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = className;
+  button.title = label; button.setAttribute('aria-label', label);
+  button.append(icon(name));
+  return button;
 }

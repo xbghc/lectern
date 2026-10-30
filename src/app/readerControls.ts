@@ -54,6 +54,7 @@ export async function setupReaderControls(options: {
     const button = doc.createElement('button');
     button.type = 'button'; button.dataset.size = String(value);
     button.setAttribute('aria-label', `Text size ${value}`);
+    button.title = `Text size ${value}`;
     button.append(doc.createElement('span'));
     doc.getElementById('reader-size-steps')!.append(button);
     return button;
@@ -82,6 +83,7 @@ export async function setupReaderControls(options: {
     for (const button of fonts) button.setAttribute('aria-pressed', String(button.dataset.readerFont === (button.dataset.readerLanguage === 'en' ? english : chinese)));
     markButton.setAttribute('aria-pressed', String(!!mark));
     markButton.setAttribute('aria-label', mark ? "Remove reading bookmark" : "Add reading bookmark");
+    markButton.title = mark ? "Remove reading bookmark" : "Add reading bookmark";
     markButton.classList.toggle('bookmarked', !!mark);
     doc.getElementById('reader-bookmark-label')!.textContent = mark ? 'Remove bookmark' : 'Add bookmark here';
     jump.hidden = !mark;

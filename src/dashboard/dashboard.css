@@ -511,6 +511,13 @@ header.app-sidebar {
 }
 #workspace-title {
   color: var(--fg);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.workspace-actions { display: flex; align-items: center; gap: 8px; }
+@media (min-width: 721px) {
+  #pane-articles > .reading-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .dashboard-main {
   max-width: 1480px;
@@ -822,7 +829,7 @@ header.app-sidebar {
   border-bottom: 1px solid var(--line);
   padding-bottom: 10px;
   margin-bottom: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 44px;
   gap: 12px;
 }
 .filterbar {
@@ -850,6 +857,8 @@ header.app-sidebar {
   font-size: 11px;
   background: none;
 }
+.article-controls #manage-articles { width: 44px; height: 44px; padding: 0; }
+#article-action-status:empty { display: none; }
 #articles {
   gap: 0;
   margin-top: 0;

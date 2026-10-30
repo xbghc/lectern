@@ -117,6 +117,8 @@ function show(pane: Pane, load = true): void {
     $("workspace-search").hidden = pane !== "articles";
     $("words-chat").hidden = pane !== "words";
   }
+  if ($("import-book")) $("import-book").hidden = pane !== "books" || $("import-book").dataset.available !== "true";
+  if (!document.body.classList.contains("app") && $("add-article")) $("add-article").hidden = pane !== "articles";
   document.body.dataset.pane = pane;
   if (document.body.classList.contains("app") && ["articles", "books", "words"].includes(pane)) {
     try { window.sessionStorage.setItem("lectern:home-pane", pane); } catch { /* Reading remains usable without browser preferences. */ }
@@ -350,7 +352,14 @@ function renderArticles(): void {
    */
   const shelved = (a: Article): boolean => Boolean(books[parseChapterId(a.id)?.bookId ?? ""]);
   const loose = articles.filter((a) => !shelved(a));
-  const queueOnly = document.body.classList.contains("app") && !$<HTMLDetailsElement>("article-tools")?.open && !q && !managingArticles;
+  const queueOnly = document.body.classList.contains("app") && !$<HTMLDetailsElement>("article-tools")?.open && !q && !filter && !managingArticles;
+  if ($("reading-queue-title")) $("reading-queue-title").textContent = queueOnly ? "Read next" : "Articles";
+  const toolsToggle = $("article-tools-toggle");
+  if (toolsToggle) {
+    toolsToggle.dataset.filtered = String(!!q || !!filter);
+    toolsToggle.title = `Filter and manage articles${q || filter ? " (filters active)" : ""}`;
+    toolsToggle.setAttribute("aria-label", toolsToggle.title);
+  }
   const list = loose.filter((a) => {
     if (queueOnly && (a.finished || a.id === document.body.dataset.resumeArticle)) return false;
     if (filter === "done" && !a.finished) return false;
@@ -361,17 +370,13 @@ function renderArticles(): void {
 
   visibleArticles = list;
   updateArticleSelection();
-  const done = loose.filter((a) => a.finished).length;
-  const chapters = articles.length - loose.length;
-  $("article-summary").textContent = `Articles: ${loose.length} · Finished: ${done}`
-    // 筛过之后说一声剩几篇：三个键和搜索框叠着用的时候，光看列表分不清是筛没了还是本来就没有
-    + (list.length !== loose.length ? ` · Showing ${list.length}` : "")
-    + (chapters > 0 ? ` · Also ${quantity(chapters, "chapter")} on your bookshelf` : "");
+  const done = list.filter((a) => a.finished).length;
+  $("article-summary").textContent = `${quantity(list.length, "article")}${!filter && done ? ` · ${done} finished` : ""}`;
 
   const box = $("articles");
   box.textContent = "";
   if (list.length === 0) {
-    box.append(el("div", "empty", loose.length ? "No matching articles" : "No reading history yet. Read an article for a while and it will appear here."));
+    box.append(el("div", "empty", loose.length ? queueOnly ? "You're all caught up" : "No matching articles" : document.body.classList.contains("app") ? "Add an article to start reading" : "No reading history yet. Read an article for a while and it will appear here."));
     return;
   }
 
@@ -441,7 +446,8 @@ function renderArticles(): void {
       void loadMaterialDetail(a.id);
     });
     const menu = el("details", "article-menu");
-    const menuToggle = tracked(el("summary", undefined, "•••"), "articles.menu");
+    const menuToggle = tracked(el("summary"), "articles.menu");
+    menuToggle.append(icon("more")); menuToggle.title = "Article actions";
     menuToggle.setAttribute("aria-label", `Article actions: ${a.title || a.url}`);
     const menuBody = el("div", "article-menu-body");
     menuBody.append(more); menu.append(menuToggle, menuBody); row.append(menu);
@@ -460,14 +466,14 @@ function renderArticles(): void {
       el("span", undefined, `${a.wordsRead} / ${quantity(a.trackedWords, "word")}`),
       el("span", undefined, formatDuration(a.totalMs)),
       el("span", undefined, `${quantity(a.sessionCount, "focus session")}`),
-      el("span", undefined, `Last read: ${fmtDate(a.lastSeenTs)}`),
+      el("span", undefined, fmtDate(a.lastSeenTs)),
     );
     if (!a.reachedBottom && !a.finished) sub.append(el("span", undefined, "End not reached"));
     // 没读完的说一句还需多久；依据挂在 title 上，悬停可见
     if (!a.finished) {
       const left = estimateArticle(a, speed);
       if (left && left.words > 0) {
-        const span = el("span", undefined, "Remaining: " + formatEstimate(left.ms));
+        const span = el("span", undefined, formatEstimate(left.ms) + " left");
         span.title = describeBasis(left);
         sub.append(span);
       }
@@ -562,9 +568,12 @@ function updateArticleSelection(): void {
   $("article-actions").hidden = !managingArticles;
   $("article-actions").inert = !managingArticles;
   $("pane-articles").classList.toggle("managing-articles", managingArticles);
-  $("manage-articles").textContent = managingArticles ? "Done" : "Manage articles";
+  const manage = $("manage-articles");
+  manage.replaceChildren(icon(managingArticles ? "check" : "select"));
+  manage.title = managingArticles ? "Done selecting" : "Select articles";
+  manage.setAttribute("aria-label", manage.title);
   $("manage-articles").setAttribute("aria-pressed", String(managingArticles));
-  $("selection-count").textContent = `Selected: ${selectedArticles.size}`;
+  $("selection-count").textContent = `${selectedArticles.size} selected`;
   const all = $<HTMLInputElement>("select-articles");
   const n = visibleArticles.filter(a => selectedArticles.has(a.id)).length;
   all.checked = n > 0 && n === visibleArticles.length;
@@ -1434,7 +1443,16 @@ $("show-books")?.addEventListener("click", () => { track("nav.books"); show("boo
 $("reading-back")?.addEventListener("click", () => { track("nav.articles"); show("articles"); });
 $("reading-statistics")?.addEventListener("click", () => { track("nav.stats"); show("stats"); });
 $("review-back")?.addEventListener("click", () => show("words"));
-$("article-tools")?.addEventListener("toggle", () => renderArticles());
+$("article-tools-toggle")?.addEventListener("click", () => {
+  const panel = $<HTMLDetailsElement>("article-tools");
+  panel.open = !panel.open;
+  if (!panel.open && managingArticles) $("manage-articles").click();
+  if (!panel.open) $("article-tools-toggle").focus();
+});
+$("article-tools")?.addEventListener("toggle", () => {
+  $("article-tools-toggle")?.setAttribute("aria-expanded", String($<HTMLDetailsElement>("article-tools").open));
+  renderArticles();
+});
 $("workspace-search")?.addEventListener("click", openSearch);
 document.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }

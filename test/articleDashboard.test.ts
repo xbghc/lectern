@@ -39,14 +39,14 @@ test("历史页选择筛选结果、建议经勾选采用、批量删除仅发�
   assert.match(doc.getElementById("classification-progress")!.textContent!, /failed: 1/);
   assert.match(doc.body.textContent!, /Source: URL only/);
   (doc.getElementById("select-nonarticles") as HTMLButtonElement).click();
-  assert.equal(doc.getElementById("selection-count")!.textContent, "Selected: 1");
+  assert.equal(doc.getElementById("selection-count")!.textContent, "1 selected");
   assert.equal((doc.querySelector('input[aria-label="Select essay"]') as HTMLInputElement).checked, false);
   assert.equal((doc.querySelector('input[aria-label="Select locked"]') as HTMLInputElement).checked, false, "失败项不能被自动勾选");
   (doc.getElementById("retry-classification") as HTMLButtonElement).click(); await tick();
   assert.match(doc.getElementById("classification-progress")!.textContent!, /failed: 0/);
   const search = doc.getElementById("q-article") as HTMLInputElement;
   search.value = "search"; search.dispatchEvent(new dom.window.Event("input"));
-  assert.equal(doc.getElementById("selection-count")!.textContent, "Selected: 1");
+  assert.equal(doc.getElementById("selection-count")!.textContent, "1 selected");
   (doc.getElementById("suggest-blacklist") as HTMLButtonElement).click(); await tick();
   assert.equal(requests.some(r => r.type === "settings:set"), false, "建议不自动采用");
   (doc.querySelector("#blacklist-suggestions input") as HTMLInputElement).click();
@@ -55,7 +55,7 @@ test("历史页选择筛选结果、建议经勾选采用、批量删除仅发�
   (doc.getElementById("delete-articles") as HTMLButtonElement).click(); await tick();
   assert.deepEqual(requests.find(r => r.type === "articles:delete")!.articleIds, ["search"]);
   assert.equal(articles[0]!.id, "essay");
-  assert.equal(doc.getElementById("selection-count")!.textContent, "Selected: 0");
+  assert.equal(doc.getElementById("selection-count")!.textContent, "0 selected");
   // 批量操作的每个键都有埋点；页面离开时一次交掉，也免得攒批的计时器拖着进程不退
   dom.window.dispatchEvent(new dom.window.Event("pagehide"));
   const clicked = requests.filter(r => r.type === "ui:track").flatMap(r => (r as { events?: string[] }).events ?? []);

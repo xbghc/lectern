@@ -639,13 +639,18 @@ body.app #app-page-title { margin:0; font:28px/1.3 var(--sans); }
 body.app .workspace-bar { top:calc(34px + var(--sa-top)); gap:5px; }
 body.app .workspace-bar .icon-btn { width:40px; height:42px; }
 body.app .dashboard-main { padding-top:0; }
-body.app .phone-continue { padding:20px 20px 16px; margin-bottom:26px; border:1px solid color-mix(in srgb,var(--primary) 20%,var(--line)); border-radius:var(--radius-lg); background:var(--wash); }
-.phone-continue h2 { font:26px/1.3 var(--sans); margin:0 0 10px; overflow-wrap:anywhere; }
-.phone-continue p { font-size:12px; line-height:1.7; color:var(--muted-foreground); margin:0 0 20px; }
-.phone-continue > .progress { height:2px; margin:0; }
-.phone-continue-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; }
-.phone-continue-bottom > span { color:var(--muted-foreground); font-size:11px; }
-.phone-continue-bottom .primary { min-height:42px; padding:10px 15px; font-size:12px; }
+body.app .phone-continue { padding:14px 16px; margin-bottom:20px; border:1px solid color-mix(in srgb,var(--primary) 20%,var(--line)); border-radius:var(--radius-lg); background:var(--wash); }
+.phone-continue h2 { min-width:0; font:600 16px/1.5 var(--sans); margin:0 0 4px; }
+.phone-continue-title-fill { display:block; width:fit-content; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+@supports (background-clip:text) or (-webkit-background-clip:text) {
+  .phone-continue-title-fill { background:linear-gradient(to right,var(--muted-foreground) var(--reading-progress),var(--foreground) var(--reading-progress)); background-clip:text; -webkit-background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+}
+@media (forced-colors:active) {
+  .phone-continue-title-fill { background:none; color:CanvasText; -webkit-text-fill-color:CanvasText; }
+}
+.phone-continue p { font-size:12px; line-height:1.5; color:var(--muted-foreground); margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.phone-continue-bottom { display:flex; align-items:center; justify-content:flex-end; margin-top:8px; }
+.phone-continue-bottom .primary { min-height:44px; padding:10px 15px; font-size:12px; }
 .phone-home-shelf { margin-bottom:28px; }
 .phone-shelf-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:16px; }
 .phone-shelf-preview { display:grid; grid-template-columns:53px minmax(0,1fr); gap:10px; align-items:center; color:var(--fg); text-decoration:none; }
@@ -1303,7 +1308,6 @@ body.reader .iconbtn[hidden] { display:none; }
   body.vocabulary-chat .icon-btn { width:48px; height:48px; }
   body.app .word-actions > summary { width:48px; height:48px; }
   body.app .word-summary-row > .sub, body.app .book-card .sub,
-  body.app .phone-continue-bottom > span,
   body.app .phone-shelf-preview p,
   body.app .phone-review-entry small { font-size:12px; }
   body.app .word-chat-entry { width:48px; height:48px; flex:none; }

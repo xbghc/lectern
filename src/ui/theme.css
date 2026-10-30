@@ -203,9 +203,8 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .article-source { background: var(--muted); border-radius: var(--radius-md); }
 .phone-header-kicker { letter-spacing: 0; font-size: 12px; }
 body.app #app-page-title { font: 650 26px/1.3 var(--sans); letter-spacing: -.6px; }
-body.app .phone-continue { padding: 20px; margin-bottom: 24px; }
-.phone-continue h2 { font-size: 22px; line-height: 1.4; }
-.phone-continue > .progress { height: 4px; }
+body.app .phone-continue { padding: 14px 16px; margin-bottom: 20px; }
+.phone-continue h2 { font-size: 16px; line-height: 1.5; letter-spacing: -.2px; }
 .phone-shelf-preview { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); }
 .phone-shelf-strip { gap: 12px; }
 .phone-shelf-preview h3 { font-size: 13px; font-weight: 600; }

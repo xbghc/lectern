@@ -7,6 +7,9 @@ export function setupSettingsLayout(): void {
   for (const id of ["sec-finish", "sec-position", "sec-review", "sec-attention", "sec-paragraph", "sec-rule-chat"]) {
     document.getElementById(id)?.remove();
   }
+  // Keep the original button and its form handler, outside the section disclosures.
+  const reset = document.getElementById("reset");
+  document.getElementById("sec-reset")?.remove();
   document.querySelector(".settings-back")?.remove();
   const title = document.querySelector("h1");
   if (title) title.textContent = "Settings";
@@ -28,7 +31,6 @@ export function setupSettingsLayout(): void {
     "Data": "Import, export and clear records",
     "Diagnostics": "Request timings, errors and interaction counts",
     "Updates": "App version and updates",
-    "Reset preferences": "Restore reading defaults while keeping your connections and data",
   };
   for (const fieldset of document.querySelectorAll<HTMLFieldSetElement>("body > fieldset")) {
     const legend = fieldset.querySelector("legend");
@@ -64,6 +66,12 @@ export function setupSettingsLayout(): void {
       fold.append(what, about);
     }
     legend?.remove();
+  }
+  if (reset) {
+    reset.textContent = "Reset preferences";
+    reset.classList.add("settings-reset");
+    reset.title = "Restore reading defaults while keeping your connections and data. Save to apply, or discard to cancel.";
+    document.body.append(reset);
   }
   const save = document.getElementById("save");
   const actions = save?.parentElement;

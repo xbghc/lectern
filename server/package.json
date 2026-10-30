@@ -1,9 +1,11 @@
 {
   "name": "lectern-server",
-  "version": "0.3.28",
+  "version": "0.3.29",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.14.0" },
+  "engines": {
+    "node": ">=22.14.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -11,6 +13,12 @@
     "admin": "node dist/server/src/admin.js",
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test test/*.test.ts"
   },
-  "dependencies": { "pg": "^8.16.3" },
-  "devDependencies": { "@types/node": "^22.20.1", "@types/pg": "^8.15.5", "typescript": "^5.9.3" }
+  "dependencies": {
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.9.3"
+  }
 }

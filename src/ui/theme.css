@@ -251,10 +251,8 @@ body.mobile-settings .settings-savebar { background: var(--background); grid-tem
 .section-nav p { letter-spacing: 0; font-weight: 500; }
 .reader-contents { background: var(--popover); }
 @media (max-width: 720px) {
-  body.app #pane-words .toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
-  body.app #q-word { grid-column: 1 / -1; width: 100%; min-height: 44px; }
-  body.app #word-summary { text-align: right; font-size: 11px; line-height: 1.5; }
-  body.app #kind-filter { min-height: 44px; }
+  body.app #pane-words .word-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  body.app #q-word, body.app #kind-filter { min-height: 48px; }
 }
 
 /* Keep reader chrome opt-in, without changing the article's dimensions or scroll position. */

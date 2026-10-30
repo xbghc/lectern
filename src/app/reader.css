@@ -222,3 +222,69 @@ body.reader .reader-bookmark-actions #reader-bookmark { width:48px; min-height:4
 @media (prefers-reduced-motion: no-preference) {
   body.reader, .reader-settings-panel, body.reader .rbar { transition: background-color .2s, color .2s; }
 }
+
+/* Tools replace the appearance dialog rather than stacking over it. Only the
+ * handle accepts the dismiss gesture; the body remains a normal scroll area. */
+html:has(#reader-tools[open]) { overflow: hidden; }
+body.reader #reader-tools {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: min(70dvh, calc(100dvh - var(--sa-top) - 16px));
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px 18px 0 0;
+  background: var(--popover);
+  color: var(--foreground);
+  box-shadow: 0 -6px 24px rgb(0 0 0 / .08);
+  font: 14px/1.5 var(--reader-sans);
+  overscroll-behavior: contain;
+}
+#reader-tools[open] { display: flex; flex-direction: column; }
+#reader-tools::backdrop { background: rgb(0 0 0 / .24); }
+body.reader #reader-tools button { min-height: 48px; border: 0; box-shadow: none; cursor: pointer; font-family: var(--reader-sans); }
+body.reader #reader-tools button:disabled { cursor: default; opacity: .4; }
+body.reader #reader-tools button[hidden] { display: none; }
+body.reader #reader-tools .reader-tools-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 48px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  background: transparent;
+  touch-action: none;
+}
+.reader-tools-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--border); }
+.reader-tools-heading { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 12px; padding: 0 max(20px, var(--sa-right)) 8px max(20px, var(--sa-left)); }
+#reader-tools-title { min-width: 0; margin: 0; font: 600 18px/1.4 var(--reader-sans); letter-spacing: -.2px; }
+#reader-tools-title:focus { outline: none; }
+body.reader #reader-tools #reader-gesture-help { flex: 0 0 48px; width: 48px; min-width: 48px; height: 48px; margin: 0; padding: 0; background: transparent; color: var(--muted-foreground); }
+.reader-tools-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 max(20px, var(--sa-right)) calc(24px + var(--sa-bottom)) max(20px, var(--sa-left)); }
+.reader-tools-bookmark-row { display: flex; align-items: center; gap: 8px; }
+body.reader #reader-tools #reader-bookmark { flex: 0 0 48px; width: 48px; height: 48px; padding: 0; background: transparent; color: var(--muted-foreground); }
+body.reader #reader-tools #reader-bookmark.bookmarked { background: var(--muted); color: var(--primary); }
+body.reader #reader-tools #bookmark-jump { flex: 1; min-width: 0; margin: 0; }
+body.reader #reader-tools .reader-tools-action { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 10px 8px; border-radius: 8px; background: transparent; color: var(--foreground); font-size: 14px; line-height: 1.5; text-align: left; }
+#reader-tools .reader-tools-action-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#reader-tools .reader-tools-action-label small { display: block; margin-top: 2px; color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
+#reader-tools .reader-tools-action > [data-icon] { display: flex; flex: 0 0 20px; }
+#reader-tools .reader-tools-action .ui-icon, #reader-tools .reader-tools-action > .ui-icon { flex: 0 0 20px; width: 20px; height: 20px; }
+#reader-tools .reader-tools-action > [data-icon="chevron"] { flex-basis: 16px; color: var(--muted-foreground); }
+#reader-tools .reader-tools-action > [data-icon="chevron"] .ui-icon { width: 16px; height: 16px; flex-basis: 16px; }
+#reader-tools .reader-tools-count { color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
+.reader-tools-menu { display: grid; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+body.reader #reader-tools .reader-tools-action:active, body.reader #reader-tools .iconbtn:active { background: var(--muted); }
+#reader-tools-status { margin: 8px 0 0; color: var(--muted-foreground); font-size: 12px; overflow-wrap: anywhere; }
+#reader-tools-status:empty { display: none; }
+.reader-tools-info { display: flex; align-items: flex-start; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+#reader-tools .reader-source { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: 1; min-width: 0; margin: 0; font: 12px/1.6 var(--reader-sans); }
+#reader-tools .reader-source-primary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; color: var(--foreground); font-size: 14px; }
+#reader-tools a.reader-source-primary { box-sizing: border-box; min-height: 48px; padding: 12px 0; }
+#reader-tools .reader-source-meta, #reader-tools .reader-source-status { max-width: 100%; overflow-wrap: anywhere; }
+#reader-tools #rprogress { flex: none; padding-top: 12px; color: var(--muted-foreground); font-size: 14px; font-variant-numeric: tabular-nums; }

@@ -9,6 +9,7 @@ import { followStoredList } from "../lib/ruleChat.ts";
 import { ruleChatBox } from "../popup/ruleChat.ts";
 import { setupProviderPicker } from "./providerPicker.ts";
 import { normalizeLlmBaseUrl, sameLlmOrigin } from "../lib/llmUrl.ts";
+import { AdvancedPreferencesEditor } from "./advancedEditor.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -42,6 +43,16 @@ const llmFields = {
 };
 const status = $("status");
 const dataStatus = $("data-status");
+let advancedEditor: AdvancedPreferencesEditor | null = null;
+
+/** Called only by the extension entry point; Android retains its existing controls. */
+export function enableAdvancedPreferences(): HTMLFieldSetElement {
+  advancedEditor ??= new AdvancedPreferencesEditor(renderStatus);
+  if (baseline) advancedEditor.setSettings(baseline);
+  if (savedLlm) advancedEditor.setModel(savedLlm);
+  renderStatus();
+  return advancedEditor.section;
+}
 
 function fill(s: Settings): void {
   s = { ...s, ...resolveReadingSettings(s) };
@@ -63,6 +74,7 @@ function fill(s: Settings): void {
   fields.ctxChars.value = String(s.contextChars);
   fields.explainVocab.checked = s.explainVocab;
   fields.finishRatio.value = String(Math.round(s.finishRatio * 100));
+  advancedEditor?.setSettings(s);
 }
 
 /** 读表单并夹到合法区间；非法输入退回默认值而不是写入 NaN。 */
@@ -96,7 +108,8 @@ function collect(): Settings {
     explainVocab: fields.explainVocab.checked,
     finishRatio: num(fields.finishRatio, 80, 10, 100) / 100,
   };
-  return { ...collected, ...resolveReadingSettings(collected) };
+  const effective = { ...collected, ...advancedEditor?.settings() };
+  return { ...effective, ...resolveReadingSettings(effective) };
 }
 
 /*
@@ -114,15 +127,23 @@ let testing = false;
 let flashing: { msg: string; error: boolean } | null = null;
 let statusTimer: number | null = null;
 
+function preferencesReady(): boolean {
+  return !!baseline && !!llmBaseline && (!advancedEditor || advancedEditor.ready);
+}
+
 function changedCount(): number {
   if (!baseline) return 0;
   const now = collect();
   const base = baseline;
-  return (Object.keys(now) as (keyof Settings)[]).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(base[k])).length + llmChangedCount();
+  return (Object.keys(now) as (keyof Settings)[]).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(base[k])).length + llmChangedCount() + (advancedEditor?.error ? 1 : 0);
 }
 
 function llmDraft(): Record<string, string> {
-  return { provider: picker.provider(), ...Object.fromEntries(Object.entries(llmFields).map(([key, input]) => [key, input.value.trim()])) };
+  const draft = { provider: picker.provider(), ...Object.fromEntries(Object.entries(llmFields).map(([key, input]) => [key, input.value.trim()])) } as Record<string, string>;
+  const advanced = advancedEditor?.model();
+  if (advanced?.maxTokens !== undefined) draft.maxTokens = String(advanced.maxTokens);
+  if (advanced?.timeoutMs !== undefined) draft.timeout = String(advanced.timeoutMs / 1000);
+  return draft;
 }
 function llmChangedCount(): number {
   if (!llmBaseline) return 0;
@@ -135,20 +156,22 @@ export const hasUnsavedChanges = (): boolean => changedCount() > 0;
 
 /** 状态栏一处两用：刚发生的事（存好了、填错了）优先，没有就报还有几项没保存。 */
 function renderStatus(): void {
+  const ready = preferencesReady();
   const changed = changedCount();
   saveBar.hidden = changed === 0 && !saving && !flashing;
   saveBar.classList.toggle("is-dirty", changed > 0);
   revertBtn.hidden = changed === 0;
-  status.classList.toggle("error", flashing?.error ?? false);
-  status.textContent = flashing ? flashing.msg : changed > 0 ? `${changed} unsaved changes` : "";
-  $<HTMLButtonElement>("save").disabled = saving || testing || !baseline || !llmBaseline || changed === 0;
+  status.classList.toggle("error", !!advancedEditor?.error || (flashing?.error ?? false));
+  status.textContent = advancedEditor?.error ? "Fix the Advanced JSON errors before saving." : flashing ? flashing.msg : changed > 0 ? `${changed} unsaved changes` : "";
+  $<HTMLButtonElement>("save").disabled = saving || testing || !ready || changed === 0 || !!advancedEditor?.error;
   revertBtn.disabled = saving || testing;
-  $<HTMLButtonElement>("reset").disabled = saving || testing;
+  $<HTMLButtonElement>("reset").disabled = saving || testing || !ready;
   const test = $<HTMLButtonElement>("test-llm");
-  test.disabled = saving || testing || !baseline || !llmBaseline;
+  test.disabled = saving || testing || !ready || !!advancedEditor?.error;
   test.textContent = testing ? "Testing connection…" : saving ? "Saving…" : changed > 0 ? "Save changes and test" : "Test connection";
   test.title = changed > 0 ? "Save all changes, then test the model connection" : "Test the saved model connection";
   $("consent-agree").textContent = changed > 0 ? "Save changes and agree" : "Agree and start";
+  $<HTMLButtonElement>("consent-agree").disabled = saving || testing || !ready || !!advancedEditor?.error;
   $("model-save-state").textContent = llmChangedCount() > 0 ? "Model changes have not been saved." : savedLlm?.provider ? "Model settings saved on this device." : "";
 }
 
@@ -194,7 +217,11 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 async function saveChanges(): Promise<boolean> {
-  if (saving || testing || !baseline || !llmBaseline) return false;
+  if (saving || testing || !preferencesReady()) return false;
+  if (advancedEditor && !advancedEditor.validate(true)) {
+    flash("Fix the Advanced JSON errors before saving.", true);
+    return false;
+  }
   const next = collect();
   if (next.stallTimeoutMs <= next.idleTimeoutMs) {
     const msg = "The stall timeout must be longer than the idle timeout.";
@@ -219,6 +246,7 @@ async function saveChanges(): Promise<boolean> {
   const preferenceControls = Object.values(fields).map(input => ({ input, disabled: input.disabled }));
   for (const { input } of preferenceControls) input.disabled = true;
   modelSection.disabled = true;
+  advancedEditor?.setBusy(true);
   renderStatus();
   try {
     if (model) await saveLlm(model);
@@ -235,6 +263,7 @@ async function saveChanges(): Promise<boolean> {
   } finally {
     saving = false;
     modelSection.disabled = false;
+    advancedEditor?.setBusy(false);
     for (const { input, disabled } of preferenceControls) input.disabled = disabled;
     renderStatus();
   }
@@ -327,7 +356,9 @@ clearButton.addEventListener("click", async () => {
   } finally { clearButton.disabled = false; }
 });
 
-void chrome.runtime.sendMessage({ type: "settings:get" }).then((s: Settings) => load(s ?? DEFAULT_SETTINGS));
+void chrome.runtime.sendMessage({ type: "settings:get" }).then((s: Settings) => load(s ?? DEFAULT_SETTINGS)).catch(() => {
+  flash("Could not load preferences. Reload this page to try again.", true);
+});
 
 /* ==================== 模型服务 ==================== */
 
@@ -382,6 +413,7 @@ async function setConsent(at: number | null): Promise<void> {
   llmStatus.textContent = "";
 }
 $("consent-agree").addEventListener("click", async () => {
+  if (!preferencesReady() || saving || testing) return;
   // Consent applies to the provider shown in this form, not a previously saved connection.
   if (hasUnsavedChanges() && !await saveChanges()) return;
   await setConsent(Date.now());
@@ -398,6 +430,7 @@ function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
   saved = { baseUrl: cfg.baseUrl, apiKeySet: !!cfg.apiKeySet };
   llmFields.maxTokens.value = String(cfg.maxTokens);
   llmFields.timeout.value = String(Math.round(cfg.timeoutMs / 1000));
+  advancedEditor?.setModel(cfg);
   savedLlm = cfg;
   llmBaseline = llmDraft();
   renderStatus();
@@ -410,6 +443,13 @@ function clamp(input: HTMLInputElement, fallback: number, min: number, max: numb
 }
 
 function collectLlm(): Partial<LlmConfig> {
+  const advanced = advancedEditor?.model();
+  if (advanced && llmBaseline) {
+    const draft = llmDraft();
+    const connectionChanged = ["provider", "apiKey", "model", "baseUrl", "protocol"].some(key => draft[key] !== llmBaseline![key]);
+    // Budgets can be edited before a provider is configured; they cannot redirect a request.
+    if (!connectionChanged) return advanced;
+  }
   let baseUrl: string;
   const model = llmFields.model.value.trim();
   const key = llmFields.apiKey.value.trim();
@@ -430,8 +470,8 @@ function collectLlm(): Partial<LlmConfig> {
     protocol: llmFields.protocol.value === "anthropic" ? "anthropic" : "openai",
     baseUrl,
     model,
-    maxTokens: clamp(llmFields.maxTokens, DEFAULT_LLM.maxTokens, 256, 8192),
-    timeoutMs: clamp(llmFields.timeout, DEFAULT_LLM.timeoutMs / 1000, 5, 120) * 1000,
+    maxTokens: advanced?.maxTokens ?? clamp(llmFields.maxTokens, DEFAULT_LLM.maxTokens, 256, 8192),
+    timeoutMs: advanced?.timeoutMs ?? clamp(llmFields.timeout, DEFAULT_LLM.timeoutMs / 1000, 5, 120) * 1000,
   };
   if (key) patch.apiKey = key;
   return patch;
@@ -445,7 +485,7 @@ async function saveLlm(patch: Partial<LlmConfig>): Promise<void> {
 }
 
 $("test-llm").addEventListener("click", async () => {
-  if (saving || testing) return;
+  if (saving || testing || !preferencesReady()) return;
   if (hasUnsavedChanges() && !await saveChanges()) return;
   // 测试连接也是一次请求：没同意过就不发，说清楚卡在哪儿
   if (!consented) {
@@ -479,7 +519,10 @@ async function loadLlm(): Promise<void> {
     : "No model requests yet.";
 }
 
-void loadLlm();
+void loadLlm().catch(() => {
+  llmStatus.textContent = "Could not load model settings. Reload this page to try again.";
+  flash(llmStatus.textContent, true);
+});
 
 /* ==================== 诊断日志 ==================== */
 

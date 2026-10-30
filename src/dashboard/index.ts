@@ -119,6 +119,7 @@ function show(pane: Pane, load = true): void {
   }
   if ($("show-books")) $("show-books").hidden = pane !== "articles";
   if ($("import-book")) $("import-book").hidden = pane !== "books";
+  if ($("words-search")) $("words-search").hidden = pane !== "words";
   if (!document.body.classList.contains("app") && $("add-article")) $("add-article").hidden = pane !== "articles";
   document.body.dataset.pane = pane;
   if (document.body.classList.contains("app") && ["articles", "books", "words"].includes(pane)) {
@@ -727,18 +728,51 @@ $("suggest-blacklist").addEventListener("click", () => {
 /* ==================== 生词本 ==================== */
 
 let snippets: Snippet[] = [];
+const expandedWords = new Set<string>();
+
+function hasWordFilter(): boolean {
+  return !!($<HTMLInputElement>("q-word").value.trim() || $<HTMLSelectElement>("kind-filter").value);
+}
+
+function setWordSearchOpen(open: boolean, focus = false): void {
+  const panel = $("word-tools"), toggle = $("words-search");
+  if (!panel || !toggle) return;
+  const filtered = hasWordFilter();
+  panel.hidden = !open && !filtered;
+  toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  toggle.dataset["filtered"] = String(filtered);
+  toggle.title = filtered ? "Search vocabulary (filters active)" : panel.hidden ? "Search vocabulary" : "Close vocabulary search";
+  if (focus) $("q-word").focus();
+}
+
+function clearWordFilters(): void {
+  $<HTMLInputElement>("q-word").value = "";
+  $<HTMLSelectElement>("kind-filter").value = "";
+  wordSearchCounted = false;
+  renderWords();
+  setWordSearchOpen(true, true);
+}
 
 async function loadWords(): Promise<void> {
   await guarded($("words"), async () => {
     const res = await send<{ snippets: Snippet[] }>({ type: "snippets:list" });
     snippets = res.snippets ?? [];
+    for (const id of expandedWords) if (!snippets.some(s => s.id === id)) expandedWords.delete(id);
     renderWords();
   });
+}
+
+async function refreshWordReviewCount(): Promise<void> {
+  try {
+    const stats = await send<ReviewStats>({ type: "review:stats" });
+    dueWords = stats.dueNow; paintBadge();
+  } catch { /* A missing count must not turn a successful save or deletion into an error. */ }
 }
 
 const KIND_LABEL: Record<Snippet["kind"], string> = { word: "Word", phrase: "Phrase", sentence: "Sentence" };
 
 function renderWords(): void {
+  const app = document.body.classList.contains("app");
   const q = $<HTMLInputElement>("q-word").value.trim().toLowerCase();
   const kind = $<HTMLSelectElement>("kind-filter").value;
   const list = snippets.filter((s) => {
@@ -753,19 +787,34 @@ function renderWords(): void {
 
   const queued = snippets.filter((s) => s.cardId).length;
   if ($("nav-word-count")) $("nav-word-count").textContent = String(snippets.length);
-  $("word-summary").textContent = `Total: ${quantity(snippets.length, "record")}; ${queued} in the review queue`;
+  const summary = $("word-summary");
+  if (app) {
+    summary.textContent = q || kind ? quantity(list.length, "match", "matches") : "";
+    summary.hidden = !summary.textContent;
+    setWordSearchOpen(!$("word-tools").hidden);
+  } else summary.textContent = `Total: ${quantity(snippets.length, "record")}; ${queued} in the review queue`;
 
   const box = $("words");
   box.textContent = "";
   if (list.length === 0) {
-    box.append(el("div", "empty", snippets.length ? "No matching records" : "No saved translations yet. Select a word or sentence in an article to save it here with its explanation."));
+    if (app) {
+      const empty = el("div", "empty word-empty");
+      empty.append(el("p", undefined, snippets.length ? "No matching records" : "Save words or sentences while reading to find them here."));
+      if (q || kind) {
+        const clear = el("button", "mini", "Clear filters");
+        clear.addEventListener("click", clearWordFilters); empty.append(clear);
+      }
+      box.append(empty);
+    } else box.append(el("div", "empty", snippets.length ? "No matching records" : "No saved translations yet. Select a word or sentence in an article to save it here with its explanation."));
     return;
   }
 
   for (const s of list) {
     const card = el("div", "card word-card");
     const row = el("div", "row1");
-    row.append(el("div", "title", s.text), el("span", "pill", KIND_LABEL[s.kind]));
+    const title = el(app ? "span" : "div", "title", s.text);
+    row.append(title);
+    if (!app) row.append(el("span", "pill", KIND_LABEL[s.kind]));
 
     if (s.cardId) {
       row.append(el("span", "pill done", "In review"));
@@ -778,6 +827,7 @@ function renderWords(): void {
           const res = await send<{ ok: boolean }>({ type: "snippet:enqueue", id: s.id });
           if (!res?.ok) throw new Error("This vocabulary record no longer exists");
           await loadWords();
+          if (app) void refreshWordReviewCount();
         } catch (err) {
           add.disabled = false;
           add.textContent = "Could not add. Try again.";
@@ -792,11 +842,20 @@ function renderWords(): void {
      * 弹 confirm 又太重——一屏几十条，逐条清理时每条都弹窗会逼人不看就点确定。
      */
     const del = el("button", "mini danger", "Delete");
+    const resetDelete = (): void => {
+      del.classList.remove("is-confirming");
+      if (app) {
+        del.replaceChildren(icon("trash"));
+        del.title = `Delete “${s.text}”`; del.setAttribute("aria-label", del.title);
+      } else del.textContent = "Delete";
+    };
+    if (app) { del.classList.add("icon-btn"); resetDelete(); }
     let armed: ReturnType<typeof setTimeout> | null = null;
     del.addEventListener("click", async () => {
       if (armed === null) {
         del.textContent = s.cardId ? "Delete with review progress?" : "Confirm deletion";
-        armed = setTimeout(() => { armed = null; del.textContent = "Delete"; }, 4000);
+        if (app) { del.classList.add("is-confirming"); del.setAttribute("aria-label", del.textContent); }
+        armed = setTimeout(() => { armed = null; resetDelete(); }, 4000);
         return;
       }
       clearTimeout(armed);
@@ -807,9 +866,11 @@ function renderWords(): void {
       try {
         await send({ type: "snippet:delete", id: s.id });
         await loadWords();
+        if (app) void refreshWordReviewCount();
       } catch (err) {
         del.disabled = false;
         del.textContent = "Could not delete. Try again.";
+        if (app) del.setAttribute("aria-label", del.textContent);
         del.title = reason(err);
       }
     });
@@ -819,7 +880,8 @@ function renderWords(): void {
 
     const sub = el("div", "sub");
     const meta = el("span");
-    if (fillMeta(meta, { phonetic: s.phonetic, pos: s.pos, word: s.text })) sub.append(meta);
+    const hasMeta = fillMeta(meta, { phonetic: s.phonetic, pos: s.pos, word: s.text });
+    if (hasMeta && !app) sub.append(meta);
     const from = tracked(el("a", undefined, s.articleTitle || hostnameOf(s.url)), "words.source");
     from.href = s.url;
     from.target = "_blank";
@@ -829,26 +891,43 @@ function renderWords(): void {
 
     const controls = el("div", "word-controls");
     while (row.children.length > 1) controls.append(row.children[1]!);
-    const actions = el("details", "word-actions");
-    const actionsToggle = tracked(el("summary"), "words.menu");
-    actionsToggle.setAttribute("aria-label", `More actions for ${s.text}`);
-    actionsToggle.append(icon("more"));
-    actions.append(actionsToggle, controls);
-    const summary = el("div", "word-summary-row");
-    summary.append(row, tr);
-    if (s.context) summary.append(el("p", "word-context-preview", s.context));
-    summary.append(sub);
-    if (document.body.classList.contains("app") && s.kind !== "sentence") {
-      const chat = tracked(el("a", "icon-btn word-chat-entry"), "chat.word");
-      chat.href = `chat.html?word=${encodeURIComponent(s.id)}`;
-      chat.setAttribute("aria-label", `Practice with AI: ${s.text}`); chat.append(icon("chat"));
-      row.append(chat);
+    let detail: HTMLElement;
+    if (app) {
+      const disclosure = el("details", "app-word-disclosure");
+      disclosure.open = expandedWords.has(s.id);
+      disclosure.addEventListener("toggle", () => {
+        if (disclosure.open) expandedWords.add(s.id); else expandedWords.delete(s.id);
+      });
+      const toggle = tracked(el("summary", "app-word-summary"), "words.detail");
+      title.title = s.text;
+      toggle.append(title, el("span", "app-word-preview", s.translation), icon("chevron"));
+      detail = el("div", "app-word-body");
+      if (hasMeta) { meta.className = "word-pronunciation"; detail.append(meta); }
+      detail.append(tr);
+      disclosure.append(toggle, detail); card.append(disclosure);
+      controls.classList.add("app-word-controls");
+      if (s.kind !== "sentence") {
+        const chat = tracked(el("a", "icon-btn word-practice"), "chat.word");
+        chat.href = `chat.html?word=${encodeURIComponent(s.id)}`;
+        chat.title = `Practice with AI: ${s.text}`; chat.setAttribute("aria-label", chat.title); chat.append(icon("chat"));
+        controls.prepend(chat);
+      }
+    } else {
+      const actions = el("details", "word-actions");
+      const actionsToggle = tracked(el("summary"), "words.menu");
+      actionsToggle.setAttribute("aria-label", `More actions for ${s.text}`);
+      actionsToggle.append(icon("more"));
+      actions.append(actionsToggle, controls);
+      const summary = el("div", "word-summary-row");
+      summary.append(row, tr);
+      if (s.context) summary.append(el("p", "word-context-preview", s.context));
+      summary.append(sub);
+      row.append(actions);
+      detail = el("details", "word-detail");
+      detail.append(tracked(el("summary", undefined, "Context and explanation"), "words.detail"));
+      card.append(summary, detail);
     }
-    row.append(actions);
-    const detail = el("details", "word-detail");
-    detail.append(tracked(el("summary", undefined, "Context and explanation"), "words.detail"));
     if (s.context) detail.append(el("blockquote", undefined, s.context));
-    card.append(summary, detail);
     if (s.contextNote) {
       const note = el("div", "sub", s.contextNote);
       note.style.display = "block";
@@ -868,6 +947,16 @@ function renderWords(): void {
         box.append(one);
       }
       detail.append(box);
+    }
+    if (app) {
+      sub.classList.add("app-word-source"); detail.append(sub, controls);
+      for (const phonetic of detail.querySelectorAll<HTMLElement>(".ph")) {
+        phonetic.tabIndex = 0; phonetic.setAttribute("role", "button");
+        phonetic.setAttribute("aria-label", `${phonetic.textContent}. Read aloud`);
+        phonetic.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); phonetic.click(); }
+        });
+      }
     }
     box.append(card);
   }
@@ -896,6 +985,15 @@ $("q-word").addEventListener("input", () => {
   renderWords();
 });
 $("kind-filter").addEventListener("change", () => { track("words.kind"); renderWords(); });
+$("words-search")?.addEventListener("click", () => {
+  const opening = $("word-tools").hidden || hasWordFilter();
+  setWordSearchOpen(opening, opening);
+});
+$("word-tools")?.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !hasWordFilter()) {
+    event.preventDefault(); setWordSearchOpen(false); $("words-search").focus();
+  }
+});
 
 /* ==================== 复习 ==================== */
 
@@ -913,8 +1011,13 @@ let dueArticles = 0;
 function paintBadge(): void {
   const total = dueWords + dueArticles;
   const badge = $("due-badge");
-  badge.textContent = String(total);
-  badge.hidden = total === 0 && !document.body.classList.contains("app");
+  const app = document.body.classList.contains("app");
+  badge.textContent = String(app ? dueWords : total);
+  badge.hidden = app ? dueWords === 0 : total === 0;
+  if (app) {
+    $("words-review-label").textContent = dueWords ? "Review" : "All caught up";
+    $("words-review")?.setAttribute("aria-label", dueWords ? `Review ${quantity(dueWords, "word")}` : "All caught up. Open vocabulary review");
+  }
   if ($("home-due-count")) $("home-due-count").textContent = String(total);
   $("seg-words-n").textContent = dueWords > 0 ? String(dueWords) : "";
   $("seg-articles-n").textContent = dueArticles > 0 ? String(dueArticles) : "";
@@ -1455,7 +1558,11 @@ $("workspace-search")?.addEventListener("click", () => {
   else openSearch();
 });
 document.addEventListener("keydown", (event) => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    if ($("words-search") && !$("pane-words").hidden) setWordSearchOpen(true, true);
+    else openSearch();
+  }
 });
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-view]")) {
   button.addEventListener("click", () => {

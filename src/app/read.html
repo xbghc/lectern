@@ -22,7 +22,7 @@
       <button id="back" class="iconbtn" aria-label="Back to library" title="Back to library"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
       <div class="rinfo"><div id="rtitle" class="rtitle">Opening…</div><div id="rmeta" class="rmeta"></div></div>
       <button id="reader-toc" class="iconbtn" aria-label="Open contents" title="Contents" aria-haspopup="dialog" aria-controls="reader-contents" hidden><span data-icon="list"></span></button>
-      <button id="reader-more" class="iconbtn" aria-label="Open reading tools" title="Reading tools" aria-haspopup="dialog" aria-controls="reader-tools"><span data-icon="more"></span></button>
+      <button id="reader-more" class="iconbtn" aria-label="Open reading tools" title="Reading tools" aria-haspopup="dialog" aria-controls="reader-tools" aria-expanded="false"><span data-icon="more"></span></button>
       <div id="reader-progress" class="reader-progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="rprogress-fill"></span></div>
     </header>
     <section class="reader-settings-panel" aria-label="Reading appearance">
@@ -70,12 +70,19 @@
       <p id="contents-book-title"></p><div class="reader-details"><span id="reader-location"></span></div>
       <div id="chapter-list"></div>
     </dialog>
-    <dialog id="reader-tools" class="reader-contents" aria-labelledby="reader-tools-title"><div class="reader-dialog-heading"><h2 id="reader-tools-title">Reading tools</h2><button id="reader-tools-close" class="iconbtn" aria-label="Close reading tools" title="Close reading tools">×</button></div>
-      <div class="reader-details"><span>Reading progress</span><span id="rprogress">0%</span></div>
-      <div id="reader-source" class="reader-source"></div>
-      <div class="reader-tool-actions reader-bookmark-actions"><button id="reader-bookmark" class="mini" aria-pressed="false" disabled><span data-icon="bookmark"></span><span id="reader-bookmark-label" class="visually-hidden">Add bookmark here</span></button><button id="bookmark-jump" class="mini" hidden></button></div>
-      <div class="reader-tool-actions"><button id="words" class="mini words" disabled>Words from this article <span id="words-n" class="n"></span></button><button id="shot" class="mini" disabled>Screenshot translation</button><button id="translate-here" class="mini">Enable translation on this page</button></div>
-      <button id="reader-gesture-help" class="mini">How reading controls work</button>
+    <dialog id="reader-tools" class="reader-tools-sheet" aria-labelledby="reader-tools-title">
+      <button id="reader-tools-close" class="reader-tools-handle" type="button" aria-label="Close reading tools" title="Close reading tools"><span></span></button>
+      <div class="reader-tools-heading"><h2 id="reader-tools-title" tabindex="-1" autofocus>Reading tools</h2><button id="reader-gesture-help" class="iconbtn" type="button" aria-label="How reading controls work" title="How reading controls work"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.5-2.5 1.5-2.5 3M12 17h.01"/></svg></button></div>
+      <div class="reader-tools-scroll">
+        <div class="reader-tools-bookmark-row"><button id="reader-bookmark" class="iconbtn" type="button" aria-pressed="false" aria-label="Add reading bookmark" title="Add reading bookmark" disabled><span data-icon="bookmark"></span><span id="reader-bookmark-label" class="visually-hidden">Add bookmark here</span></button><button id="bookmark-jump" class="reader-tools-action" type="button" hidden><span class="reader-tools-action-label">Go to bookmark<small id="bookmark-position"></small></span><span data-icon="chevron"></span></button></div>
+        <p id="reader-tools-status" role="status" aria-live="polite"></p>
+        <div class="reader-tools-menu">
+          <button id="words" class="reader-tools-action" type="button" disabled><span data-icon="words"></span><span class="reader-tools-action-label">Article vocabulary</span><span id="words-n" class="reader-tools-count"></span><span data-icon="chevron"></span></button>
+          <button id="shot" class="reader-tools-action" type="button" disabled><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="6" y="6" width="12" height="12" rx="1"/><path d="m8 15 3-3 2 2 3-4"/></svg><span class="reader-tools-action-label">Screenshot translation</span><span data-icon="chevron"></span></button>
+          <button id="translate-here" class="reader-tools-action" type="button" hidden><span data-icon="type"></span><span class="reader-tools-action-label">Enable translation on this page</span><span data-icon="chevron"></span></button>
+        </div>
+        <div class="reader-tools-info"><div id="reader-source" class="reader-source"></div><span id="rprogress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</span></div>
+      </div>
     </dialog>
     <dialog id="reader-intro" class="reader-contents" aria-labelledby="reader-intro-title">
       <h2 id="reader-intro-title">Your screen is for reading</h2>

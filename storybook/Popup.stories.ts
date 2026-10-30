@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/html-vite';
 import { controls, renderPage, type PageArgs } from './render.ts';
 export default {
-  title: "Extension/Popup", render: renderPage, argTypes: controls,
-  args: { page: 'popup', state: 'populated', tab: 'current', width: 380, height: 760 },
+  title: "Extension/Popup", render: renderPage, argTypes: { ...controls, height: { control: false } },
+  args: { page: 'popup', state: 'populated', tab: 'current', width: 370, height: 602 },
 } satisfies Meta<PageArgs>;
 type Story = StoryObj<PageArgs>;
 export const Current: Story = { name: "Focus · Today's rhythm" };

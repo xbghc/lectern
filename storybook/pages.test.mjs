@@ -68,6 +68,60 @@ test('compact reading controls keep filters, selection and book contents reachab
   } finally { close(); }
 });
 
+test('Android vocabulary expands in place, keeps filters visible and updates the word review count', async () => {
+  let close;
+  const dom = new JSDOM(pages.app.replace('<!--PREVIEW_CONFIG-->', '<script>window.__PREVIEW__={page:"app",state:"populated",tab:"words"}</script>'), {
+    url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
+    beforeParse(window) {
+      close = window.close.bind(window); window.structuredClone = structuredClone;
+      window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder;
+      window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+    },
+  });
+  const settle = () => new Promise(resolve => setTimeout(resolve, 60));
+  try {
+    await settle();
+    const { document, Event, chrome } = dom.window;
+    const cards = () => [...document.querySelectorAll('#words details.app-word-disclosure')];
+    const sentence = () => cards().find(card => card.querySelector('.title').textContent === 'Attention is a practice.');
+    assert.equal(cards().length, 3);
+    assert.ok(cards().every(card => !card.open));
+    assert.equal(document.getElementById('due-badge').textContent, '2', 'article reviews are excluded from vocabulary count');
+    assert.equal(document.querySelector('.phone-nav-link[aria-label="Settings"] span:last-child').textContent, 'Settings');
+    sentence().querySelector('summary').click(); await settle();
+    assert.equal(sentence().open, true);
+    assert.equal(sentence().querySelector('.word-practice'), null, 'sentences have no AI word-practice action');
+    const add = [...sentence().querySelectorAll('button')].find(button => button.textContent === 'Add to review');
+    add.click(); await settle();
+    assert.equal(sentence().open, true, 'saving preserves the expanded entry');
+    assert.ok(sentence().querySelector('.pill.done'));
+    assert.equal(document.getElementById('due-badge').textContent, '3');
+    const remove = sentence().querySelector('.danger');
+    remove.click();
+    assert.equal((await chrome.runtime.sendMessage({ type: 'snippets:list' })).snippets.length, 3, 'first delete tap asks for confirmation');
+    assert.match(remove.textContent, /review progress/);
+    remove.click(); await settle();
+    assert.equal(cards().length, 2);
+    assert.equal(document.getElementById('due-badge').textContent, '2');
+    assert.ok(cards().every(card => card.querySelector('a.word-practice')));
+    const search = document.getElementById('words-search'), panel = document.getElementById('word-tools');
+    assert.equal(panel.hidden, true); search.click(); assert.equal(panel.hidden, false);
+    const query = document.getElementById('q-word'); query.value = 'no matching vocabulary'; query.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(); search.click();
+    assert.equal(panel.hidden, false, 'active search cannot be hidden');
+    assert.equal(cards().length, 0);
+    document.querySelector('#words .word-empty button').click(); await settle();
+    assert.equal(query.value, ''); assert.equal(cards().length, 2);
+    const kind = document.getElementById('kind-filter'); kind.value = 'phrase'; kind.dispatchEvent(new Event('change', { bubbles: true }));
+    search.click();
+    assert.equal(panel.hidden, false, 'active type filter cannot be hidden');
+    assert.equal(cards().length, 1); assert.equal(cards()[0].querySelector('.title').textContent, 'mental model');
+    kind.value = ''; kind.dispatchEvent(new Event('change', { bubbles: true })); search.click();
+    assert.equal(panel.hidden, true);
+    assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+  } finally { close(); }
+});
+
 test('EPUB import stays available from the shelf toolbar and its empty state', async () => {
   for (const state of ['populated', 'empty']) {
     let close, picks = 0;
@@ -240,8 +294,8 @@ test('sync settings keep secrets out of status, require a new token for a new ad
 });
 
 test('options form tracks unsaved changes, keeps blacklists on reset, and only the extension page gets a section index', async () => {
-  const open = (page) => {
-    const html = pages[page].replace('<!--PREVIEW_CONFIG-->', `<script>window.__PREVIEW__=${JSON.stringify({ page, state: 'populated', tab: 'articles' })}</script>`);
+  const open = (page, state = 'populated') => {
+    const html = pages[page].replace('<!--PREVIEW_CONFIG-->', `<script>window.__PREVIEW__=${JSON.stringify({ page, state, tab: 'articles' })}</script>`);
     let closeWindow;
     const dom = new JSDOM(html, {
       url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
@@ -344,42 +398,85 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     assert.equal(bar.classList.contains('is-dirty'), true);
     assert.equal(status.textContent, "1 unsaved changes");
 
-    type('finishRatio', '85');
+    const editJson = edit => {
+      const value = JSON.parse(document.getElementById('advanced-json').value);
+      edit(value); type('advanced-json', JSON.stringify(value, null, 2));
+    };
+    for (const id of ['finishRatio', 'idle', 'stall', 'ctxChars', 'maxTokens', 'timeout', 'sec-rule-chat']) {
+      assert.equal(document.getElementById(id), null, `${id} is JSON-only or removed from extension settings`);
+    }
+    editJson(value => { value.reading.finishRatio = .85; });
     type('excluded', 'https://example.com/search\nnews.example.com');
     assert.equal(bar.classList.contains('is-dirty'), true);
     assert.equal(status.textContent, "3 unsaved changes");
     assert.equal(revert.hidden, false);
 
     // 恢复默认只动开关和阈值，名单原样留着
-    type('idle', '45');
+    editJson(value => { value.reading.idleTimeoutMs = 45_000; });
     document.getElementById('reset').click();
-    assert.equal(document.getElementById('idle').value, '30');
-    assert.equal(document.getElementById('finishRatio').value, '80');
+    const defaults = JSON.parse(document.getElementById('advanced-json').value);
+    assert.equal(defaults.reading.idleTimeoutMs, 30_000);
+    assert.equal(defaults.reading.finishRatio, .8);
     assert.equal(document.getElementById('excluded').value, 'https://example.com/search\nnews.example.com');
 
     revert.click();
     assert.equal(bar.classList.contains('is-dirty'), false);
     assert.equal(document.getElementById('excluded').value.includes('news.example.com'), false);
 
-    // stall 不大于 idle：不保存，错标在那一对框上，改了就消
+    // Invalid JSON blocks every global save route before any model or preference writes.
     const saved = await chrome.runtime.sendMessage({ type: 'settings:get' });
-    type('idle', '100'); type('stall', '90');
+    const savedModel = await chrome.runtime.sendMessage({ type: 'llm:get' });
+    type('model', 'must-not-save-invalid-json');
+    editJson(value => { value.reading.idleTimeoutMs = 100_000; value.reading.stallTimeoutMs = 90_000; });
+    for (const id of ['save', 'test-llm', 'consent-agree']) assert.equal(document.getElementById(id).disabled, true);
     document.getElementById('save').click();
+    document.getElementById('test-llm').click();
+    document.getElementById('consent-agree').click();
     await settle();
     assert.deepEqual(await chrome.runtime.sendMessage({ type: 'settings:get' }), saved);
-    assert.equal(document.getElementById('idle').getAttribute('aria-invalid'), 'true');
-    assert.equal(document.getElementById('stall').validity.customError, true);
+    assert.deepEqual(await chrome.runtime.sendMessage({ type: 'llm:get' }), savedModel);
+    assert.equal(document.getElementById('advanced-json').getAttribute('aria-invalid'), 'true');
+    assert.equal(document.getElementById('advanced-json').validity.customError, true);
+    assert.match(document.getElementById('advanced-json-error').textContent, /stallTimeoutMs.*line \d+, column \d+/);
     assert.equal(status.classList.contains('error'), true);
-    type('stall', '200');
-    assert.equal(document.getElementById('idle').hasAttribute('aria-invalid'), false);
-    assert.equal(document.getElementById('stall').validity.customError, false);
+    editJson(value => {
+      value.reading.stallTimeoutMs = 200_000;
+      value.reading.minSessionMs = 12_551;
+      value.reading.finishRatio = .8571;
+      value.model.timeoutMs = 18_501;
+    });
+    assert.equal(document.getElementById('advanced-json').hasAttribute('aria-invalid'), false);
+    assert.equal(document.getElementById('advanced-json').validity.customError, false);
 
     document.getElementById('save').click();
     await settle();
-    assert.equal((await chrome.runtime.sendMessage({ type: 'settings:get' })).stallTimeoutMs, 200_000);
+    const applied = await chrome.runtime.sendMessage({ type: 'settings:get' });
+    assert.equal(applied.stallTimeoutMs, 200_000);
+    assert.equal(applied.minSessionMs, 12_551, 'native millisecond precision survives saving');
+    assert.equal(applied.finishRatio, .8571, 'native ratio precision survives saving');
+    assert.equal((await chrome.runtime.sendMessage({ type: 'llm:get' })).timeoutMs, 18_501);
     assert.equal(bar.classList.contains('is-dirty'), false);
     assert.deepEqual(Array.from(dom.window.__previewErrors), []);
   } finally { close(); }
+
+  const empty = open('options', 'empty');
+  try {
+    await settle();
+    const { document, chrome, Event } = empty.dom.window;
+    const input = document.getElementById('advanced-json');
+    const value = JSON.parse(input.value);
+    value.model.maxTokens = 4096; value.model.timeoutMs = 12_345;
+    input.value = JSON.stringify(value); input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.getElementById('save').click(); await settle();
+    const model = await chrome.runtime.sendMessage({ type: 'llm:get' });
+    assert.equal(model.maxTokens, 4096, 'budgets can be saved before a provider is configured');
+    assert.equal(model.timeoutMs, 12_345);
+    assert.equal(model.provider, '');
+    assert.equal(model.consentAt, null, 'saving JSON does not grant consent');
+    assert.equal(model.apiKeySet, false);
+    assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), false);
+    assert.deepEqual(Array.from(empty.dom.window.__previewErrors), []);
+  } finally { empty.close(); }
 });
 
 test('sync section keeps its explanation behind the title button and its diagnostics behind a one-line verdict', async () => {
@@ -406,7 +503,7 @@ test('sync section keeps its explanation behind the title button and its diagnos
     const info = document.querySelector('#sync-settings legend button.info');
     const about = document.getElementById('sync-about');
     // The button's glyph is not part of the section's name.
-    assert.equal(document.querySelector('.section-nav a').textContent, "Device sync");
+    assert.equal(document.querySelector('.section-nav a[href="#sync-settings"]').textContent, "Device sync");
     assert.equal(about.hidden, true);
     info.click();
     assert.equal(about.hidden, false);
@@ -633,6 +730,8 @@ test('Android reading entry, local reader preferences and chapter navigation use
     assert.equal(document.getElementById('reader-font-settings').open, false);
     document.getElementById('article').click();
     document.getElementById('reader-more').click();
+    assert.equal(document.getElementById('reader-font-settings').open, false);
+    assert.deepEqual([...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id), ['reader-tools'], 'tools replace the appearance modal');
     document.getElementById('reader-bookmark').click();
     await settle();
     assert.equal(document.documentElement.style.getPropertyValue('--reader-font-size'), '18px');

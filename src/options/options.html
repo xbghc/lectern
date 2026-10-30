@@ -218,6 +218,50 @@
       #llm-status { overflow-wrap:anywhere; }
       #test-llm { min-height:48px; }
       #provider-doc { color:var(--primary); text-underline-offset:3px; }
+      /* Extension-only layout. Android reuses the original form and its own section disclosures. */
+      body.extension-settings { max-width:760px; padding:32px 24px 120px; }
+      .extension-settings h1 { font-size:28px; letter-spacing:-.6px; margin-bottom:28px; }
+      .extension-settings > fieldset { margin:24px 0; padding:18px 22px 22px; border-radius:12px; }
+      .extension-settings > fieldset > legend { font-size:16px; padding:0 8px; }
+      .extension-settings .field { grid-template-columns:140px minmax(0,1fr); gap:8px 16px; margin:14px 0; }
+      .extension-settings .field .wide { grid-column:2; width:100%; box-sizing:border-box; }
+      .extension-settings .field .hint { grid-column:2; }
+      .extension-settings .field.check { grid-template-columns:minmax(0,1fr) auto; }
+      .extension-settings .field.check .hint { grid-column:1 / -1; }
+      .extension-settings .field.check input { width:35px; height:21px; }
+      .extension-settings .field.check input::before { width:15px; height:15px; }
+      .extension-settings .model-advanced { margin-top:16px; }
+      .extension-settings .model-advanced > summary, .extension-settings .provider-search-options > summary { min-height:32px; align-content:center; }
+      .extension-settings .site-rules-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+      .extension-settings .site-rules-grid fieldset { min-width:0; margin:0; padding:0; border:0; background:none; }
+      .extension-settings .site-rules-grid legend { padding:0; font-size:13px; font-weight:500; }
+      .extension-settings .site-rules-grid p { min-height:40px; }
+      .extension-settings .site-rules-grid textarea { min-height:130px; }
+      .extension-settings .advanced-editor > summary { padding:4px 0; cursor:pointer; color:var(--muted-foreground); font-size:13px; }
+      .extension-settings #advanced-json { display:block; box-sizing:border-box; width:100%; min-height:360px; max-height:60vh; resize:vertical; padding:16px; tab-size:2; font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; white-space:pre; overflow:auto; }
+      .extension-settings #advanced-json-error { margin:8px 0; color:var(--destructive); overflow-wrap:anywhere; }
+      .extension-settings .advanced-editor > button { margin-top:12px; }
+      .extension-settings .maintenance-section + .maintenance-section { border-top:1px solid var(--line); margin-top:8px; padding-top:8px; }
+      .extension-settings .maintenance-section > summary { padding:10px 0; cursor:pointer; font-size:14px; }
+      .extension-settings .maintenance-section > fieldset { padding:8px 0 0; margin:0; border:0; background:none; }
+      .extension-settings .extension-reset { display:block; margin:28px 0 0; }
+      .extension-settings .savebar { position:fixed; top:auto; bottom:0; left:0; right:0; margin:0; padding:12px 24px; background:var(--background); border-top:1px solid var(--line); box-shadow:0 -2px 8px #00000006; justify-content:flex-end; z-index:10; }
+      .extension-settings .savebar #status { margin-right:auto; order:-1; }
+      .extension-settings .section-nav p { letter-spacing:0; text-transform:none; }
+      .extension-settings .section-nav a { border-left:0; border-radius:6px; padding:8px 12px; }
+      .extension-settings .section-nav a[aria-current] { background:var(--muted); }
+      @media (min-width:1100px) {
+        body.extension-settings.has-nav { --nav-left:max(24px,calc(50% - 490px)); margin-left:calc(var(--nav-left) + 196px); }
+      }
+      @media (max-width:680px) {
+        body.extension-settings { padding:20px 16px 120px; }
+        .extension-settings > fieldset { padding:14px 16px 16px; }
+        .extension-settings .field { grid-template-columns:1fr; }
+        .extension-settings .field .wide, .extension-settings .field .hint { grid-column:auto; }
+        .extension-settings .site-rules-grid { grid-template-columns:1fr; }
+        .extension-settings .site-rules-grid p { min-height:0; }
+        .extension-settings .savebar { padding:12px 16px; }
+      }
     </style>
     <link rel="stylesheet" href="theme.css" />
   </head>

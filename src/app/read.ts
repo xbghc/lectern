@@ -4,6 +4,7 @@ import type { Article, ReaderFetch, Snippet } from "../types.ts";
 import { go, navigation, readerUrl, shim } from "./boot.ts";
 import { hostHooks, inApp, native, systemBars } from "./native.ts";
 import { setupReaderControls } from "./readerControls.ts";
+import { setupReadingTools } from "./readerTools.ts";
 import { decorateIcons } from "../ui/icons.ts";
 import { bookProgress } from "../books/progress.ts";
 import { startFullscreen, type FullscreenReading } from "./fullscreen.ts";
@@ -218,6 +219,9 @@ function renderMeta(url: string): void {
       finished: bookContext.records.find(a => a.id === bookContext!.articleId)?.finished ?? false,
     }]) : pct;
     $("rprogress").textContent = `${progress}%`;
+    $("rprogress").setAttribute("aria-label", bookContext ? "Book reading progress" : "Article reading progress");
+    $("rprogress").setAttribute("aria-valuenow", String(progress));
+    $("rprogress").title = `${bookContext ? "Book" : "Article"} progress · ${progress}%`;
     $("rprogress-fill").style.width = `${progress}%`;
     $("reader-progress").setAttribute("aria-valuenow", String(progress));
     const est = st.estimate;
@@ -281,21 +285,35 @@ async function main(): Promise<void> {
   const tools = $<HTMLDialogElement>("reader-tools");
   const fontDialog = $<HTMLDialogElement>("reader-font-settings");
   const intro = $<HTMLDialogElement>("reader-intro");
-  $("reader-toc").addEventListener("click", () => { full?.reveal(); contents.showModal(); });
-  $("reader-more").addEventListener("click", () => { full?.reveal(); tools.showModal(); });
+  const toolsSheet = setupReadingTools({
+    dialog: tools, handle: $<HTMLButtonElement>("reader-tools-close"), heading: $("reader-tools-title"),
+    trigger: $<HTMLButtonElement>("reader-more"), fallbackFocus: $("reader-toggle"),
+    beforeOpen: () => {
+      full?.hide();
+      for (const dialog of [contents, intro]) if (dialog.open) dialog.close();
+    },
+  });
+  window.addEventListener("pagehide", toolsSheet.dispose, { once: true });
+  const showReaderDialog = (dialog: HTMLDialogElement): void => {
+    toolsSheet.close();
+    full?.hide();
+    for (const other of [contents, intro]) if (other !== dialog && other.open) other.close();
+    if (!dialog.open) dialog.showModal();
+  };
+  $("reader-toc").addEventListener("click", () => showReaderDialog(contents));
+  $("reader-more").addEventListener("click", toolsSheet.open);
   $("contents-close").addEventListener("click", () => contents.close());
-  $("reader-tools-close").addEventListener("click", () => tools.close());
-  for (const dialog of [contents, tools]) dialog.addEventListener("close", () => full?.hide());
+  contents.addEventListener("close", () => full?.hide());
   $("reader-font-close").addEventListener("click", () => full?.hide());
   $("reader-intro-done").addEventListener("click", () => intro.close());
-  $("reader-gesture-help").addEventListener("click", () => { tools.close(); $("reader-intro-done").textContent = "Continue reading"; intro.showModal(); });
+  $("reader-gesture-help").addEventListener("click", () => { $("reader-intro-done").textContent = "Continue reading"; showReaderDialog(intro); });
   intro.addEventListener("close", () => {
     full?.hide();
     void chrome.storage.local.set({ 'reader:gestures-shown': true }).catch(() => undefined);
   });
   const url = params.get("u")?.trim() ?? "";
   $("back").addEventListener("click", () => void leave());
-  $("shot").addEventListener("click", () => { tools.close(); requestAnimationFrame(() => requestAnimationFrame(() => page?.get("translation")?.screenshot())); });
+  $("shot").addEventListener("click", () => { toolsSheet.close(); requestAnimationFrame(() => requestAnimationFrame(() => page?.get("translation")?.screenshot())); });
   // 全屏先进：正文还在抓的时候系统栏就该让开，不必等正文回来才挪一次位置
   full = startFullscreen({
     body: document.body,
@@ -312,16 +330,22 @@ async function main(): Promise<void> {
   const sheet = $("sheet");
   const backdrop = $("sheet-backdrop");
   const setSheet = (open: boolean): void => {
+    if (open) {
+      toolsSheet.close();
+      for (const dialog of [contents, intro]) if (dialog.open) dialog.close();
+    }
     sheet.hidden = !open;
     backdrop.hidden = !open;
     full?.hide();
+    $(open ? "sheet-close" : "reader-toggle").focus({ preventScroll: true });
   };
   backdrop.addEventListener("click", () => setSheet(false));
 
   hostHooks.beforeBack = () => {
     if (cancelRegion()) return true;
     if (page?.get("translation")?.dismiss()) return true;
-    for (const dialog of [intro, tools]) if (dialog.open) { dialog.close(); return true; }
+    if (intro.open) { intro.close(); return true; }
+    if (tools.open) { toolsSheet.close(); return true; }
     if (contents.open) { contents.close(); return true; }
     // 单子开着时先收单子：手机上"返回"关掉的是最上面那一层，不是整个页面
     if (!sheet.hidden) {
@@ -419,14 +443,14 @@ async function main(): Promise<void> {
   const byline = $("reader-source");
   byline.replaceChildren();
   if (book) {
-    byline.append(el("span", undefined, book.title));
-    if (book.author) byline.append(el("span", undefined, book.author));
+    byline.append(el("span", "reader-source-primary", book.title));
+    if (book.author) byline.append(el("span", "reader-source-meta", book.author));
   } else {
-    const link = el("a", undefined, hostnameOf(pageUrl));
+    const link = el("a", "reader-source-primary", hostnameOf(pageUrl));
     link.href = pageUrl;
     byline.append(link);
   }
-  byline.append(el("span", undefined, new Date(cached.savedTs).toLocaleDateString("en-US")));
+  byline.append(el("span", "reader-source-meta", new Date(cached.savedTs).toLocaleDateString("en-US")));
   // 洗过的 HTML，见 sanitize.ts；正文来自任意网站，这一步不能省
   box.innerHTML = "";
   if (refetchFailure) {
@@ -446,7 +470,7 @@ async function main(): Promise<void> {
     window.addEventListener("pagehide", resources.release, { once: true });
   }
   if (cached.archiveManifest) {
-    const status = el("span", undefined, "Saved article · Preparing images…");
+    const status = el("span", "reader-source-status", "Saved article · Preparing images…");
     byline.append(status);
     const hydration = hydrateArchiveImages(body, cached.archiveManifest, identity);
     box.append(body);
@@ -472,14 +496,14 @@ async function main(): Promise<void> {
     };
     if (chapter.index > 0) jump(chapter.index - 1, "‹ Previous chapter");
     const toc = el("button", "mini", "Contents");
-    toc.addEventListener("click", () => contents.showModal());
+    toc.addEventListener("click", () => showReaderDialog(contents));
     nav.append(toc);
     if (chapter.index + 1 < current.chapters.length) jump(chapter.index + 1, "Next chapter ›");
     box.append(nav);
   }
 
   await setupReaderControls({ articleId, body, book, chapter: chapter?.index ?? null,
-    openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")) });
+    openChapter: id => void go(readerUrl(id) + (returnPane ? `&from=${returnPane}` : "")), closeTools: toolsSheet.close });
   if (onPhone()) {
     const saved = await chrome.storage.local.get('reader:gestures-shown').catch(() => ({ 'reader:gestures-shown': true }));
     if (!saved['reader:gestures-shown'] && document.visibilityState !== 'hidden') intro.showModal();
@@ -504,7 +528,7 @@ async function main(): Promise<void> {
     if (area === "local" && changes["snippets"]) void refreshCount();
   });
   $("words").addEventListener("click", async () => {
-    tools.close();
+    toolsSheet.close();
     try { renderWords(await refreshCount()); }
     catch (err) {
       const box = $("sheet-list");

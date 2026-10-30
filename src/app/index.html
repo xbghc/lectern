@@ -18,10 +18,10 @@
       <nav aria-label="Main navigation">
         <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>Reading</span></button>
         <button data-tab="words" class="tab"><span data-icon="words"></span><span>Vocabulary</span><span id="nav-word-count" class="nav-count"></span></button>
-        <a id="to-options" href="options.html" class="phone-nav-link" aria-label="Settings" title="Settings"><span data-icon="settings"></span></a>
+        <a id="to-options" href="options.html" class="phone-nav-link" aria-label="Settings" title="Settings"><span data-icon="settings"></span><span>Settings</span></a>
       </nav>
     </header>
-    <div class="workspace-bar"><div class="breadcrumb"><span id="workspace-title">Reading</span></div><button id="show-books" class="icon-btn" aria-label="Open bookshelf" title="Bookshelf"><span data-icon="shelf"></span></button><button id="workspace-search" class="icon-btn" aria-expanded="false" aria-controls="article-tools" aria-label="Search articles" title="Search articles"><span data-icon="search"></span></button><button id="reading-statistics" class="icon-btn" aria-label="View reading statistics" title="Reading statistics"><span data-icon="chart"></span></button><button id="import-book" class="icon-btn" type="button" aria-label="Import EPUB" title="Import EPUB" hidden><span data-icon="plus"></span></button><a id="words-chat" href="chat.html" class="icon-btn phone-chat-entry" aria-label="Practice vocabulary with AI" title="Practice vocabulary with AI" data-track="chat.open" hidden><span data-icon="chat"></span></a></div>
+    <div class="workspace-bar"><div class="breadcrumb"><span id="workspace-title">Reading</span></div><button id="show-books" class="icon-btn" aria-label="Open bookshelf" title="Bookshelf"><span data-icon="shelf"></span></button><button id="workspace-search" class="icon-btn" aria-expanded="false" aria-controls="article-tools" aria-label="Search articles" title="Search articles"><span data-icon="search"></span></button><button id="reading-statistics" class="icon-btn" aria-label="View reading statistics" title="Reading statistics"><span data-icon="chart"></span></button><button id="import-book" class="icon-btn" type="button" aria-label="Import EPUB" title="Import EPUB" hidden><span data-icon="plus"></span></button><button id="words-search" class="icon-btn" type="button" aria-expanded="false" aria-controls="word-tools" aria-label="Search vocabulary" title="Search vocabulary" hidden><span data-icon="search"></span></button><a id="words-chat" href="chat.html" class="icon-btn phone-chat-entry" aria-label="Practice vocabulary with AI" title="Practice vocabulary with AI" data-track="chat.open" hidden><span data-icon="chat"></span></a></div>
     <main id="main" class="dashboard-main">
 
 
@@ -88,16 +88,18 @@
 
     <!-- ---------------- 生词本 ---------------- -->
     <section id="pane-words" class="pane" hidden>
-      <button id="words-review" class="phone-review-entry"><span data-icon="review"></span><span><strong><span id="due-badge">0</span> items due</strong><small>Revisit words in the context you read them</small></span><span data-icon="arrow"></span></button>
-      <div class="toolbar">
+      <button id="words-review" class="phone-review-entry"><span data-icon="review"></span><span id="words-review-label">All caught up</span><span id="due-badge" hidden>0</span><span data-icon="arrow"></span></button>
+      <div id="word-tools" hidden>
+      <div class="toolbar word-toolbar">
         <input id="q-word" type="search" placeholder="Search text, translations or sources" aria-label="Search vocabulary" />
-        <select id="kind-filter">
+        <select id="kind-filter" aria-label="Vocabulary type">
           <option value="">All types</option>
           <option value="word">Word</option>
           <option value="phrase">Phrase</option>
           <option value="sentence">Sentence</option>
         </select>
-        <span id="word-summary" class="muted small"></span>
+      </div>
+      <p id="word-summary" class="muted small" role="status" hidden></p>
       </div>
       <div id="words" class="list"></div>
     </section>

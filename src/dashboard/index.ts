@@ -117,6 +117,7 @@ function show(pane: Pane, load = true): void {
     $("workspace-search").hidden = pane !== "articles";
     $("words-chat").hidden = pane !== "words";
   }
+  if ($("show-books")) $("show-books").hidden = pane !== "articles";
   if ($("import-book")) $("import-book").hidden = pane !== "books" || $("import-book").dataset.available !== "true";
   if (!document.body.classList.contains("app") && $("add-article")) $("add-article").hidden = pane !== "articles";
   document.body.dataset.pane = pane;
@@ -353,7 +354,6 @@ function renderArticles(): void {
   const shelved = (a: Article): boolean => Boolean(books[parseChapterId(a.id)?.bookId ?? ""]);
   const loose = articles.filter((a) => !shelved(a));
   const queueOnly = document.body.classList.contains("app") && !$<HTMLDetailsElement>("article-tools")?.open && !q && !filter && !managingArticles;
-  if ($("reading-queue-title")) $("reading-queue-title").textContent = queueOnly ? "Read next" : "Articles";
   const toolsToggle = $("article-tools-toggle");
   if (toolsToggle) {
     toolsToggle.dataset.filtered = String(!!q || !!filter);

@@ -651,19 +651,12 @@ body.app .phone-continue { padding:14px 16px; margin-bottom:20px; border:1px sol
 .phone-continue p { font-size:12px; line-height:1.5; color:var(--muted-foreground); margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .phone-continue-bottom { display:flex; align-items:center; justify-content:flex-end; margin-top:8px; }
 .phone-continue-bottom .primary { min-height:44px; padding:10px 15px; font-size:12px; }
-.phone-home-shelf { margin-bottom:28px; }
-.phone-shelf-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:16px; }
-.phone-shelf-preview { display:grid; grid-template-columns:53px minmax(0,1fr); gap:10px; align-items:center; color:var(--fg); text-decoration:none; }
 .shelf-cover { display:grid; place-items:center; position:relative; overflow:hidden; background:var(--muted); border:1px solid var(--border); border-radius:2px 5px 5px 2px; box-shadow:3px 3px 0 #09090b0a; color:var(--fg-soft); aspect-ratio:2/3; }
 .shelf-cover::before { content:''; position:absolute; left:7%; top:0; bottom:0; border-left:1px solid #09090b18; }
 .shelf-cover img { width:100%; height:100%; object-fit:cover; }
 .shelf-cover > span { padding:14%; text-align:center; font:16px/1.7 var(--sans); overflow-wrap:anywhere; }
-.phone-shelf-preview .shelf-cover { width:53px; height:80px; aspect-ratio:auto; }
-.phone-shelf-preview .shelf-cover > span { padding:6px; font-size:9px; }
-.phone-shelf-preview h3 { font:14px/1.5 var(--sans); margin:0 0 7px; overflow-wrap:anywhere; }
-.phone-shelf-preview p { font:11px var(--sans); color:var(--muted-foreground); margin:0; }
 body.app .app-sidebar nav .phone-nav-link[aria-label]::after { content:''; height:13px; }
-body.app .queue-heading { margin-bottom:4px; }
+body.app .queue-heading { justify-content:flex-end; margin:0; }
 body.app .queue-heading #add-article { position:static; border:0; width:40px; height:40px; padding:0; box-shadow:none; border-radius: var(--radius-sm); }
 .queue-actions { display:flex; align-items:center; gap:4px; }
 .section-count { margin-left:6px; color:var(--muted-foreground); font-size:12px; font-weight:400; }
@@ -687,25 +680,28 @@ body.app .phone-review-entry { display:flex; align-items:center; gap:12px; width
 .phone-review-entry strong { display:block; font-size:14px; font-weight:500; }
 .phone-review-entry small { display:block; font-size:11px; color:var(--muted-foreground); margin-top:6px; }
 .phone-review-entry .badge { display:inline; background:none; padding:0; color:inherit; font:inherit; }
-body.app #book-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px 18px; }
-body.app .book-card { padding:0; background:none; border:0; min-width:0; }
-body.app .book-card .row1 { display:flex; flex-direction:column; align-items:stretch; gap:9px; }
-body.app .shelf-cover-link { display:block; text-decoration:none; width:100%; }
-body.app .book-card .title { font:16px/1.4 var(--sans); display:block; margin-top:4px; }
-body.app .book-author { color:var(--muted-foreground); font-size:12px; line-height:1.5; margin:0; }
-.book-reading-progress { display:flex; align-items:center; gap:10px; margin:12px 0 4px; color:var(--muted-foreground); font-size:12px; font-variant-numeric:tabular-nums; }
+body.app #book-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:12px; }
+body.app .book-card { padding:12px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); min-width:0; }
+body.app .book-card .row1 { display:flex; flex-direction:row; align-items:center; gap:12px; }
+body.app .shelf-cover-link { display:block; flex:0 0 48px; text-decoration:none; width:48px; }
+body.app .shelf-cover-link .shelf-cover { width:48px; height:72px; }
+body.app .book-info { flex:1; min-width:0; }
+body.app .book-card .title { font:600 14px/1.4 var(--sans); display:block; margin:0 0 4px; }
+body.app .book-card .title a { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+body.app .book-author { color:var(--muted-foreground); font-size:11px; line-height:1.5; margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.book-reading-progress { display:flex; align-items:center; gap:8px; margin:8px 0 0; color:var(--muted-foreground); font-size:11px; font-variant-numeric:tabular-nums; }
 .book-reading-progress .progress { flex:1; margin:0; height:3px; }
 body.app .book-card .sub { margin:8px 0 12px; font-size:12px; }
 body.app .book-card .sub > span { display:block; }
-.book-actions { position:relative; }
+.book-actions { position:relative; margin:4px 0 0 60px; }
 body.app .book-actions .book-toc { margin:0; font-size:12px; }
-body.app .book-actions .book-toc > summary { display:grid; place-items:center; width:48px; height:48px; padding:0; list-style:none; }
+body.app .book-actions .book-toc > summary { display:grid; place-items:center; width:44px; height:44px; padding:0; list-style:none; }
 body.app .book-actions .book-toc > summary::before { content:none; }
 .book-actions .book-toc[open] > summary { color:var(--primary); background:var(--wash); }
 body.app .book-toc .chapter-row { display:block; padding:10px 0; }
 body.app .book-toc .chapter-row > a { display:block; white-space:normal; overflow:visible; text-overflow:clip; line-height:1.5; font-size:13px; }
 body.app .book-toc .chapter-row > .muted { display:block; margin-top:4px; line-height:1.5; }
-body.app .book-actions .book-delete { position:absolute; right:0; top:0; width:48px; height:48px; padding:0; }
+body.app .book-actions .book-delete { position:absolute; right:0; top:0; width:44px; height:44px; padding:0; }
 body.app .book-actions .book-delete:hover { color:var(--danger, #b42318); }
 .shelf-cover-placeholder { background:var(--muted); color:var(--muted-foreground); }
 .shelf-cover-placeholder > .ui-icon { width:30%; height:auto; opacity:.5; }
@@ -1225,8 +1221,6 @@ body.app .app-sidebar nav .phone-nav-link { display:flex; flex:1; flex-direction
 .phone-nav-link svg { width:20px; height:20px; }
 body.app .phone-chat-entry { color:var(--primary); background:var(--wash); border-radius: var(--radius-md); }
 body.app .word-chat-entry { margin-left:auto; flex-shrink:0; color:var(--primary); }
-body.app #home-books:empty { display:none; }
-#home-books { font-size:12px; color:var(--muted-foreground); }
 .phone-stat-distribution.is-empty { background:var(--line); }
 #statistics .row.between, .vocabulary-chat .row.between { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 #statistics button { cursor:pointer; border:0; background:none; font-family:var(--sans); }
@@ -1308,7 +1302,6 @@ body.reader .iconbtn[hidden] { display:none; }
   body.vocabulary-chat .icon-btn { width:48px; height:48px; }
   body.app .word-actions > summary { width:48px; height:48px; }
   body.app .word-summary-row > .sub, body.app .book-card .sub,
-  body.app .phone-shelf-preview p,
   body.app .phone-review-entry small { font-size:12px; }
   body.app .word-chat-entry { width:48px; height:48px; flex:none; }
   body.app .word-detail > summary, body.app .book-toc > summary,

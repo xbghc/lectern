@@ -1,4 +1,5 @@
 import "./sync.ts";
+import { resolveReadingSettings } from "../features/reading/settings.ts";
 import type { ExportBundle, ImportOutcome, LlmConfig, LlmLogBundle, LlmUsage, Settings } from "../types.ts";
 import { DEFAULT_LLM, DEFAULT_SETTINGS, MAX_AUTO_WORDS } from "../types.ts";
 import { saveTextFile } from "../lib/download.ts";
@@ -43,6 +44,7 @@ const status = $("status");
 const dataStatus = $("data-status");
 
 function fill(s: Settings): void {
+  s = { ...s, ...resolveReadingSettings(s) };
   fields.idle.value = String(Math.round(s.idleTimeoutMs / 1000));
   fields.stall.value = String(Math.round(s.stallTimeoutMs / 1000));
   fields.maxQuiet.value = String(Math.round(s.maxQuietMs / 1000));
@@ -70,7 +72,7 @@ function collect(): Settings {
     if (!Number.isFinite(v)) return fallback;
     return Math.min(max, Math.max(min, v));
   };
-  return {
+  const collected: Settings = {
     idleTimeoutMs: num(fields.idle, 30, 5, 600) * 1000,
     stallTimeoutMs: num(fields.stall, 90, 10, 1800) * 1000,
     maxQuietMs: num(fields.maxQuiet, 300, 0, 1800) * 1000,
@@ -94,6 +96,7 @@ function collect(): Settings {
     explainVocab: fields.explainVocab.checked,
     finishRatio: num(fields.finishRatio, 80, 10, 100) / 100,
   };
+  return { ...collected, ...resolveReadingSettings(collected) };
 }
 
 /*

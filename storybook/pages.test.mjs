@@ -20,6 +20,11 @@ test('compact reading controls keep filters, selection and book contents reachab
   try {
     await settle();
     const { document } = dom.window;
+    assert.equal(document.getElementById('home-shelf'), null);
+    assert.equal(document.getElementById('reading-queue-title'), null);
+    assert.ok(document.querySelector('.workspace-bar #show-books'));
+    assert.equal(document.getElementById('show-books').hidden, false);
+    assert.equal(document.querySelectorAll('#articles .article-card').length, 1, 'unfinished articles follow the resume card without repeating it');
     const tools = document.getElementById('article-tools-toggle');
     tools.click(); await settle();
     assert.equal(tools.getAttribute('aria-expanded'), 'true');
@@ -39,6 +44,7 @@ test('compact reading controls keep filters, selection and book contents reachab
     assert.equal(manage.getAttribute('aria-pressed'), 'false', 'closing controls exits bulk selection');
     document.getElementById('show-books').click(); await settle();
     assert.equal(document.getElementById('pane-books').hidden, false);
+    assert.equal(document.getElementById('show-books').hidden, true);
     const book = document.querySelector('.book-card'), toc = book.querySelector('.book-toc');
     assert.equal(book.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '37');
     assert.equal(book.querySelector('.shelf-cover').textContent, '', 'fallback covers do not repeat the title');
@@ -105,8 +111,7 @@ const scenarios = [
   ['options', 'error', 'articles', "1 reading item (including 2 records) could not be uploaded and remain on this device"],
   ['appOptions', 'error', 'articles', "1 reading item (including 2 records) could not be uploaded and remain on this device"],
   ['sidepanel', 'populated', 'articles', 'consolidate'],
-  ['app', 'populated', 'articles', "Read next"],
-  ['app', 'populated', 'articles', "The Art of Deep Reading"],
+  ['app', 'populated', 'articles', "Continue reading"],
   ['appOptions', 'populated', 'articles', "Settings"],
   ['app', 'populated', 'stats', "Last 30 days"],
   ['chat', 'populated', 'articles', "Put your reading into words."],
@@ -251,13 +256,20 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     const { document, chrome, Event } = app.dom.window;
     assert.equal(document.querySelector('.section-nav'), null);
     assert.equal(document.getElementById('save-llm'), null);
+    for (const id of ['sec-finish', 'sec-position', 'sec-review', 'sec-attention', 'sec-paragraph', 'sec-rule-chat']) {
+      assert.equal(document.getElementById(id), null, `${id} is absent from Android settings`);
+    }
+    const appDefaults = await chrome.runtime.sendMessage({ type: 'settings:get' });
+    assert.equal(appDefaults.finishRatio, .9);
+    assert.equal(appDefaults.restorePositionEnabled, true);
+    assert.equal(appDefaults.articleReviewEnabled, true);
     const type = (id, value) => { const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
     const send = chrome.runtime.sendMessage.bind(chrome.runtime);
     let modelTests = 0;
     chrome.runtime.sendMessage = msg => { if (msg.type === 'llm:test') modelTests++; return send(msg); };
     type('model', 'saved-from-global-button');
     type('apiKey', 'synthetic-unified-save-key');
-    type('finishRatio', '85');
+    type('ctxChars', '850');
     assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), true);
     assert.equal(document.getElementById('test-llm').disabled, false);
     assert.equal(document.getElementById('test-llm').textContent, 'Save changes and test');
@@ -269,7 +281,8 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     document.getElementById('save').click();
     await settle();
     assert.equal((await chrome.runtime.sendMessage({ type: 'llm:get' })).model, 'saved-from-global-button');
-    assert.equal((await chrome.runtime.sendMessage({ type: 'settings:get' })).finishRatio, .85);
+    assert.equal((await chrome.runtime.sendMessage({ type: 'settings:get' })).contextChars, 850);
+    assert.equal((await chrome.runtime.sendMessage({ type: 'settings:get' })).finishRatio, .9);
     assert.equal(document.getElementById('apiKey').value, '');
     assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), false);
     assert.equal(modelTests, 0, 'Saving does not make a model request');
@@ -298,6 +311,9 @@ test('options form tracks unsaved changes, keeps blacklists on reset, and only t
     document.getElementById('revert').click();
     assert.equal(document.getElementById('apiKey').value, '');
     assert.equal(document.getElementById('savebar').classList.contains('is-dirty'), false);
+    document.getElementById('reset').click();
+    document.getElementById('save').click(); await settle();
+    assert.equal((await chrome.runtime.sendMessage({ type: 'settings:get' })).finishRatio, .9, 'reset keeps the Android threshold');
     assert.deepEqual(Array.from(app.dom.window.__previewErrors), []);
   } finally { app.close(); }
 

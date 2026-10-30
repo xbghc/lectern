@@ -25,6 +25,7 @@ import { mergeEpisodes } from "../lib/stats.ts";
 import { KEY_CARDS, KEY_SNIPPETS, MAX_SNIPPETS } from "../features/translation/vocab.ts";
 import { KEY_LLM, getLlmConfig } from "../core/background/llm.ts";
 import { KEY_ARTICLE_CARDS, REVIEW_PREFIX, articleCardWrites, reviewKey, textKey } from "../features/reading/articleReview.ts";
+import { editableReadingPatch, resolveReadingSettings } from "../features/reading/settings.ts";
 
 export const KEY_SETTINGS = "settings";
 export const KEY_ARTICLES = "articles";
@@ -84,10 +85,15 @@ export async function updateLocalOnly(keys: readonly string[], change: (values: 
   });
 }
 
-export async function getSettings(): Promise<Settings> {
+async function getStoredSettings(): Promise<Settings> {
   const got = await local().get(KEY_SETTINGS);
   const stored = (got[KEY_SETTINGS] as Partial<Settings> & LegacySettings) ?? {};
   return { ...DEFAULT_SETTINGS, ...stored, ...migrate(stored) };
+}
+
+export async function getSettings(): Promise<Settings> {
+  const stored = await getStoredSettings();
+  return { ...stored, ...resolveReadingSettings(stored) };
 }
 
 type Stored = Partial<Settings> & LegacySettings;
@@ -187,9 +193,9 @@ async function seedTranslationAllowlist(stored: Stored): Promise<string[]> {
 
 export async function setSettings(patch: Partial<Settings>): Promise<Settings> {
   return serialize(async () => {
-    const merged = { ...(await getSettings()), ...patch };
+    const merged = { ...(await getStoredSettings()), ...editableReadingPatch(patch) };
     await local().set({ [KEY_SETTINGS]: merged });
-    return merged;
+    return { ...merged, ...resolveReadingSettings(merged) };
   });
 }
 
@@ -199,10 +205,10 @@ export async function setSettings(patch: Partial<Settings>): Promise<Settings> {
  */
 export async function updateSettings(change: (current: Settings) => Partial<Settings>): Promise<Settings> {
   return serialize(async () => {
-    const current = await getSettings();
-    const merged = { ...current, ...change(current) };
+    const current = await getStoredSettings();
+    const merged = { ...current, ...editableReadingPatch(change({ ...current, ...resolveReadingSettings(current) })) };
     await local().set({ [KEY_SETTINGS]: merged });
-    return merged;
+    return { ...merged, ...resolveReadingSettings(merged) };
   });
 }
 
@@ -215,11 +221,11 @@ export async function allowTranslationSite(url: string): Promise<Settings> {
   // 不带点的主机名（localhost、内网机器名）写不成域名规则，退一步记整个源
   const rule = host && matchesUrlRule(url, host) ? host : host ? new URL(url).origin : "";
   return serialize(async () => {
-    const current = await getSettings();
-    if (!rule || matchesUrlRules(url, current.translationAllowedUrls)) return current;
+    const current = await getStoredSettings();
+    if (!rule || matchesUrlRules(url, current.translationAllowedUrls)) return { ...current, ...resolveReadingSettings(current) };
     const merged = { ...current, translationAllowedUrls: [...current.translationAllowedUrls, rule] };
     await local().set({ [KEY_SETTINGS]: merged });
-    return merged;
+    return { ...merged, ...resolveReadingSettings(merged) };
   });
 }
 

@@ -203,19 +203,12 @@ dialog::backdrop { background: rgb(0 0 0 / .5); }
 .article-source { background: var(--muted); border-radius: var(--radius-md); }
 .phone-header-kicker { letter-spacing: 0; font-size: 12px; }
 body.app #app-page-title { font: 650 26px/1.3 var(--sans); letter-spacing: -.6px; }
-body.app .phone-continue { padding: 14px 16px; margin-bottom: 20px; }
+body.app .phone-continue { padding: 14px 16px; margin-bottom: 8px; }
 .phone-continue h2 { font-size: 16px; line-height: 1.5; letter-spacing: -.2px; }
-.phone-shelf-preview { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); }
-.phone-shelf-strip { gap: 12px; }
-.phone-shelf-preview h3 { font-size: 13px; font-weight: 600; }
-.phone-shelf-preview { grid-template-columns: 42px minmax(0, 1fr); gap: 10px; }
-.phone-shelf-preview .shelf-cover { width: 42px; height: 62px; }
 body.app .phone-review-entry { border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
 body.app .app-sidebar .tab.active > [data-icon], .phone-settings-nav a.active svg { border-radius: var(--radius-md); }
 .phone-settings-nav a.active { color: var(--foreground); }
-body.app .book-card { padding: 0; border: 0; border-radius: 0; background: none; }
-body.app .book-card .title { font-weight: 600; font-size: 15px; }
-body.app #book-list { gap: 16px; }
+body.app .book-card .title { font-weight: 600; font-size: 14px; }
 .shelf-cover { border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); }
 .phone-stat-ranges { width: 100%; }
 .phone-stat-summary strong { font-weight: 600; }
@@ -258,14 +251,6 @@ body.mobile-settings .settings-savebar { background: var(--background); grid-tem
 .mobile-settings .settings-savebar #reset { white-space: nowrap; }
 .section-nav p { letter-spacing: 0; font-weight: 500; }
 .reader-contents { background: var(--popover); }
-.phone-shelf-preview .shelf-cover > span {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-  padding-block: 0;
-  margin-block: 6px;
-}
 @media (max-width: 720px) {
   body.app #pane-words .toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
   body.app #q-word { grid-column: 1 / -1; width: 100%; min-height: 44px; }

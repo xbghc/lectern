@@ -3,9 +3,10 @@ import { sectionName } from "../options/nav.ts";
 /** Keep the shared settings controls and handlers, but give the app a compact section index. */
 export function setupSettingsLayout(): void {
   document.body.classList.add("mobile-settings");
-  // App 使用自己的贴底进度线，扩展顶部情况条的开关在这里没有作用。
-  const extensionProgress = document.getElementById("focusBarEnabled")?.closest<HTMLElement>(".field");
-  if (extensionProgress) extensionProgress.hidden = true;
+  // Detached controls keep the shared form's references, but are absent from the Android UI.
+  for (const id of ["sec-finish", "sec-position", "sec-review", "sec-attention", "sec-paragraph", "sec-rule-chat"]) {
+    document.getElementById(id)?.remove();
+  }
   document.querySelector(".settings-back")?.remove();
   const title = document.querySelector("h1");
   if (title) title.textContent = "Settings";
@@ -21,11 +22,6 @@ export function setupSettingsLayout(): void {
   const descriptions: Record<string, string> = {
     "Device sync": "Server connection, sync status and offline records",
     "Text translation": "Translation, text selection and word explanations",
-    "Completion rules": "Choose when articles count as finished",
-    "Resume reading": "Return to the paragraph you last read",
-    "Article review": "Outlines and recall questions",
-    "Focus timeouts": "Focus tracking and inactivity limits",
-    "Paragraph progress": "Dwell time and reading thresholds",
     "Session rules": "Focus sessions and reading statistics",
     "Reading blocklist": "Skip tracking on these pages; translation remains available",
     "Translation allowlist": "Enable translation automatically on these sites",

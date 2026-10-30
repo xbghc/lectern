@@ -118,7 +118,7 @@ function show(pane: Pane, load = true): void {
     $("words-chat").hidden = pane !== "words";
   }
   if ($("show-books")) $("show-books").hidden = pane !== "articles";
-  if ($("import-book")) $("import-book").hidden = pane !== "books" || $("import-book").dataset.available !== "true";
+  if ($("import-book")) $("import-book").hidden = pane !== "books";
   if (!document.body.classList.contains("app") && $("add-article")) $("add-article").hidden = pane !== "articles";
   document.body.dataset.pane = pane;
   if (document.body.classList.contains("app") && ["articles", "books", "words"].includes(pane)) {
@@ -354,10 +354,10 @@ function renderArticles(): void {
   const shelved = (a: Article): boolean => Boolean(books[parseChapterId(a.id)?.bookId ?? ""]);
   const loose = articles.filter((a) => !shelved(a));
   const queueOnly = document.body.classList.contains("app") && !$<HTMLDetailsElement>("article-tools")?.open && !q && !filter && !managingArticles;
-  const toolsToggle = $("article-tools-toggle");
+  const toolsToggle = document.body.classList.contains("app") ? $("workspace-search") : null;
   if (toolsToggle) {
     toolsToggle.dataset.filtered = String(!!q || !!filter);
-    toolsToggle.title = `Filter and manage articles${q || filter ? " (filters active)" : ""}`;
+    toolsToggle.title = `${$<HTMLDetailsElement>("article-tools")?.open ? "Close article search" : "Search articles"}${q || filter ? " (filters active)" : ""}`;
     toolsToggle.setAttribute("aria-label", toolsToggle.title);
   }
   const list = loose.filter((a) => {
@@ -1443,17 +1443,17 @@ $("show-books")?.addEventListener("click", () => { track("nav.books"); show("boo
 $("reading-back")?.addEventListener("click", () => { track("nav.articles"); show("articles"); });
 $("reading-statistics")?.addEventListener("click", () => { track("nav.stats"); show("stats"); });
 $("review-back")?.addEventListener("click", () => show("words"));
-$("article-tools-toggle")?.addEventListener("click", () => {
-  const panel = $<HTMLDetailsElement>("article-tools");
-  panel.open = !panel.open;
-  if (!panel.open && managingArticles) $("manage-articles").click();
-  if (!panel.open) $("article-tools-toggle").focus();
-});
 $("article-tools")?.addEventListener("toggle", () => {
-  $("article-tools-toggle")?.setAttribute("aria-expanded", String($<HTMLDetailsElement>("article-tools").open));
+  const panel = $<HTMLDetailsElement>("article-tools");
+  $("workspace-search")?.setAttribute("aria-expanded", String(panel.open));
+  if (!panel.open && managingArticles) $("manage-articles").click();
   renderArticles();
 });
-$("workspace-search")?.addEventListener("click", openSearch);
+$("workspace-search")?.addEventListener("click", () => {
+  const panel = $<HTMLDetailsElement>("article-tools");
+  if (panel?.open && !$("pane-articles").hidden) panel.open = false;
+  else openSearch();
+});
 document.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); }
 });

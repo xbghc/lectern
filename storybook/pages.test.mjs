@@ -25,7 +25,9 @@ test('compact reading controls keep filters, selection and book contents reachab
     assert.ok(document.querySelector('.workspace-bar #show-books'));
     assert.equal(document.getElementById('show-books').hidden, false);
     assert.equal(document.querySelectorAll('#articles .article-card').length, 1, 'unfinished articles follow the resume card without repeating it');
-    const tools = document.getElementById('article-tools-toggle');
+    assert.equal(document.getElementById('article-tools-toggle'), null);
+    assert.equal(document.getElementById('add-article'), null);
+    const tools = document.getElementById('workspace-search');
     tools.click(); await settle();
     assert.equal(tools.getAttribute('aria-expanded'), 'true');
     document.querySelector('#finish-filter [data-filter="done"]').click();
@@ -45,6 +47,10 @@ test('compact reading controls keep filters, selection and book contents reachab
     document.getElementById('show-books').click(); await settle();
     assert.equal(document.getElementById('pane-books').hidden, false);
     assert.equal(document.getElementById('show-books').hidden, true);
+    const importButton = document.getElementById('import-book');
+    assert.equal(importButton.hidden, false, 'bookshelf always exposes its add action');
+    importButton.click(); await settle();
+    assert.match(document.getElementById('book-status').textContent, /Android app/);
     const book = document.querySelector('.book-card'), toc = book.querySelector('.book-toc');
     assert.equal(book.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '37');
     assert.equal(book.querySelector('.shelf-cover').textContent, '', 'fallback covers do not repeat the title');

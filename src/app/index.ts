@@ -278,6 +278,10 @@ async function renderBooks(): Promise<void> {
 async function importBook(uri?: string): Promise<void> {
   if (importing) return;
   $("show-books").click();
+  if (!canOpenBooks()) {
+    say(native() ? "Update the app to import books." : "Import EPUB is available in the Android app.");
+    return;
+  }
   importing = true;
   $<HTMLButtonElement>("import-book").disabled = true;
   $<HTMLButtonElement>("import-book-empty").disabled = true;
@@ -317,12 +321,11 @@ async function importBook(uri?: string): Promise<void> {
   }
 }
 
+$("import-book").hidden = document.body.dataset.pane !== "books";
+$("import-book").addEventListener("click", () => void importBook());
 if (canOpenBooks()) {
-  $("import-book").dataset.available = "true";
-  $("import-book").hidden = document.body.dataset.pane !== "books";
   $("import-book-empty").hidden = false;
   $("book-open-hint").hidden = true;
-  $("import-book").addEventListener("click", () => void importBook());
   $("import-book-empty").addEventListener("click", () => void importBook());
 }
 void renderBooks();

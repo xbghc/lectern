@@ -32,11 +32,11 @@ export async function renderReadingHome(articles: Article[], speed: SpeedSummary
     const root = $('continue-reading');
     if (!target) { root.replaceChildren(); return; }
     root.replaceChildren(el('section', { class: 'phone-continue' }, [
-      el('h2', { title: target.title }, [el('span', { class: 'phone-continue-title-fill', style: `--reading-progress:${target.progress}%` }, [target.title])]),
+      el('h2', { title: target.title }, [target.title]),
       el('p', { title: target.source }, [parseChapterId(target.articleId) ? target.source : hostnameOf(target.articleId)]),
       el('span', { class: 'visually-hidden', role: 'progressbar', 'aria-label': 'Reading progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(target.progress) }),
       el('div', { class: 'phone-continue-bottom' }, [
-        el('a', { class: 'primary', href: `read.html?u=${encodeURIComponent(target.articleId)}&from=articles`, 'data-track': 'articles.open' }, ["Continue reading", icon('arrow')])]),
+        el('a', { class: 'primary', style: `--reading-progress:${target.progress}%`, href: `read.html?u=${encodeURIComponent(target.articleId)}&from=articles`, 'data-track': 'articles.open' }, ["continue", icon('arrow')])]),
     ]));
     return;
   }

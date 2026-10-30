@@ -117,7 +117,7 @@ const scenarios = [
   ['options', 'error', 'articles', "1 reading item (including 2 records) could not be uploaded and remain on this device"],
   ['appOptions', 'error', 'articles', "1 reading item (including 2 records) could not be uploaded and remain on this device"],
   ['sidepanel', 'populated', 'articles', 'consolidate'],
-  ['app', 'populated', 'articles', "Continue reading"],
+  ['app', 'populated', 'articles', "continue"],
   ['appOptions', 'populated', 'articles', "Settings"],
   ['app', 'populated', 'stats', "Last 30 days"],
   ['chat', 'populated', 'articles', "Put your reading into words."],

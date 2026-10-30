@@ -1,5 +1,5 @@
 const paths = {
-  brand: '<path fill="currentColor" stroke="none" fill-rule="evenodd" transform="translate(-4 -4) scale(.25)" d="M20 32H40C48 32 54 35 60 40V94C54 89 48 86 40 86H20ZM68 40C74 35 80 32 88 32H108V86H88C80 86 74 89 68 94ZM88 32H100V62L94 56L88 62Z"/>',
+  brand: '<path fill="currentColor" stroke="none" fill-rule="evenodd" transform="translate(-4 -4) scale(.25)" d="M20 32H40C48 32 54 35 60 40V89.5C60 91.9 58.8 92.3 56.8 90.9C51.8 87.4 46.6 86 40 86H20ZM68 40C74 35 80 32 88 32H108V86H88C81.4 86 76.2 87.4 71.2 90.9C69.2 92.3 68 91.9 68 89.5ZM88 32H100V62L94 56L88 62Z"/>',
   book: '<path d="M12 5C8 2 4 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-2-10 1Zm0 0v16M5 7l4 1M5 11l4 1m6-4 4-1m-4 5 4-1"/>',
   words: '<rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 13l3-7 3 7m-5-2h4m-5 10h14V7"/>',
   review: '<rect x="7" y="5" width="14" height="17" rx="2"/><path d="M17 2H5a2 2 0 0 0-2 2v14m8-9h6m-6 4h6m-6 4h4"/>',

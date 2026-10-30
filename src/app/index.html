@@ -14,14 +14,14 @@
   <body class="dash app">
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="app-sidebar reading-header">
-      <div class="app-heading"><button id="reading-back" class="icon-btn" aria-label="Back to reading home" hidden><span data-icon="back"></span></button><div><span class="phone-header-kicker">Lectern</span><h1 id="app-page-title">Reading</h1></div></div>
+      <div class="app-heading"><button id="reading-back" class="icon-btn" aria-label="Back to reading home" title="Back to reading" hidden><span data-icon="back"></span></button><div><span class="phone-header-kicker">Lectern</span><h1 id="app-page-title">Reading</h1></div></div>
       <nav aria-label="Main navigation">
         <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>Reading</span></button>
         <button data-tab="words" class="tab"><span data-icon="words"></span><span>Vocabulary</span><span id="nav-word-count" class="nav-count"></span></button>
-        <a id="to-options" href="options.html" class="phone-nav-link"><span data-icon="settings"></span><span>Settings</span></a>
+        <a id="to-options" href="options.html" class="phone-nav-link" aria-label="Settings" title="Settings"><span data-icon="settings"></span></a>
       </nav>
     </header>
-    <div class="workspace-bar"><div class="breadcrumb"><span id="workspace-title">Reading</span></div><button id="workspace-search" class="icon-btn" aria-label="Search articles"><span data-icon="search"></span></button><button id="reading-statistics" class="icon-btn" aria-label="View reading statistics"><span data-icon="chart"></span></button><a id="words-chat" href="chat.html" class="icon-btn phone-chat-entry" aria-label="Practice vocabulary with AI" data-track="chat.open" hidden><span data-icon="chat"></span></a></div>
+    <div class="workspace-bar"><div class="breadcrumb"><span id="workspace-title">Reading</span></div><button id="workspace-search" class="icon-btn" aria-label="Search articles" title="Search articles"><span data-icon="search"></span></button><button id="reading-statistics" class="icon-btn" aria-label="View reading statistics" title="Reading statistics"><span data-icon="chart"></span></button><button id="import-book" class="icon-btn" type="button" aria-label="Import EPUB" title="Import EPUB" hidden><span data-icon="plus"></span></button><a id="words-chat" href="chat.html" class="icon-btn phone-chat-entry" aria-label="Practice vocabulary with AI" title="Practice vocabulary with AI" data-track="chat.open" hidden><span data-icon="chat"></span></a></div>
     <main id="main" class="dashboard-main">
 
 
@@ -31,9 +31,9 @@
       <div id="reading-metrics" hidden></div>
       <div class="reading-layout"><div class="reading-main">
       <div id="continue-reading"></div>
-      <section id="home-shelf" class="phone-home-shelf" hidden><div class="section-heading"><h2>Bookshelf</h2><button id="show-books" class="text-btn"><span id="home-books-count"></span>All <span data-icon="arrow"></span></button></div><div id="home-books" class="phone-shelf-strip"></div></section>
-      <div class="section-heading queue-heading"><h2>Read next</h2><button id="add-article" class="icon-btn" aria-label="Add article"><span data-icon="plus"></span></button></div>
-      <details id="article-tools" class="queue-tools"><summary>All articles and management</summary>
+      <section id="home-shelf" class="phone-home-shelf" hidden><div class="section-heading"><h2>Bookshelf <span id="home-books-count" class="section-count"></span></h2><button id="show-books" class="icon-btn" aria-label="Open bookshelf" title="Open bookshelf"><span data-icon="arrow"></span></button></div><div id="home-books" class="phone-shelf-strip"></div></section>
+      <div class="section-heading queue-heading"><h2 id="reading-queue-title">Read next</h2><div class="queue-actions"><button id="article-tools-toggle" class="icon-btn" type="button" aria-label="Filter and manage articles" title="Filter and manage articles" aria-expanded="false" aria-controls="article-tools"><span data-icon="filter"></span></button><button id="add-article" class="icon-btn" aria-label="Add article" title="Add article"><span data-icon="plus"></span></button></div></div>
+      <details id="article-tools" class="queue-tools"><summary hidden>Filter and manage articles</summary>
       <div class="article-controls">
       <div id="article-search" class="toolbar article-search">
         <div id="finish-filter" class="filterbar" role="group" aria-label="Filter by reading status">
@@ -51,13 +51,13 @@
         </div>
       </div>
       <div id="article-actions" class="article-actions" hidden>
-        <label class="selection-toggle" title="Select all search and filter results"><input id="select-articles" type="checkbox" aria-label="Select all results" /> Select all</label>
+        <label class="selection-toggle" title="Select all results"><input id="select-articles" type="checkbox" aria-label="Select all results" /></label>
         <span id="selection-count" class="muted small">0 selected</span>
-        <button id="delete-articles" class="action-delete" disabled>Delete the selected </button>
+        <button id="delete-articles" class="action-delete icon-btn" aria-label="Delete selected articles" title="Delete selected articles" disabled><span data-icon="trash"></span></button>
         <button id="classify-articles" aria-label="Filter selected articles with AI" disabled>AI filter</button>
         <button id="suggest-blacklist" disabled>Blocklist suggestions</button>
       </div>
-      <button id="manage-articles" class="mini" aria-pressed="false">Manage articles</button>
+      <button id="manage-articles" class="icon-btn" aria-label="Select articles" title="Select articles" aria-pressed="false"><span data-icon="select"></span></button>
       </div>
       <p id="article-action-status" class="muted small" role="status"></p>
       <section id="classification-panel" class="classification-panel" hidden aria-label="AI article filter">
@@ -72,7 +72,7 @@
       <details id="blacklist-section" class="blacklist-section" hidden><summary>Suggested URL blocks</summary><div id="blacklist-suggestions"></div></details>
       </details>
       <div id="articles" class="list"></div>
-      <div class="list-view-controls" hidden role="group" aria-label="Article view"><button data-view="list" class="icon-btn" aria-label="List view" aria-pressed="true"><span data-icon="list"></span></button><button data-view="grid" class="icon-btn" aria-label="Grid view" aria-pressed="false"><span data-icon="grid"></span></button></div>
+      <div class="list-view-controls" hidden role="group" aria-label="Article view"><button data-view="list" class="icon-btn" aria-label="List view" title="List view" aria-pressed="true"><span data-icon="list"></span></button><button data-view="grid" class="icon-btn" aria-label="Grid view" title="Grid view" aria-pressed="false"><span data-icon="grid"></span></button></div>
       </div><aside id="reading-rail" class="reading-rail" aria-label="Reading and review"></aside></div>
     </section>
 
@@ -105,22 +105,17 @@
     </section>
 
     <section id="pane-stats" class="pane" hidden><div id="statistics"></div></section>
-    <section id="pane-books" class="pane" hidden><p class="book-local-label">Local books · Text and chapter progress stay on this device</p>      <!-- 书：从手机里挑一个 EPUB，解包之后每一章都是一篇阅读材料 -->
-      <div id="book-row" class="addrow" hidden>
-        <button id="import-book" type="button" class="primary">Import EPUB</button>
-        <span id="book-status" class="muted small" role="status"></span>
-      </div>
-      <p id="book-empty" class="empty" hidden>Your bookshelf is empty. Import an EPUB, or open one with Lectern from your file manager.</p>
-      <details id="book-section" class="blacklist-section" hidden>
-        <summary id="book-summary">My books</summary>
+    <section id="pane-books" class="pane" hidden>
+      <p id="book-status" class="muted small" role="status"></p>
+      <div id="book-empty" class="empty" hidden><p>Your bookshelf is empty.</p><button id="import-book-empty" type="button" class="primary" hidden>Import EPUB</button><p id="book-open-hint" class="muted small">Open an EPUB with Lectern to start reading.</p></div>
+      <section id="book-section" aria-label="Books" hidden>
         <div id="book-list" class="list"></div>
-      </details>
+      </section>
 </section>
     </main>
     <dialog id="article-dialog" class="article-dialog" aria-labelledby="add-title">
-      <div class="dialog-heading"><h2 id="add-title">Add an article</h2><button id="close-add" class="icon-btn" type="button" aria-label="Close add article">×</button></div>
-      <p class="muted">Paste an article URL, or share it to Lectern from your browser.</p>
-      <form id="add" class="addrow"><label class="visually-hidden" for="add-url">Article URL</label><input id="add-url" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required /><button id="add-go" type="submit" class="primary">Reading</button></form>
+      <div class="dialog-heading"><h2 id="add-title">Add an article</h2><button id="close-add" class="icon-btn" type="button" aria-label="Close add article" title="Close"><span data-icon="close"></span></button></div>
+      <form id="add" class="addrow"><input id="add-url" type="url" inputmode="url" placeholder="Paste article URL" aria-label="Article URL" autocomplete="off" required /><button id="add-go" type="submit" class="primary">Read</button></form>
       <p id="add-hint" class="muted small" role="status" hidden></p>
     </dialog>
 

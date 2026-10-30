@@ -98,6 +98,54 @@ const FILES: Record<string, string | Uint8Array> = {
   "OEBPS/images/cover art.jpg": new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]),
 };
 
+test('EPUB 2 guide cover pages resolve nested SVG images and encoded, case-insensitive paths', async () => {
+  const source = opf().replace(' properties="cover-image"', '').replace('images/cover%20art.jpg', 'images/art%20one.jpg')
+    .replace('</package>', '<guide><reference type="cover" href="text/front.xhtml"/></guide></package>');
+  const data = new Uint8Array([0xff, 0xd8, 0xff, 1]);
+  const sink = collector();
+  const book = await importEpub(zip({ ...FILES, 'OEBPS/content.opf': source,
+    'OEBPS/text/front.xhtml': '<html><body><svg><image xlink:href="../images/art%20one.jpg"/></svg></body></html>',
+    'OEBPS/IMAGES/ART ONE.JPG': data,
+  }), BOOK_ID, 'book.epub', { parse, doc: sanitizeDoc, hash, sink });
+  assert.equal(book.coverHash, await hash(data));
+  assert.ok(book.resources.includes(book.coverHash!));
+});
+
+test('undeclared named covers are found; malformed or external cover pages do not break import', async () => {
+  const source = opf().replace(' properties="cover-image"', '');
+  const book = await importEpub(zip({ ...FILES, 'OEBPS/content.opf': source }), BOOK_ID, 'book.epub', { parse, doc: sanitizeDoc, hash, sink: collector() });
+  assert.equal(book.coverHash, await hash(FILES['OEBPS/images/cover art.jpg'] as Uint8Array));
+  const broken = source.replace('images/cover%20art.jpg', 'images/art.jpg').replace('</package>', '<guide><reference type="cover" href="front.xhtml"/></guide></package>');
+  const missing = await importEpub(zip({ ...FILES, 'OEBPS/content.opf': broken,
+    'OEBPS/front.xhtml': '<img src="https://example.com/tracker.jpg">',
+  }), BOOK_ID, 'book.epub', { parse, doc: sanitizeDoc, hash, sink: collector() });
+  assert.equal(missing.coverHash, undefined);
+  assert.equal(missing.chapters.length, 2);
+});
+
+test('EPUB 3 landmarks and manifest cover identifiers locate images with non-cover filenames', async () => {
+  const data = new Uint8Array([0xff, 0xd8, 0xff, 2]);
+  for (const [id, nav] of [
+    ['art', '<nav epub:type="landmarks"><a epub:type="cover" href="text/front.xhtml">Cover</a></nav>'],
+    ['cover-image', NAV],
+  ]) {
+    const source = opf().replace('id="cover"', `id="${id}"`).replace(' properties="cover-image"', '').replace('images/cover%20art.jpg', 'images/art.jpg');
+    const book = await importEpub(zip({ ...FILES, 'OEBPS/content.opf': source, 'OEBPS/nav.xhtml': nav!,
+      'OEBPS/text/front.xhtml': '<img src="../images/art.jpg">', 'OEBPS/images/art.jpg': data,
+    }), BOOK_ID, 'book.epub', { parse, doc: sanitizeDoc, hash, sink: collector() });
+    assert.equal(book.coverHash, await hash(data));
+  }
+});
+
+test('a broken primary cover falls back to the declared local cover page', async () => {
+  const source = opf().replace('</manifest>', '<item id="front" href="front.xhtml" media-type="application/xhtml+xml"/><item id="art" href="art.png" media-type="image/png"/></manifest>')
+    .replace('</package>', '<guide><reference type="cover" href="front.xhtml"/></guide></package>');
+  const files = { ...FILES, 'OEBPS/content.opf': source, 'OEBPS/front.xhtml': '<img src="art.png">', 'OEBPS/art.png': new Uint8Array([137, 80, 78, 71]) };
+  delete (files as Record<string, unknown>)['OEBPS/images/cover art.jpg'];
+  const book = await importEpub(zip(files), BOOK_ID, 'book.epub', { parse, doc: sanitizeDoc, hash, sink: collector() });
+  assert.equal(book.coverHash, await hash(files['OEBPS/art.png']));
+});
+
 test("zip 里的路径按引用方所在目录解析，百分号编码先解开", () => {
   assert.equal(resolvePath("OEBPS/text/ch1.xhtml", "../images/cover%20art.jpg"), "OEBPS/images/cover art.jpg");
   assert.equal(resolvePath("OEBPS/content.opf", "text/ch1.xhtml#anchor"), "OEBPS/text/ch1.xhtml");

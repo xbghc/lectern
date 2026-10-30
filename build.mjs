@@ -1,6 +1,7 @@
 import { build, context } from "esbuild";
 import { rmSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, watch as watchFs } from "node:fs";
 import { join } from "node:path";
+import { readerFontBundle } from "./scripts/reader-fonts.mjs";
 
 /*
  * 两个产物，同一份源码：
@@ -10,10 +11,8 @@ import { join } from "node:path";
  * App 的页面（首页 / 阅读器 / 设置 / 生词对话）各自的入口在 src/app/ 下，第一件事都是装上
  * chrome.* 的垫片（src/app/boot.ts），之后引用的就是扩展那几个页面自己的代码。
  *
- * 只打包拉丁字形（约 60KB）。中文不打包：界面里的中文全部来自 LLM 输出，
- * 是任意的，子集必然漏字，漏掉的那个字跳成系统宋体反而比整体用系统宋体更难看；
- * 全量中文衬线又是 10MB 起。系统宋体（SimSun / Songti SC / Noto Serif CJK）
- * 到处都有，交给它。
+ * 界面使用 Source Serif 4 拉丁字形（约 60KB）。App 阅读器另带 Literata 和
+ * 霞鹜文楷屏幕版的全部网页字体分包，离线可用，不依赖手机安装字体或外部 CDN。
  *
  * 扩展额外带约 10MB 的本地 OCR 资源（Worker、两个 LSTM wasm 变体和 fast 英文数据）。
  * 包会变大，但截图不用离开本机，首次识别也不必依赖 CDN；App 用宿主识别器，不带这份。
@@ -82,6 +81,11 @@ function copyStaticExtension() {
 function copyStaticApp() {
   mkdirSync(OUT, { recursive: true });
   copyFonts();
+  const readerFonts = readerFontBundle();
+  writeFileSync(join(OUT, "reader-fonts.css"), readerFonts.css);
+  for (const [name, source] of readerFonts.files) copyFileSync(source, join(OUT, "fonts", name));
+  mkdirSync(join(OUT, "font-licenses"), { recursive: true });
+  for (const [source, name] of readerFonts.licenses) copyFileSync(source, join(OUT, "font-licenses", name));
   for (const [from, to] of [
     ["src/popup/popup.css", "popup.css"],
     ["src/ui/theme.css", "theme.css"],

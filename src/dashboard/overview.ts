@@ -9,7 +9,7 @@ import type { Book } from '../books/types.ts';
 import { parseChapterId } from '../books/types.ts';
 import { el } from '../popup/dom.ts';
 import type { UiEvent } from '../lib/uiUsage.ts';
-import { icon, type IconName } from '../ui/icons.ts';
+import { icon, iconButton, type IconName } from '../ui/icons.ts';
 import { minutes, sessionTimeline, weekChart, time, duration as formatDuration } from '../ui/activity.ts';
 
 const ask = <T,>(message: unknown): Promise<T> => chrome.runtime.sendMessage(message) as Promise<T>;
@@ -21,7 +21,7 @@ const action = (label: string, run: () => void, className = 'primary', event?: U
 };
 function metric(label: string, value: string, note: string, name: IconName): HTMLElement {
   return el('div', { class: 'reading-metric' }, [el('span', { class: 'metric-label' }, [icon(name), label]),
-    el('strong', { class: 'metric-value' }, [value]), el('span', { class: 'metric-note' }, [note])]);
+    el('strong', { class: 'metric-value' }, [value]), ...(note ? [el('span', { class: 'metric-note' }, [note])] : [])]);
 }
 let homeRequest = 0;
 export async function renderReadingHome(articles: Article[], speed: SpeedSummary | null, navigate: (pane: 'review' | 'words' | 'stats', queue?: 'words' | 'articles') => void, books: Record<string, Book> = {}): Promise<void> {
@@ -32,10 +32,9 @@ export async function renderReadingHome(articles: Article[], speed: SpeedSummary
     const root = $('continue-reading');
     if (!target) { root.replaceChildren(); return; }
     root.replaceChildren(el('section', { class: 'phone-continue' }, [
-      el('div', { class: 'phone-continue-label' }, [el('span', {}, ["Continue reading"]), icon('bookmark')]),
-      el('h2', {}, [target.title]), el('p', {}, [target.source]),
-      el('div', { class: 'progress' }, [el('i', { style: `width:${target.progress}%` })]),
-      el('div', { class: 'phone-continue-bottom' }, [el('span', {}, [`Read ${target.progress}%`]),
+      el('h2', {}, [target.title]), el('p', {}, [parseChapterId(target.articleId) ? target.source : hostnameOf(target.articleId)]),
+      el('div', { class: 'progress', role: 'progressbar', 'aria-label': 'Reading progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(target.progress) }, [el('i', { style: `width:${target.progress}%` })]),
+      el('div', { class: 'phone-continue-bottom' }, [el('span', { 'aria-hidden': 'true' }, [`${target.progress}%`]),
         el('a', { class: 'primary', href: `read.html?u=${encodeURIComponent(target.articleId)}&from=articles`, 'data-track': 'articles.open' }, ["Continue reading", icon('arrow')])]),
     ]));
     return;
@@ -47,13 +46,13 @@ export async function renderReadingHome(articles: Article[], speed: SpeedSummary
     const ratio = next.trackedWords > 0 ? Math.min(100, Math.round(next.wordsRead / next.trackedWords * 100)) : 0;
     const link = el('a', { class: 'primary', href: next.url, target: '_blank', rel: 'noreferrer', 'data-track': 'articles.open' }, ["Continue reading", icon('arrow')]);
     // Uses the same reader routing as article titles in the Android host.
-    const content = el('div', { class: 'continue-body' }, [el('span', { class: 'continue-label' }, ["Pick up where you left off"]),
+    const content = el('div', { class: 'continue-body' }, [
       el('h2', {}, [next.title || hostnameOf(next.url)]), el('p', {}, [hostnameOf(next.url)]),
       el('div', { class: 'continue-bottom' }, [link, el('div', { class: 'continue-progress' }, [
         el('div', { class: 'progress' }, [el('i', { style: `width:${ratio}%` })]),
-        el('span', {}, [`Read ${ratio}%${left && left.words > 0 ? ` · Remaining: ${formatEstimate(left.ms)}` : ''}`])])])]);
+        el('span', {}, [`${ratio}%${left && left.words > 0 ? ` · ${formatEstimate(left.ms)} left` : ''}`])])])]);
     const book = el('div', { class: 'book-art', 'aria-hidden': 'true' }, [el('div', { class: 'book-jacket' }, [icon('book'), el('span', {}, ['Lectern']), el('i')])]);
-    continueBox.replaceChildren(el('div', { class: 'section-heading' }, [el('h2', {}, ["Continue reading"])]), el('div', { class: 'continue-card' }, [content, book]));
+    continueBox.replaceChildren(el('div', { class: 'continue-card' }, [content, book]));
   } else continueBox.replaceChildren();
   try {
     const [data, words, review, articleReview] = await Promise.all([
@@ -65,24 +64,23 @@ export async function renderReadingHome(articles: Article[], speed: SpeedSummary
     const start = activity.days[0]!.startTs;
     const finished = articles.filter(a => !parseChapterId(a.id) && a.finished && a.finishedTs && a.finishedTs >= start).length;
     const newWords = words.snippets.filter(s => s.createdTs >= start).length;
-    const metrics = [metric("Focus this week", formatDuration(activity.totalMs), "Time spent reading", 'clock'),
-      metric("Finished this week", `${quantity(finished, "article")}`, "Every page counts", 'book'),
-      metric("Words this week", `${quantity(newWords, "record")}`, "Learn through reading", 'words')];
-    const rhythm = el('div', { class: 'reading-metric metric-rhythm' }, [el('span', { class: 'metric-label' }, [icon('chart'), "Reading over the last 7 days"]), weekChart(activity)]);
-    $('reading-metrics').replaceChildren(...metrics, rhythm);
+    const metrics = [metric("Focus this week", formatDuration(activity.totalMs), "", 'clock'),
+      metric("Finished this week", `${quantity(finished, "article")}`, "", 'book'),
+      metric("Words this week", `${quantity(newWords, "record")}`, "", 'words')];
+    $('reading-metrics').replaceChildren(...metrics);
     $('nav-word-count').textContent = String(words.snippets.length);
     const due = review.dueNow + articleReview.stats.dueNow;
     const prompt = el('section', { class: 'review-prompt' }, [
-      el('div', { class: 'section-heading' }, [el('h2', {}, ["Make it stay with you"]), icon('review')]),
+      el('div', { class: 'section-heading' }, [el('h2', {}, ["Review"]), icon('review')]),
       el('div', { class: 'due-figure' }, [el('strong', { id: 'home-due-count' }, [String(due)]), el('span', {}, [" due for review"]), el('div', { class: 'flash-art', 'aria-hidden': 'true' }, [el('i'), el('i', {}, ['Aa'])])]),
-      el('p', {}, [due ? "Revisit the words you have read. A few minutes of practice helps them stay with you." : "Today's reviews are complete. Keep reading and discover something new."]),
+      ...(!due ? [el('p', {}, ["All caught up"])] : []),
       action(due ? "Start review" : "View review", () => navigate('review', !review.dueNow && articleReview.stats.dueNow ? 'articles' : 'words'), 'primary', 'nav.review'),
-      el('small', {}, ["Spaced repetition at your pace"]),
     ]);
-    const week = el('section', { class: 'week-panel' }, [el('div', { class: 'section-heading' }, [el('h2', {}, ["Your reading week"]), action("Statistics", () => navigate('stats'), 'text-btn', 'nav.stats')]),
-      el('div', { class: 'week-total' }, [minutes(activity.totalMs), el('small', {}, [" minutes spent reading."])]), weekChart(activity)]);
+    const statistics = iconButton('chart', 'Reading statistics');
+    statistics.dataset.track = 'nav.stats'; statistics.addEventListener('click', () => navigate('stats'));
+    const week = el('section', { class: 'week-panel' }, [el('div', { class: 'section-heading' }, [el('h2', {}, ["This week"]), statistics]), weekChart(activity)]);
     const latest = [...words.snippets].sort((a,b) => b.createdTs - a.createdTs)[0];
-    const word = el('section', { class: 'word-panel' }, [el('div', { class: 'section-heading' }, [el('h2', {}, ["Recently discovered words"])])]);
+    const word = el('section', { class: 'word-panel' }, [el('div', { class: 'section-heading' }, [el('h2', {}, ["Recent word"])])]);
     if (latest) word.append(el('h3', {}, [latest.text]), el('p', {}, [latest.translation]),
       ...(latest.context ? [el('blockquote', {}, [latest.context])] : []), action("View vocabulary", () => navigate('words'), 'text-btn', 'nav.words'));
     else word.append(el('p', {}, ["Select text in an article to save your first word."]));

@@ -16,6 +16,7 @@ import { coverUrl, deleteBook, getBook, importHash, listBooks, localSink, saveBo
 import { canOpenBooks, openEpub, pickEpub } from "../books/native.ts";
 import { bookProgress, resumeChapter } from "../books/progress.ts";
 import { chapterId, type Book } from "../books/types.ts";
+import { icon, iconButton } from "../ui/icons.ts";
 
 /**
  * App 首页 = 扩展的 dashboard（文章 / 复习 / 生词本），外加一个"文章从哪来"的入口：
@@ -38,7 +39,7 @@ savedSection.open = true;
 savedSection.hidden = true;
 savedSection.className = "blacklist-section";
 const savedSummary = document.createElement("summary");
-savedSummary.textContent = "Saved from the extension";
+savedSummary.textContent = "Saved";
 const savedList = document.createElement("div");
 savedList.className = "list";
 savedSection.append(savedSummary, savedList);
@@ -65,10 +66,7 @@ async function renderSavedArticles(): Promise<void> {
     meta.textContent = `${hostnameOf(archive.url)} · ${available ? "Text downloaded" : "Open to download text and images"}`;
     if (archive.missingResources?.length) meta.textContent += ` · ${archive.missingResources.length} resources were not saved`;
     item.append(title, meta);
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "mini";
-    remove.textContent = "Delete";
+    const remove = iconButton("trash", `Delete “${archive.title || archive.url}”`);
     remove.addEventListener("click", () => {
       if (!confirm(`Delete “${archive.title || archive.url}” with its archive, reading history and review? Vocabulary and word cards will be kept. Deletion syncs to other devices.`)) return;
       remove.disabled = true;
@@ -92,7 +90,7 @@ async function renderSavedArticles(): Promise<void> {
   if (turn !== archiveRender) return;
   savedList.replaceChildren(fragment);
   savedSection.hidden = archives.length === 0;
-  savedSummary.textContent = `Saved from the extension (${archives.length})`;
+  savedSummary.textContent = `Saved · ${archives.length}`;
 }
 void renderSavedArticles();
 window.addEventListener("focus-sync-updated", () => { void renderSavedArticles(); });
@@ -129,16 +127,14 @@ if (shared) {
  * 章的阅读记录、划词、复习都由下面那一层自己管，这儿只负责"哪本书、第几节、读到哪了"。
  */
 
-const bookRow = $("book-row");
 const bookSection = $("book-section");
 const bookStatus = $("book-status");
 const bookList = $("book-list");
 /** 封面的临时地址，重画前逐个回收。 */
 let coverUrls: string[] = [];
 let openBookId = new URLSearchParams(location.search).get("book") ?? "";
-if (openBookId) document.querySelector<HTMLButtonElement>('[data-tab="books"]')?.click();
+if (openBookId) $("show-books").click();
 let importing = false;
-let shelfDrawn = false;
 
 const say = (text: string): void => { bookStatus.textContent = text; };
 
@@ -184,7 +180,7 @@ async function renderBooks(): Promise<void> {
     const coverNode = (): HTMLElement => {
       const box = document.createElement("div"); box.className = "shelf-cover";
       if (cover) { const img = document.createElement("img"); img.src = cover; img.alt = ""; box.append(img); }
-      else { const name = document.createElement("span"); name.textContent = book.title; box.append(name); }
+      else { box.classList.add("shelf-cover-placeholder"); box.append(icon("book")); }
       return box;
     };
     const coverLink = document.createElement("a"); coverLink.className = "shelf-cover-link";
@@ -193,8 +189,9 @@ async function renderBooks(): Promise<void> {
     if (homeFragment.childElementCount < 2) {
       const preview = document.createElement("a"); preview.className = "phone-shelf-preview";
       preview.href = readerUrl(target) + "&from=articles";
+      preview.setAttribute("aria-label", `Read “${book.title}” · ${progress}%`);
       const info = document.createElement("div"); const name = document.createElement("h3"); name.textContent = book.title;
-      const detail = document.createElement("p"); detail.textContent = progress ? `Read ${progress}%` : "Not started";
+      const detail = document.createElement("p"); detail.textContent = `${progress}%`;
       info.append(name, detail); preview.append(coverNode(), info); homeFragment.append(preview);
     }
     const title = document.createElement("div");
@@ -203,10 +200,18 @@ async function renderBooks(): Promise<void> {
     open.href = readerUrl(target) + "&from=books";
     open.textContent = book.title;
     title.append(open);
-    const pill = document.createElement("span");
-    pill.className = `pill${done.size === book.chapters.length ? " done" : ""}`;
-    pill.textContent = `Read ${progress}%`;
-    row.append(title, pill);
+    row.append(title);
+    if (book.author) {
+      const author = document.createElement("p"); author.className = "book-author"; author.textContent = book.author;
+      row.append(author);
+    }
+    const progressRow = document.createElement("div"); progressRow.className = "book-reading-progress";
+    const bar = document.createElement("div"); bar.className = "progress";
+    bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-label", `Reading progress for “${book.title}”`);
+    bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", "100"); bar.setAttribute("aria-valuenow", String(progress));
+    const fillProgress = document.createElement("i"); fillProgress.style.width = `${progress}%`; bar.append(fillProgress);
+    const progressText = document.createElement("span"); progressText.textContent = `${progress}%`; progressText.setAttribute("aria-hidden", "true");
+    progressRow.append(bar, progressText);
 
     const sub = document.createElement("div");
     sub.className = "sub";
@@ -215,7 +220,7 @@ async function renderBooks(): Promise<void> {
     const tracked = book.chapters.flatMap(c => records.get(chapterId(book.id, c.index)) ?? []);
     const read = tracked.reduce((n, a) => n + a.wordsRead, 0);
     const ms = tracked.reduce((n, a) => n + a.totalMs, 0);
-    for (const part of [book.author, `${quantity(book.chapters.length, "chapter")}`, `About ${words.toLocaleString("en-US")} words`,
+    for (const part of [`${quantity(book.chapters.length, "chapter")}`, `${words.toLocaleString("en-US")} words`,
       ms > 0 ? `Read ${read.toLocaleString("en-US")} words · ${formatDuration(ms)}` : "Not read yet",
       book.missingResources > 0 ? `${book.missingResources} images were not saved` : ""]) {
       if (part) sub.append(Object.assign(document.createElement("span"), { textContent: part }));
@@ -224,10 +229,11 @@ async function renderBooks(): Promise<void> {
     const toc = document.createElement("details");
     toc.className = "book-toc";
     const summary = document.createElement("summary");
-    summary.textContent = "Contents";
+    summary.className = "icon-btn"; summary.title = "Contents";
+    summary.setAttribute("aria-label", `Contents of “${book.title}”`); summary.append(icon("list"));
     const chapters = document.createElement("div");
     chapters.className = "list";
-    toc.append(summary, chapters);
+    toc.append(summary, sub, chapters);
     // 一本书上千节的话，展开时才画：书架本身不该为没人看的目录卡住
     const fill = (): void => {
       if (chapters.childElementCount > 0) return;
@@ -238,17 +244,14 @@ async function renderBooks(): Promise<void> {
     toc.addEventListener("toggle", () => { if (toc.open) fill(); });
     if (book.id === openBookId) { toc.open = true; fill(); }
 
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "mini";
-    remove.textContent = "Delete";
+    const remove = iconButton("trash", `Delete “${book.title}”`, "icon-btn book-delete");
     remove.addEventListener("click", () => {
       if (!confirm(`Delete “${book.title}”? Its text, images and chapter reading records will be removed. Vocabulary and word cards will be kept.`)) return;
       remove.disabled = true;
       void deleteBook(book.id)
         .then(() => renderBooks())
         .catch((err: unknown) => {
-          // 写在这张卡片上：#book-status 在导入那一行里，宿主不支持导入时整行是藏着的，写进去等于没说
+          // Keep failures next to the book that could not be deleted.
           remove.disabled = false;
           problem.textContent = `Could not delete: ${reasonOf(err)}`;
           problem.hidden = false;
@@ -259,25 +262,22 @@ async function renderBooks(): Promise<void> {
     problem.setAttribute("role", "status");
     problem.hidden = true;
 
-    card.append(row, sub, toc, remove, problem);
+    const actions = document.createElement("div"); actions.className = "book-actions";
+    actions.append(toc, remove);
+    card.append(row, progressRow, actions, problem);
     fragment.append(card);
   }
   if (turn !== bookRender) { for (const url of urls) URL.revokeObjectURL(url); return; }
   bookList.replaceChildren(fragment);
   $("home-books").replaceChildren(homeFragment);
-  $("home-books-count").textContent = `${books.length} ${books.length === 1 ? "book" : "books"} · `;
+  $("home-books-count").textContent = String(books.length);
+  $("home-books-count").setAttribute("aria-label", quantity(books.length, "book"));
   $("home-shelf").hidden = false;
-  if (!books.length) $("home-books").textContent = "No books yet. Open your bookshelf to import an EPUB.";
+  if (!books.length) $("home-books").textContent = "No books yet";
   for (const url of coverUrls) URL.revokeObjectURL(url);
   coverUrls = urls;
   bookSection.hidden = books.length === 0;
   $("book-empty").hidden = books.length > 0;
-  if (books.length > 0) {
-    // 只在第一次画的时候展开：用户收起来之后，一次同步或一次导入不该把它又掀开
-    if (!shelfDrawn) (bookSection as HTMLDetailsElement).open = true;
-    shelfDrawn = true;
-    $("book-summary").textContent = `My books (${books.length})`;
-  }
 }
 
 /**
@@ -288,9 +288,10 @@ async function renderBooks(): Promise<void> {
  */
 async function importBook(uri?: string): Promise<void> {
   if (importing) return;
-  document.querySelector<HTMLButtonElement>('[data-tab="books"]')?.click();
+  $("show-books").click();
   importing = true;
   $<HTMLButtonElement>("import-book").disabled = true;
+  $<HTMLButtonElement>("import-book-empty").disabled = true;
   try {
     say("Opening file…");
     const picked = uri ? { uri, name: "" } : await pickEpub();
@@ -298,10 +299,11 @@ async function importBook(uri?: string): Promise<void> {
     const handle = await openEpub(picked.uri);
     try {
       const existing = await getBook(handle.hash);
-      const book = existing ?? await importEpub(
+      const hasCover = existing?.coverHash ? !!await cachedBlob(existing.coverHash).catch(() => undefined) : false;
+      const imported = existing && hasCover ? existing : await importEpub(
         { names: handle.names, bytes: handle.bytes },
         handle.hash,
-        picked.name || "Untitled book.epub",
+        picked.name || existing?.fileName || "Untitled book.epub",
         {
           parse: (text, mime) => new DOMParser().parseFromString(text, mime),
           doc: document,
@@ -310,10 +312,10 @@ async function importBook(uri?: string): Promise<void> {
           onProgress: (done, total) => say(`Importing…${done}/${quantity(total, "chapter")}`),
         },
       );
-      if (!existing) await saveBook(book);
+      const book = imported === existing ? existing : await saveBook(imported);
       openBookId = book.id;
       await renderBooks();
-      say(existing ? `“${book.title}” is already on your bookshelf` : `“${book.title}” imported: ${quantity(book.chapters.length, "chapter")}`);
+      say(existing ? !hasCover && book.coverHash ? `Cover restored for “${book.title}”` : `“${book.title}” is already on your bookshelf` : `“${book.title}” imported: ${quantity(book.chapters.length, "chapter")}`);
     } finally {
       handle.close();
     }
@@ -322,12 +324,17 @@ async function importBook(uri?: string): Promise<void> {
   } finally {
     importing = false;
     $<HTMLButtonElement>("import-book").disabled = false;
+    $<HTMLButtonElement>("import-book-empty").disabled = false;
   }
 }
 
 if (canOpenBooks()) {
-  bookRow.hidden = false;
+  $("import-book").dataset.available = "true";
+  $("import-book").hidden = document.body.dataset.pane !== "books";
+  $("import-book-empty").hidden = false;
+  $("book-open-hint").hidden = true;
   $("import-book").addEventListener("click", () => void importBook());
+  $("import-book-empty").addEventListener("click", () => void importBook());
 }
 void renderBooks();
 window.addEventListener("focus-sync-updated", () => { void renderBooks(); });

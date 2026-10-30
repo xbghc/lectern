@@ -1178,12 +1178,56 @@ test('reader sheet stays at the viewport bottom through streaming and closes thr
     assert.equal(box.style.bottom, '0px');
     sheet.updateStream({ translation: '泄漏', phonetic: null, pos: null, contextNote: null, usage: null, vocab: [] });
     sheet.showResult(RECT, SNIPPET);
-    assert.equal(root.querySelectorAll('.reader-sheet-close').length, 1);
+    assert.equal(root.querySelectorAll('.reader-sheet-close').length, 0);
+    assert.equal(root.activeElement, box, 'the dialog keeps focus without a close icon');
     assert.equal(box.style.bottom, '0px');
     assert.ok(sheet.followAnchor({ ...RECT, top: -500, bottom: -400 } as DOMRect));
-    root.querySelector<HTMLButtonElement>('.reader-sheet-close')!.click();
+    root.querySelector<HTMLElement>('.reader-sheet-backdrop')!.click();
     assert.equal(closed, 1);
     assert.equal(sheet.hostElement, null);
     dom.window.dispatchEvent(new dom.window.Event('resize'));
+  } finally { sheet.hide(); g['window'] = previousWindow; }
+});
+
+test('reader sheet dismisses only deliberate outside gestures and keeps internal content usable', () => {
+  const previousWindow = g['window']; g['window'] = dom.window;
+  let closed = 0;
+  const sheet = new Popover({ presentation: 'sheet', onClose: () => { closed++; sheet.hide(); }, onConfirm() {}, onOpenOptions() {}, onAsk() {} });
+  const open = () => {
+    sheet.showResult(RECT, SNIPPET);
+    const root = sheet.hostElement!.shadowRoot!;
+    return { box: root.querySelector<HTMLElement>('.reader-sheet')!, backdrop: root.querySelector<HTMLElement>('.reader-sheet-backdrop')! };
+  };
+  const touch = (target: HTMLElement, type: string, ys: number[]) => {
+    const event = new dom.window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'touches', { value: ys.map((clientY, identifier) => ({ identifier, clientY })) });
+    target.dispatchEvent(event);
+    assert.equal(event.defaultPrevented, false, 'reading gestures must keep native scrolling');
+  };
+  try {
+    let { box, backdrop } = open();
+    box.click(); box.dispatchEvent(new dom.window.WheelEvent('wheel', { deltaY: 100, bubbles: true }));
+    touch(box, 'touchstart', [150]); touch(box, 'touchmove', [60]);
+    assert.equal(closed, 0, 'interacting or scrolling inside must not dismiss');
+    touch(backdrop, 'touchstart', [150]); touch(backdrop, 'touchmove', [119]);
+    assert.equal(closed, 0, '31px of movement is below the threshold');
+    touch(backdrop, 'touchmove', [118]); assert.equal(closed, 1);
+    touch(backdrop, 'touchmove', [80]); assert.equal(closed, 1, 'dismiss only once per presentation');
+    ({ backdrop } = open());
+    touch(backdrop, 'touchstart', [100]); touch(backdrop, 'touchmove', [132]); assert.equal(closed, 2, 'either vertical direction');
+    ({ backdrop } = open());
+    touch(backdrop, 'touchstart', [100]); touch(backdrop, 'touchcancel', []); touch(backdrop, 'touchmove', [200]);
+    touch(backdrop, 'touchstart', [100, 140]); touch(backdrop, 'touchmove', [200, 240]);
+    assert.equal(closed, 2, 'cancelled gestures and multitouch do not dismiss');
+    const wheel = (deltaY: number, deltaMode = 0, ctrlKey = false) => {
+      const event = new dom.window.WheelEvent('wheel', { deltaY, deltaMode, ctrlKey, bubbles: true, cancelable: true });
+      backdrop.dispatchEvent(event); assert.equal(event.defaultPrevented, false);
+    };
+    wheel(100, 0, true); wheel(15); wheel(16); assert.equal(closed, 2);
+    wheel(1); assert.equal(closed, 3, 'small wheel deltas accumulate');
+    ({ backdrop } = open()); wheel(-2, 1); assert.equal(closed, 4, 'line-based wheels are normalised');
+    ({ box } = open());
+    box.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.equal(closed, 5, 'Escape closes through the owner for focus restoration');
   } finally { sheet.hide(); g['window'] = previousWindow; }
 });

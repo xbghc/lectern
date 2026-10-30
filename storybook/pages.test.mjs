@@ -4,12 +4,94 @@ import { JSDOM } from 'jsdom';
 import { compilePages } from '../.storybook/pages-plugin.mjs';
 
 const pages = await compilePages();
+
+test('compact reading controls keep filters, selection and book contents reachable', async () => {
+  let close, confirmation = '';
+  const dom = new JSDOM(pages.app.replace('<!--PREVIEW_CONFIG-->', '<script>window.__PREVIEW__={page:"app",state:"populated",tab:"articles"}</script>'), {
+    url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
+    beforeParse(window) {
+      close = window.close.bind(window); window.structuredClone = structuredClone;
+      window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder;
+      window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+      window.confirm = message => { confirmation = message; return false; };
+    },
+  });
+  const settle = () => new Promise(resolve => setTimeout(resolve, 60));
+  try {
+    await settle();
+    const { document } = dom.window;
+    const tools = document.getElementById('article-tools-toggle');
+    tools.click(); await settle();
+    assert.equal(tools.getAttribute('aria-expanded'), 'true');
+    document.querySelector('#finish-filter [data-filter="done"]').click();
+    assert.equal(document.querySelectorAll('#articles .article-card').length, 1);
+    tools.click(); await settle();
+    assert.equal(document.getElementById('article-tools').open, false);
+    assert.equal(tools.dataset.filtered, 'true');
+    assert.equal(document.querySelectorAll('#articles .article-card').length, 1, 'collapsing controls preserves an active filter');
+    tools.click(); await settle();
+    const manage = document.getElementById('manage-articles'); manage.click();
+    assert.equal(manage.getAttribute('aria-label'), 'Done selecting');
+    const select = document.querySelector('#articles input[type="checkbox"]'); select.checked = true;
+    select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    assert.equal(document.getElementById('delete-articles').disabled, false);
+    tools.click(); await settle();
+    assert.equal(manage.getAttribute('aria-pressed'), 'false', 'closing controls exits bulk selection');
+    document.getElementById('show-books').click(); await settle();
+    assert.equal(document.getElementById('pane-books').hidden, false);
+    const book = document.querySelector('.book-card'), toc = book.querySelector('.book-toc');
+    assert.equal(book.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '37');
+    assert.equal(book.querySelector('.shelf-cover').textContent, '', 'fallback covers do not repeat the title');
+    const summary = toc.querySelector('summary');
+    assert.match(summary.getAttribute('aria-label'), /Contents of/); assert.ok(summary.title);
+    summary.click(); await settle();
+    assert.equal(toc.open, true); assert.ok(toc.querySelectorAll('.chapter-row a').length > 0);
+    const remove = book.querySelector('.book-delete');
+    assert.ok(remove.getAttribute('aria-label')); assert.ok(remove.title);
+    remove.click(); assert.match(confirmation, /The Art of Deep Reading/);
+    assert.equal(document.querySelectorAll('.book-card').length, 1, 'cancelled deletion preserves the book');
+    document.getElementById('reading-back').click(); await settle();
+    assert.equal(document.getElementById('pane-articles').hidden, false);
+    assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+  } finally { close(); }
+});
+
+test('EPUB import stays available from the shelf toolbar and its empty state', async () => {
+  for (const state of ['populated', 'empty']) {
+    let close, picks = 0;
+    const dom = new JSDOM(pages.app.replace('<!--PREVIEW_CONFIG-->', `<script>window.__PREVIEW__=${JSON.stringify({page:'app',state,tab:'articles'})}</script>`), {
+      url: 'https://preview.invalid/', runScripts: 'dangerously', pretendToBeVisual: true,
+      beforeParse(window) {
+        close = window.close.bind(window); window.structuredClone = structuredClone;
+        window.TextEncoder = TextEncoder; window.TextDecoder = TextDecoder;
+        window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+        window.Native = { epubOpen() {}, epubPick(id) { picks++; window.__fsEpub.picked(id, '', ''); } };
+      },
+    });
+    const settle = () => new Promise(resolve => setTimeout(resolve, 60));
+    try {
+      await settle();
+      const { document } = dom.window, toolbar = document.getElementById('import-book');
+      assert.equal(toolbar.hidden, true);
+      document.getElementById('show-books').click(); await settle();
+      assert.equal(toolbar.hidden, false);
+      const trigger = state === 'empty' ? document.getElementById('import-book-empty') : toolbar;
+      assert.equal(trigger.hidden, false); trigger.click(); await settle();
+      assert.equal(picks, 1); assert.equal(toolbar.disabled, false);
+      assert.equal(document.getElementById('book-status').textContent, '');
+      document.getElementById('reading-back').click(); await settle();
+      assert.equal(toolbar.hidden, true);
+      assert.deepEqual(Array.from(dom.window.__previewErrors), []);
+    } finally { close(); }
+  }
+});
+
 const scenarios = [
   ['popup', 'populated', 'current', "Tracking focus"],
   ['popup', 'empty', 'current', "No focus sessions yet"],
   ['popup', 'error', 'current', "Article detection failed"],
   ['popup', 'populated', 'translation', "Text translation"],
-  ['dashboard', 'populated', 'articles', "Articles: 3"],
+  ['dashboard', 'populated', 'articles', "3 articles"],
   ['dashboard', 'empty', 'articles', "No reading history yet"],
   ['dashboard', 'populated', 'words', 'consolidate'],
   ['dashboard', 'populated', 'stats', "Longest session today"],
@@ -23,7 +105,7 @@ const scenarios = [
   ['options', 'error', 'articles', "1 reading item (including 2 records) could not be uploaded and remain on this device"],
   ['appOptions', 'error', 'articles', "1 reading item (including 2 records) could not be uploaded and remain on this device"],
   ['sidepanel', 'populated', 'articles', 'consolidate'],
-  ['app', 'populated', 'articles', "Articles: 3"],
+  ['app', 'populated', 'articles', "Read next"],
   ['app', 'populated', 'articles', "The Art of Deep Reading"],
   ['appOptions', 'populated', 'articles', "Settings"],
   ['app', 'populated', 'stats', "Last 30 days"],
@@ -500,15 +582,19 @@ test('Android reading entry, local reader preferences and chapter navigation use
     assert.equal(document.getElementById('reader-font-smaller').disabled, true);
     document.querySelector('#reader-size-steps [data-size="18"]').click();
     const sepia = document.querySelector('button[data-reader-theme="sepia"]');
-    const sans = document.querySelector('button[data-reader-font="sans"]');
+    assert.equal(document.body.dataset.readerEnglish, 'literata');
+    assert.equal(document.body.dataset.readerChinese, 'wenkai');
+    const sans = document.querySelector('button[data-reader-language="en"][data-reader-font="sans"]');
     sepia.click(); sans.click();
     assert.equal(document.body.dataset.readerTheme, 'sepia');
-    assert.equal(document.body.dataset.readerFont, 'sans');
+    assert.equal(document.body.dataset.readerEnglish, 'sans');
+    assert.equal(document.body.dataset.readerChinese, 'wenkai');
     assert.equal(sepia.getAttribute('aria-pressed'), 'true');
     assert.equal(sans.getAttribute('aria-pressed'), 'true');
     await settle();
     assert.equal((await chrome.storage.local.get('reader:theme'))['reader:theme'], 'sepia');
-    assert.equal((await chrome.storage.local.get('reader:font-family'))['reader:font-family'], 'sans');
+    assert.equal((await chrome.storage.local.get('reader:font-english'))['reader:font-english'], 'sans');
+    assert.equal((await chrome.storage.local.get('reader:font-chinese'))['reader:font-chinese'], 'wenkai');
     const set = chrome.storage.local.set;
     chrome.storage.local.set = async () => { throw new Error('Device storage full'); };
     document.querySelector('button[data-reader-theme="dark"]').click();

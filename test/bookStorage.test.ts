@@ -8,6 +8,7 @@ import { savePosition, deleteArticles, getArticles, commitSession, exportAll, up
 import { newCard, newFsrs, gradeCard } from '../src/lib/review.ts';
 import { gradeStoredCard } from '../src/features/translation/vocab.ts';
 import { gradeArticleCard } from '../src/features/reading/articleReview.ts';
+import { saveBook, getBook } from '../src/books/local.ts';
 
 const book: Book = { id: 'ab'.repeat(32), title: 'Local book', author: '', fileName: 'book.epub', addedTs: 1, resources: [], missingResources: 0,
   chapters: [0, 1].map(index => ({ index, title: `Chapter ${index}`, words: 200 })) };
@@ -18,6 +19,24 @@ const article = (articleId = id): Article => ({ id: articleId, url: articleId, t
   firstSeenTs: now, lastSeenTs: now, reachedBottom: false, finished: false, finishedTs: null });
 const position: ReadingPosition = { articleId: id, hash: 'p1', index: 1, offset: 180, paragraphCount: 2, savedTs: now };
 const paragraph: ParagraphRecord = { hash: 'p1', index: 1, words: 100, firstSeenTs: now, dwellMs: 3000 };
+
+test('re-importing a book repairs its cover and preserves shelf metadata, chapter progress and bookmarks', async () => {
+  const driver = memoryDriver(freshState()); installStorage(driver);
+  const original = { ...book, resources: ['old-resource'] };
+  await saveBook(original);
+  await localStorage().set({ articles: { [id]: article() }, [`pos:${id}`]: position, [`reader:bookmark:${id}`]: { ratio: .4 } });
+  const before = await localStorage().get(null);
+  const updated = await saveBook({ ...book, addedTs: now, title: 'Imported again', coverHash: 'cd'.repeat(32), resources: ['cd'.repeat(32)] });
+  assert.equal(updated.title, original.title); assert.equal(updated.addedTs, original.addedTs);
+  assert.equal(updated.coverHash, 'cd'.repeat(32));
+  assert.deepEqual(updated.resources, ['old-resource', 'cd'.repeat(32)]);
+  const saved = await localStorage().get(null);
+  assert.deepEqual(saved.articles, before.articles); assert.deepEqual(saved[`pos:${id}`], position);
+  assert.deepEqual(saved[`reader:bookmark:${id}`], { ratio: .4 });
+  assert.equal(JSON.stringify((await driver.read()).outbox).includes(updated.coverHash!), false);
+  await saveBook(book);
+  assert.equal((await getBook(book.id))?.coverHash, updated.coverHash, 'failed extraction does not clear a saved cover');
+});
 
 // Exercise actual local writes: simply checking the outbound queue misses destructive projection.
 test('book position and chapter progress survive local writes, remote projection and reopening storage', async () => {

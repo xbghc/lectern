@@ -11,7 +11,7 @@
 import { sanitizeArticle } from "../app/sanitize.ts";
 import { imageMime, MAX_RESOURCE_BYTES, type ArchiveResource } from "../archive/types.ts";
 import { countWords, normalizeText } from "../lib/wordcount.ts";
-import { CONTAINER_PATH, chapterTitle, decodeText, packagePath, parsePackage, resolvePath, tocTitles, type ParseXml } from "./epub.ts";
+import { CONTAINER_PATH, chapterTitle, decodeText, packagePath, parsePackage, resolvePath, tocTitles, navigationCover, type ParseXml } from "./epub.ts";
 import {
   chapterId, MAX_BOOK_BYTES, MAX_BOOK_IMAGES, MAX_CHAPTER_BYTES, MAX_CHAPTERS,
   type Book, type BookChapter, type BookChapterContent,
@@ -60,9 +60,15 @@ export async function importEpub(zip: ZipSource, id: string, fileName: string, e
 
   const opfPath = packagePath(decodeText(await read(CONTAINER_PATH)), env.parse);
   const pkg = parsePackage(decodeText(await read(opfPath)), opfPath, env.parse);
+  const mediaTypes = new Map([...pkg.mediaTypes].map(([path, mime]) => [path.toLowerCase(), mime]));
 
   let titles = new Map<string, string>();
-  if (pkg.navHref && has(pkg.navHref)) titles = tocTitles(decodeText(await read(pkg.navHref)), pkg.navHref, env.parse, "nav");
+  let navCover: string | null = null;
+  if (pkg.navHref && has(pkg.navHref)) {
+    const source = decodeText(await read(pkg.navHref));
+    titles = tocTitles(source, pkg.navHref, env.parse, "nav");
+    navCover = navigationCover(source, pkg.navHref, env.parse);
+  }
   if (titles.size === 0 && pkg.ncxHref && has(pkg.ncxHref)) {
     titles = tocTitles(decodeText(await read(pkg.ncxHref)), pkg.ncxHref, env.parse, "ncx");
   }
@@ -76,7 +82,7 @@ export async function importEpub(zip: ZipSource, id: string, fileName: string, e
     if (known !== undefined) return known;
     let resource: ArchiveResource | null = null;
     try {
-      const mime = imageMime(pkg.mediaTypes.get(path) ?? "");
+      const mime = imageMime(mediaTypes.get(path.toLowerCase()) ?? "");
       if (!mime || !has(path)) throw new Error("Unrecognized image format");
       if (stored.size >= MAX_BOOK_IMAGES || bytesStored >= MAX_BOOK_BYTES) throw new Error("This book contains too many images");
       const bytes = await read(path);
@@ -145,7 +151,32 @@ export async function importEpub(zip: ZipSource, id: string, fileName: string, e
   }
   env.onProgress?.(spine.length, spine.length);
 
-  const cover = pkg.coverHref ? await store(pkg.coverHref) : null;
+  // EPUB 2 often declares a cover XHTML/SVG page in <guide>, rather than a
+  // bitmap. Follow only local images, with the same format/size limits as chapters.
+  const candidates = [...new Set([pkg.coverHref, pkg.guideCoverHref, navCover, ...pkg.namedCoverHrefs,
+    ...[...pkg.mediaTypes.keys()].filter(path => /(?:^|\/)(?:cover(?:[ _.-][^/]*)?|封面)\.(?:jpe?g|png|webp|gif|xhtml|html|svg)$/i.test(path)),
+  ].filter((path): path is string => !!path))].slice(0, 12);
+  let cover: ArchiveResource | null = null;
+  for (const path of candidates) {
+    if (!has(path)) continue;
+    const mime = mediaTypes.get(path.toLowerCase()) ?? '';
+    if (imageMime(mime)) cover = await store(path);
+    else if (['application/xhtml+xml', 'text/html', 'image/svg+xml'].includes(mime) || /\.(?:xhtml|html|svg)$/i.test(path)) {
+      try {
+        const bytes = await read(path);
+        if (bytes.byteLength > MAX_CHAPTER_BYTES) continue;
+        const doc = env.parse(decodeText(bytes), 'text/html');
+        const images = [...doc.getElementsByTagName('*')].filter(el => ['img', 'image'].includes(el.localName.toLowerCase()));
+        for (const image of images.slice(0, 8)) {
+          const href = image.getAttribute('src') ?? image.getAttribute('href') ?? image.getAttribute('xlink:href');
+          if (!href || /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href)) continue;
+          cover = await store(resolvePath(path, href));
+          if (cover) break;
+        }
+      } catch { /* A bad cover must not prevent the book from importing. */ }
+    }
+    if (cover) break;
+  }
   return {
     id,
     title: bookTitle(pkg.title, fileName),

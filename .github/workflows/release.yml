@@ -7,6 +7,7 @@ name: Release
 # 得先卸载第一个。仓库里配了四个 Secret（见 README「持续集成与发布」）时改出正式签名的包。
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v*"]
 
@@ -72,12 +73,16 @@ jobs:
           ./gradlew assembleDebug --console=plain
           cp app/build/outputs/apk/debug/app-debug.apk "../lectern-${GITHUB_REF_NAME}-debug.apk"
 
-      - name: Create Release
+      - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" lectern-*.zip lectern-*.apk \
-            --title "$GITHUB_REF_NAME" --generate-notes
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" lectern-*.zip lectern-*.apk
+          else
+            gh release create "$GITHUB_REF_NAME" lectern-*.zip lectern-*.apk \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi
 
   # GitHub Release 发完之后，把同一个 zip 传到 Chrome 应用商店并提交审核。没配凭据时那边自己跳过。
   # 单独一个 job：商店那头失败（多半是上一版还在审）不影响上面已经发出去的 Release 和 APK，

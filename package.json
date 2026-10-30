@@ -1,6 +1,6 @@
 {
   "name": "lectern",
-  "version": "0.3.28",
+  "version": "0.3.29",
   "private": true,
   "description": "A browser extension and Android reading companion with focus tracking, AI translation, spaced repetition and optional device sync.",
   "type": "module",
@@ -20,7 +20,9 @@
     "test:storybook": "node --test storybook/pages.test.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/literata": "5.3.0",
     "@mozilla/readability": "^0.6.0",
+    "lxgw-wenkai-screen-webfont": "1.7.0",
     "tesseract.js": "^7.0.0",
     "ts-fsrs": "5.4.2"
   },

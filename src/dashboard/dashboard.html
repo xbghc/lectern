@@ -12,30 +12,25 @@
     <a class="skip-link" href="#main">Skip to main content</a>
     <header class="app-sidebar">
       <a class="brand" href="#articles"><span data-icon="book"></span><span class="brand-name">Lectern</span></a>
-      <div class="brand-subtitle">Reading companion</div>
-      <p class="nav-label">Your reading space</p>
       <nav aria-label="Main navigation">
         <button data-tab="articles" class="tab active"><span data-icon="book"></span><span>My reading</span></button>
         <button data-tab="words" class="tab"><span data-icon="words"></span><span>Vocabulary</span><span id="nav-word-count" class="nav-count"></span></button>
         <button data-tab="review" class="tab"><span data-icon="review"></span><span>Spaced review</span><span id="due-badge" class="badge" hidden></span></button>
         <button data-tab="stats" class="tab stats-nav"><span data-icon="chart"></span><span>Reading statistics</span></button>
 
-        <a id="to-options" href="#" class="settings-link"><span data-icon="settings"></span><span>Preferences</span></a>
+        <a id="to-options" href="#" class="settings-link" aria-label="Settings" title="Settings"><span data-icon="settings"></span></a>
       </nav>
-      <div class="sidebar-quote">Every page you read <br>becomes a part of you.</div>
-      <div class="sidebar-local"><strong><i></i>Read freely. Keep your data close.</strong><span>Your data. Your pace.</span></div>
     </header>
-    <div class="workspace-bar"><div class="breadcrumb">Workspace <span data-icon="chevron"></span><span id="workspace-title">My reading</span></div><button id="workspace-search" class="icon-btn" aria-label="Search articles" title="Search articles (Ctrl / ⌘ K)"><span data-icon="search"></span></button></div>
+    <div class="workspace-bar"><h1 id="workspace-title">My reading</h1><div class="workspace-actions"><button id="workspace-search" class="icon-btn" aria-label="Search articles" title="Search articles (Ctrl / ⌘ K)"><span data-icon="search"></span></button><button id="add-article" class="icon-btn" aria-label="Add article" title="Add article"><span data-icon="plus"></span></button></div></div>
     <main id="main" class="dashboard-main">
 
 
     <!-- ---------------- 文章 ---------------- -->
     <section id="pane-articles" class="pane">
-      <div class="page-heading"><div><h1>Make room for reading.</h1><p>Follow yesterday's curiosity. Leave room for a new idea.</p></div><button id="add-article" class="primary add-trigger"><span data-icon="plus"></span><span>Add article</span></button></div>
       <div id="reading-metrics" class="reading-metrics" aria-label="Reading overview"></div>
       <div class="reading-layout"><div class="reading-main">
       <div id="continue-reading"></div>
-      <div class="section-heading"><h2>My articles</h2><span>A little each day, a lasting impression</span></div>
+      <div class="section-heading"><h2>Articles</h2></div>
       <div class="article-controls">
       <div id="article-search" class="toolbar article-search">
         <div id="finish-filter" class="filterbar" role="group" aria-label="Filter by reading status">
@@ -53,13 +48,13 @@
         </div>
       </div>
       <div id="article-actions" class="article-actions" hidden>
-        <label class="selection-toggle" title="Select all search and filter results"><input id="select-articles" type="checkbox" aria-label="Select all results" /> Select all</label>
+        <label class="selection-toggle" title="Select all results"><input id="select-articles" type="checkbox" aria-label="Select all results" /></label>
         <span id="selection-count" class="muted small">0 selected</span>
-        <button id="delete-articles" class="action-delete" disabled>Delete the selected </button>
+        <button id="delete-articles" class="action-delete icon-btn" aria-label="Delete selected articles" title="Delete selected articles" disabled><span data-icon="trash"></span></button>
         <button id="classify-articles" aria-label="Filter selected articles with AI" disabled>AI filter</button>
         <button id="suggest-blacklist" disabled>Blocklist suggestions</button>
       </div>
-      <button id="manage-articles" class="mini" aria-pressed="false">Manage articles</button>
+      <button id="manage-articles" class="icon-btn" aria-label="Select articles" title="Select articles" aria-pressed="false"><span data-icon="select"></span></button>
       </div>
       <p id="article-action-status" class="muted small" role="status"></p>
       <section id="classification-panel" class="classification-panel" hidden aria-label="AI article filter">
@@ -73,7 +68,7 @@
       </section>
       <details id="blacklist-section" class="blacklist-section" hidden><summary>Suggested URL blocks</summary><div id="blacklist-suggestions"></div></details>
       <div id="articles" class="list"></div>
-      <div class="list-view-controls" role="group" aria-label="Article view"><button data-view="list" class="icon-btn" aria-label="List view" aria-pressed="true"><span data-icon="list"></span></button><button data-view="grid" class="icon-btn" aria-label="Grid view" aria-pressed="false"><span data-icon="grid"></span></button></div>
+      <div class="list-view-controls" role="group" aria-label="Article view"><button data-view="list" class="icon-btn" aria-label="List view" title="List view" aria-pressed="true"><span data-icon="list"></span></button><button data-view="grid" class="icon-btn" aria-label="Grid view" title="Grid view" aria-pressed="false"><span data-icon="grid"></span></button></div>
       </div><aside id="reading-rail" class="reading-rail" aria-label="Reading and review"></aside></div>
     </section>
 
@@ -109,9 +104,8 @@
     <section id="pane-stats" class="pane" hidden><div class="page-heading"><div><h1>A little each day, a lasting impression.</h1><p>Look back at your reading and find your own rhythm.</p></div></div><div id="statistics"></div></section>
     </main>
     <dialog id="article-dialog" class="article-dialog" aria-labelledby="add-title">
-      <div class="dialog-heading"><h2 id="add-title">Add an article</h2><button id="close-add" class="icon-btn" type="button" aria-label="Close add article">×</button></div>
-      <p class="muted">With your consent and a model configured, Lectern identifies articles and tracks your reading progress.</p>
-      <form id="add" class="addrow"><label class="visually-hidden" for="add-url">Article URL</label><input id="add-url" type="url" inputmode="url" placeholder="https://…" autocomplete="off" required /><button id="add-go" type="submit" class="primary">Reading</button></form>
+      <div class="dialog-heading"><h2 id="add-title">Add an article</h2><button id="close-add" class="icon-btn" type="button" aria-label="Close add article" title="Close"><span data-icon="close"></span></button></div>
+      <form id="add" class="addrow"><input id="add-url" type="url" inputmode="url" placeholder="Paste article URL" aria-label="Article URL" autocomplete="off" required /><button id="add-go" type="submit" class="primary">Read</button></form>
       <p id="add-hint" class="muted small" role="status" hidden></p>
     </dialog>
 

@@ -10,8 +10,12 @@ body.reader {
   --reader-segment: #ffffff;
   --reader-serif: "Source Serif 4", "Noto Serif SC", "Songti SC", "Noto Serif CJK SC", SimSun, serif;
   --reader-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --reader-kai: "Kaiti SC", STKaiti, KaiTi, "Noto Serif CJK SC", cursive;
-  --reader-font-family: var(--reader-serif);
+  --reader-kai: "Kaiti SC", STKaiti, KaiTi, "Noto Serif CJK SC", serif;
+  --reader-mono: ui-monospace, "Roboto Mono", "Droid Sans Mono", Menlo, Consolas, monospace;
+  --reader-literata: "Literata Variable", var(--reader-serif);
+  --reader-wenkai: "LXGW WenKai Screen", var(--reader-kai);
+  --reader-chinese-family: var(--reader-wenkai);
+  --reader-font-family: var(--reader-literata);
   --bg: var(--background);
   --fg: var(--foreground);
   --fg-soft: var(--foreground);
@@ -67,8 +71,17 @@ body.reader[data-reader-theme="dark"] {
     color-scheme: dark;
   }
 }
-body.reader[data-reader-font="sans"] { --reader-font-family: var(--reader-sans); }
-body.reader[data-reader-font="kai"] { --reader-font-family: var(--reader-kai); }
+body.reader[data-reader-english="serif"] { --reader-font-family: var(--reader-serif); }
+body.reader[data-reader-english="sans"] { --reader-font-family: system-ui, sans-serif; }
+body.reader[data-reader-english="mono"] { --reader-font-family: var(--reader-mono); }
+body.reader[data-reader-chinese="serif"] { --reader-chinese-family: "Noto Serif SC", "Songti SC", "Noto Serif CJK SC", SimSun, serif; }
+body.reader[data-reader-chinese="sans"] { --reader-chinese-family: var(--reader-sans); }
+body.reader[data-reader-chinese="kai"] { --reader-chinese-family: var(--reader-kai); }
+body.reader .article [data-reader-script="zh"] { font-family: var(--reader-chinese-family); }
+/* Translation's close button restores focus to .body (tabindex=-1). Chromium's
+ * default focus outline then frames the whole article. Keep focus for keyboard
+ * and screen readers, but only interactive controls need a visible focus ring. */
+body.reader .article .body:focus { outline: none; }
 body.reader .visually-hidden {
   position: absolute;
   width: 1px;
@@ -169,7 +182,7 @@ body.reader .reader-panel-handle {
 .reader-panel-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--border); }
 .reader-settings-panel fieldset { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .reader-setting-row { display: flex; align-items: center; gap: 8px; min-height: 52px; }
-.reader-setting-label { width: 44px; flex: 0 0 44px; color: var(--muted-foreground); }
+.reader-setting-label { width: 48px; flex: 0 0 48px; color: var(--muted-foreground); }
 .reader-settings-panel button { border: 0; box-shadow: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .reader-settings-panel button:disabled { cursor: default; opacity: .4; }
 body.reader .reader-size-change { flex: 0 0 44px; min-width: 44px; min-height: 44px; padding: 0; background: transparent; color: var(--foreground); font: 14px var(--reader-sans); }
@@ -182,7 +195,7 @@ body.reader .reader-size-steps button { position: relative; flex: 1; min-width: 
 .reader-size-steps button[aria-pressed="true"] span { width: 16px; height: 16px; }
 .reader-theme-row { min-height: 64px; }
 .reader-themes { flex: 1; min-width: 0; display: flex; justify-content: space-between; padding: 0 8px; }
-body.reader .reader-themes button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 36px; min-height: 56px; padding: 0; background: transparent; color: var(--muted-foreground); font: 11px/1.4 var(--reader-sans); }
+body.reader .reader-themes button { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 48px; padding: 0; background: transparent; color: var(--muted-foreground); font: 11px/1.4 var(--reader-sans); }
 .reader-swatch { display: grid; place-items: center; box-sizing: border-box; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 50%; font: 13px var(--reader-serif); }
 [data-reader-theme="auto"] > .reader-swatch { background: linear-gradient(135deg, #fbfaf7 50%, #141414 50%); }
 [data-reader-theme="white"] > .reader-swatch { background: #ffffff; color: #1f1f1f; }
@@ -190,12 +203,17 @@ body.reader .reader-themes button { display: flex; flex-direction: column; align
 [data-reader-theme="dark"] > .reader-swatch { background: #141414; color: #bdbab4; }
 .reader-themes button[aria-pressed="true"] > .reader-swatch { border: 2px solid var(--primary); }
 body.reader .reader-themes button[aria-pressed="true"] { color: var(--primary); }
-.reader-fonts { display: grid; flex: 1; min-width: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 10px; background: var(--muted); }
+.reader-fonts { display: grid; flex: 1; min-width: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 10px; background: var(--muted); }
 body.reader .reader-fonts button { min-width: 0; height: 38px; min-height: 38px; padding: 0 4px; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 15px; }
 .reader-fonts [data-reader-font="serif"] { font-family: var(--reader-serif); }
 .reader-fonts [data-reader-font="sans"] { font-family: var(--reader-sans); }
 .reader-fonts [data-reader-font="kai"] { font-family: var(--reader-kai); }
+.reader-fonts [data-reader-font="mono"] { font-family: var(--reader-mono); }
+body.reader .reader-fonts [data-reader-font="literata"] { font-family: var(--reader-literata); font-size: 13px; }
+.reader-fonts [data-reader-font="wenkai"] { font-family: var(--reader-wenkai); }
 body.reader .reader-fonts button[aria-pressed="true"] { background: var(--reader-segment); color: var(--foreground); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+body.reader .reader-bookmark-actions { display:flex; align-items:center; gap:8px; }
+body.reader .reader-bookmark-actions #reader-bookmark { width:48px; min-height:48px; padding:0; flex:none; justify-content:center; }
 .reader-settings button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .reader-settings-panel #reader-font-status { margin: 8px 0 0; background: transparent; }
 @media (min-width: 721px) {

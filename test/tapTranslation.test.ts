@@ -198,6 +198,23 @@ test("滚动、拖动、长按、取消手势和多指触摸不触发翻译", t 
   assert.equal(requests.length, 0);
 });
 
+test('native selection cancels pending taps and remains available for the context menu', t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  tap();
+  const range = document.createRange(); range.selectNodeContents(root.querySelector('p')!);
+  const selection = document.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+  t.mock.timers.tick(1000);
+  tap(); t.mock.timers.tick(1000);
+  const context = new dom.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  root.dispatchEvent(context);
+  assert.equal(context.defaultPrevented, false);
+  assert.equal(requests.length, 0);
+  assert.equal(selection.toString(), 'Hello world! Stay curious.');
+  selection.removeAllRanges();
+  tap(); t.mock.timers.tick(150);
+  assert.equal(requests.length, 1, 'tap translation resumes after native selection ends');
+});
+
 test("链接、按钮、输入框和点击外部不会触发待处理翻译", t => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
   for (const target of root.querySelectorAll("a, button, input")) {

@@ -38,7 +38,7 @@ export async function setupReaderControls(options: {
   const jump = doc.getElementById('bookmark-jump') as HTMLButtonElement;
   const key = BOOKMARK_PREFIX + articleId;
   let size = DEFAULT_SIZE, theme: ReaderTheme = 'auto', mark: Bookmark | null = null;
-  let english: EnglishFont = 'serif', chinese: ChineseFont = 'serif';
+  let english: EnglishFont = 'literata', chinese: ChineseFont = 'wenkai';
   prepareReaderTypography(body);
   const title = doc.querySelector<HTMLElement>('.article h1.atitle');
   if (title) prepareReaderTypography(title);

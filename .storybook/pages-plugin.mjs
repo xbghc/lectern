@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
+import { readerFontBundle } from '../scripts/reader-fonts.mjs';
 
 export const pages = {
   popup: ['src/popup/popup.html', 'src/popup/index.ts'],
@@ -19,6 +20,7 @@ const script = text => `<script>${text.replace(/<\/script/gi, '<\\/script')}</sc
 /** Bundle the real page entry; only the platform boot and transport are replaced. */
 export async function compilePages() {
   const result = {};
+  const readerFonts = readerFontBundle({ inline: true }).css;
   for (const [name, [template, entry]] of Object.entries(pages)) {
     const bundled = await build({
       stdin: { contents: `import './storybook/runtime.ts'; import './${entry}';`, resolveDir: root, loader: 'ts' },
@@ -46,6 +48,7 @@ export async function compilePages() {
       html = html.replace(new RegExp(`<link[^>]*href="${file.replace('.', '\\.')}"[^>]*>`, 'g'), () => `<style>${css}</style>`);
     }
     html = html.replace('<head>', '<head><base href="https://preview.invalid/" /><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; font-src data:; img-src data: blob:; connect-src \'none\'; form-action \'none\'" />');
+    html = html.replace('<link rel="stylesheet" href="reader-fonts.css" />', () => `<style>${readerFonts}</style>`);
     result[name] = html.replace('</body>', () => `<!--PREVIEW_CONFIG-->${script(bundled.outputFiles[0].text)}</body>`);
   }
   return result;

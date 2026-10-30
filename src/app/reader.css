@@ -12,8 +12,10 @@ body.reader {
   --reader-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --reader-kai: "Kaiti SC", STKaiti, KaiTi, "Noto Serif CJK SC", serif;
   --reader-mono: ui-monospace, "Roboto Mono", "Droid Sans Mono", Menlo, Consolas, monospace;
-  --reader-chinese-family: "Noto Serif SC", "Songti SC", "Noto Serif CJK SC", SimSun, serif;
-  --reader-font-family: var(--reader-serif);
+  --reader-literata: "Literata Variable", var(--reader-serif);
+  --reader-wenkai: "LXGW WenKai Screen", var(--reader-kai);
+  --reader-chinese-family: var(--reader-wenkai);
+  --reader-font-family: var(--reader-literata);
   --bg: var(--background);
   --fg: var(--foreground);
   --fg-soft: var(--foreground);
@@ -69,8 +71,10 @@ body.reader[data-reader-theme="dark"] {
     color-scheme: dark;
   }
 }
+body.reader[data-reader-english="serif"] { --reader-font-family: var(--reader-serif); }
 body.reader[data-reader-english="sans"] { --reader-font-family: system-ui, sans-serif; }
 body.reader[data-reader-english="mono"] { --reader-font-family: var(--reader-mono); }
+body.reader[data-reader-chinese="serif"] { --reader-chinese-family: "Noto Serif SC", "Songti SC", "Noto Serif CJK SC", SimSun, serif; }
 body.reader[data-reader-chinese="sans"] { --reader-chinese-family: var(--reader-sans); }
 body.reader[data-reader-chinese="kai"] { --reader-chinese-family: var(--reader-kai); }
 body.reader .article [data-reader-script="zh"] { font-family: var(--reader-chinese-family); }
@@ -199,12 +203,14 @@ body.reader .reader-themes button { display: flex; flex-direction: column; align
 [data-reader-theme="dark"] > .reader-swatch { background: #141414; color: #bdbab4; }
 .reader-themes button[aria-pressed="true"] > .reader-swatch { border: 2px solid var(--primary); }
 body.reader .reader-themes button[aria-pressed="true"] { color: var(--primary); }
-.reader-fonts { display: grid; flex: 1; min-width: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 10px; background: var(--muted); }
+.reader-fonts { display: grid; flex: 1; min-width: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 10px; background: var(--muted); }
 body.reader .reader-fonts button { min-width: 0; height: 38px; min-height: 38px; padding: 0 4px; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 15px; }
 .reader-fonts [data-reader-font="serif"] { font-family: var(--reader-serif); }
 .reader-fonts [data-reader-font="sans"] { font-family: var(--reader-sans); }
 .reader-fonts [data-reader-font="kai"] { font-family: var(--reader-kai); }
 .reader-fonts [data-reader-font="mono"] { font-family: var(--reader-mono); }
+body.reader .reader-fonts [data-reader-font="literata"] { font-family: var(--reader-literata); font-size: 13px; }
+.reader-fonts [data-reader-font="wenkai"] { font-family: var(--reader-wenkai); }
 body.reader .reader-fonts button[aria-pressed="true"] { background: var(--reader-segment); color: var(--foreground); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
 .reader-settings button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .reader-settings-panel #reader-font-status { margin: 8px 0 0; background: transparent; }

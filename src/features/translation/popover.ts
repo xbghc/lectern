@@ -224,10 +224,10 @@ button:active { background: #f4f4f5; border-color: #18181b; color: #18181b; }
 
 .reader-sheet-backdrop { position:fixed; inset:0; background:rgba(36,30,22,.17); pointer-events:auto; }
 .box.reader-sheet { position:fixed; width:100%; max-width:none; border-radius:18px 18px 0 0; padding:20px 22px calc(22px + max(env(safe-area-inset-bottom),var(--inset-bottom,0px))); box-shadow:0 -10px 35px rgba(36,27,21,.15); overscroll-behavior:contain; }
-.reader-sheet .term { font-size:28px; padding-right:36px; }
+.reader-sheet:focus { outline:none; }
+.reader-sheet .term { font-size:28px; }
 .reader-sheet .tr { font-size:18px; margin:12px 0; }
 .reader-sheet .note, .reader-sheet .usage { font-size:13px; line-height:1.8; }
-.reader-sheet-close { position:sticky; top:0; z-index:2; float:right; margin:-7px -10px 0 0; border:0; width:40px; height:40px; padding:0; font:26px/1 system-ui,sans-serif; color:inherit; background:inherit; }
 .reader-sheet .qin { font-size:16px; }
 `;
 
@@ -236,6 +236,9 @@ const MAX_QUESTION_CHARS = 200;
 
 /** 离底不到这么远就算「贴着底」，见 pinBottom。 */
 const PIN_SLACK_PX = 24;
+
+/** A deliberate reading gesture closes the sheet; small finger movements do not. */
+const SHEET_DISMISS_PX = 32;
 
 /**
  * 发出一问时给答案留的高度，见 reserveAnswer。提示词让模型把答案控制在 150 字以内；
@@ -416,21 +419,48 @@ export class Popover {
 
     if (this.actions.presentation === "sheet") {
       const backdrop = document.createElement("div"); backdrop.className = "reader-sheet-backdrop";
-      backdrop.addEventListener("click", () => this.actions.onClose?.());
-      backdrop.addEventListener("touchmove", event => event.preventDefault(), { passive: false });
-      backdrop.addEventListener("wheel", event => event.preventDefault(), { passive: false });
+      let dismissed = false;
+      const dismiss = (): void => { if (!dismissed) { dismissed = true; this.actions.onClose?.(); } };
+      backdrop.addEventListener("click", dismiss);
+      let touch: { id: number; y: number } | null = null;
+      backdrop.addEventListener("touchstart", event => {
+        const first = event.touches[0];
+        touch = event.touches.length === 1 && first ? { id: first.identifier, y: first.clientY } : null;
+      }, { passive: true });
+      backdrop.addEventListener("touchmove", event => {
+        const current = event.touches[0];
+        if (!current || !touch || event.touches.length !== 1 || current.identifier !== touch.id) { touch = null; return; }
+        if (Math.abs(current.clientY - touch.y) >= SHEET_DISMISS_PX) dismiss();
+      }, { passive: true });
+      const endTouch = (): void => { touch = null; };
+      backdrop.addEventListener("touchend", endTouch, { passive: true });
+      backdrop.addEventListener("touchcancel", endTouch, { passive: true });
+      let wheelDistance = 0, lastWheel = 0;
+      backdrop.addEventListener("wheel", event => {
+        // Normalise line/page wheels too, without blocking the underlying article's scroll.
+        const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1);
+        if (event.ctrlKey || !delta) return; // Pinch zoom is not a reading gesture.
+        if (event.timeStamp - lastWheel > 200 || Math.sign(delta) !== Math.sign(wheelDistance)) wheelDistance = 0;
+        lastWheel = event.timeStamp;
+        wheelDistance += delta;
+        if (Math.abs(wheelDistance) >= SHEET_DISMISS_PX) dismiss();
+      }, { passive: true });
       root.append(backdrop);
       box.classList.add("reader-sheet"); box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Translation and explanation"); box.setAttribute("aria-modal", "true");
+      box.tabIndex = -1;
       const resize = (): void => this.position();
       window.addEventListener("resize", resize);
       window.visualViewport?.addEventListener("resize", resize);
       window.visualViewport?.addEventListener("scroll", resize);
       this.sheetCleanup = () => { window.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("resize", resize); window.visualViewport?.removeEventListener("scroll", resize); };
       box.addEventListener("keydown", event => {
+        if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); dismiss(); return; }
         if (event.key !== "Tab") return;
         const controls = [...box.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),[tabindex="0"]')];
         const first = controls[0], last = controls.at(-1);
-        if (event.shiftKey && root.activeElement === first) { event.preventDefault(); last?.focus(); }
+        if (!first) { event.preventDefault(); box.focus({ preventScroll: true }); }
+        else if (root.activeElement === box) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
+        else if (event.shiftKey && root.activeElement === first) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && root.activeElement === last) { event.preventDefault(); first?.focus(); }
       });
     }
@@ -439,6 +469,7 @@ export class Popover {
     this.host = host;
     this.root = root;
     this.box = box;
+    if (this.actions.presentation === "sheet") box.focus({ preventScroll: true });
     return box;
   }
 
@@ -511,12 +542,6 @@ export class Popover {
   private position(): void {
     const box = this.box;
     if (box && this.actions.presentation === "sheet") {
-      if (!box.querySelector(".reader-sheet-close")) {
-        const close = document.createElement("button"); close.type = "button"; close.className = "reader-sheet-close";
-        close.textContent = "×"; close.setAttribute("aria-label", "Close translation");
-        close.addEventListener("click", () => this.actions.onClose?.()); box.prepend(close);
-        close.focus({ preventScroll: true });
-      }
       const viewport = window.visualViewport;
       const height = viewport?.height ?? window.innerHeight;
       box.style.maxHeight = `${Math.max(120, Math.min(height * .68, 520))}px`;

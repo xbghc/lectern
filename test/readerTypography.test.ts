@@ -6,11 +6,14 @@ import { prepareReaderTypography, readerFonts, ENGLISH_FONT_KEY, CHINESE_FONT_KE
 import { setupReaderControls } from '../src/app/readerControls.ts';
 
 test('font preferences migrate legacy values and validate each language independently', () => {
-  assert.deepEqual(readerFonts({}), { english: 'serif', chinese: 'serif' });
+  assert.deepEqual(readerFonts({}), { english: 'literata', chinese: 'wenkai' });
+  assert.deepEqual(readerFonts({ 'reader:font-family': 'serif' }), { english: 'serif', chinese: 'serif' });
   assert.deepEqual(readerFonts({ 'reader:font-family': 'kai' }), { english: 'serif', chinese: 'kai' });
   assert.deepEqual(readerFonts({ 'reader:font-family': 'sans' }), { english: 'sans', chinese: 'sans' });
   assert.deepEqual(readerFonts({ [ENGLISH_FONT_KEY]: 'mono', [CHINESE_FONT_KEY]: 'sans' }), { english: 'mono', chinese: 'sans' });
-  assert.deepEqual(readerFonts({ [ENGLISH_FONT_KEY]: 'bad', [CHINESE_FONT_KEY]: 'kai' }), { english: 'serif', chinese: 'kai' });
+  assert.deepEqual(readerFonts({ [ENGLISH_FONT_KEY]: 'bad', [CHINESE_FONT_KEY]: 'kai' }), { english: 'literata', chinese: 'kai' });
+  assert.deepEqual(readerFonts({ [ENGLISH_FONT_KEY]: 'literata', [CHINESE_FONT_KEY]: 'wenkai', 'reader:font-family': 'sans' }), { english: 'literata', chinese: 'wenkai' });
+  assert.deepEqual(readerFonts({ [ENGLISH_FONT_KEY]: 'serif', [CHINESE_FONT_KEY]: 'serif' }), { english: 'serif', chinese: 'serif' });
 });
 
 test('mixed-script typography preserves text, inline markup, block identity and native selection', () => {
@@ -53,5 +56,10 @@ test('reader controls save both languages without changing the other selection',
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(saved[ENGLISH_FONT_KEY], 'mono'); assert.equal(saved[CHINESE_FONT_KEY], 'sans');
     assert.equal(doc.querySelectorAll('.reader-fonts [aria-pressed=true]').length, 2);
+    doc.querySelector<HTMLButtonElement>('[data-reader-language=en][data-reader-font=literata]')!.click();
+    doc.querySelector<HTMLButtonElement>('[data-reader-language=zh][data-reader-font=wenkai]')!.click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(saved[ENGLISH_FONT_KEY], 'literata'); assert.equal(saved[CHINESE_FONT_KEY], 'wenkai');
+    assert.equal(doc.body.dataset.readerEnglish, 'literata'); assert.equal(doc.body.dataset.readerChinese, 'wenkai');
   } finally { dom.window.dispatchEvent(new dom.window.Event('pagehide')); dom.window.close(); g.chrome = previous; }
 });

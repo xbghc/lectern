@@ -1,5 +1,5 @@
-export type EnglishFont = 'serif' | 'sans' | 'mono';
-export type ChineseFont = 'serif' | 'sans' | 'kai';
+export type EnglishFont = 'literata' | 'serif' | 'sans' | 'mono';
+export type ChineseFont = 'wenkai' | 'serif' | 'sans' | 'kai';
 export const ENGLISH_FONT_KEY = 'reader:font-english';
 export const CHINESE_FONT_KEY = 'reader:font-chinese';
 export const LEGACY_FONT_KEY = 'reader:font-family';
@@ -8,8 +8,10 @@ export function readerFonts(saved: Record<string, unknown>): { english: EnglishF
   const legacy = saved[LEGACY_FONT_KEY];
   const en = saved[ENGLISH_FONT_KEY], zh = saved[CHINESE_FONT_KEY];
   return {
-    english: en === 'serif' || en === 'sans' || en === 'mono' ? en : legacy === 'sans' ? 'sans' : 'serif',
-    chinese: zh === 'serif' || zh === 'sans' || zh === 'kai' ? zh : legacy === 'sans' || legacy === 'kai' ? legacy : 'serif',
+    english: en === 'literata' || en === 'serif' || en === 'sans' || en === 'mono' ? en
+      : legacy === 'sans' ? 'sans' : legacy === 'serif' || legacy === 'kai' ? 'serif' : 'literata',
+    chinese: zh === 'wenkai' || zh === 'serif' || zh === 'sans' || zh === 'kai' ? zh
+      : legacy === 'serif' || legacy === 'sans' || legacy === 'kai' ? legacy : 'wenkai',
   };
 }
 

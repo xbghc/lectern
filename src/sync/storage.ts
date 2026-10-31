@@ -1,5 +1,6 @@
 import type { Article, ArticleCard, BgToPage, FsrsState, ParagraphRecord, Session, StoredCard } from "../types.ts";
 import { DEFAULT_SETTINGS } from "../types.ts";
+import { resolveReadingSettings } from "../features/reading/settings.ts";
 import { gradeFsrs } from "../lib/review.ts";
 import { summarizeSpeed } from "../lib/readingTime.ts";
 import { mergeEpisodes } from "../lib/stats.ts";
@@ -335,7 +336,7 @@ export function projectRecords(state: SyncState): void {
     c.snippetIds = c.snippetIds.filter(id => snippetById.has(id));
     for (const id of c.snippetIds) snippetById.get(id)!.cardId = c.id;
   }
-  const settings = {...DEFAULT_SETTINGS,...object(data.settings)};
+  const settings = resolveReadingSettings(object(data.settings));
   for(const [key,cached] of Object.entries(data))if(key.startsWith("rh:")&&[object(cached).url,object(cached).finalUrl].some(url=>typeof url==="string"&&deleted[normalizeUrl(url)]))delete data[key];
   for (const [id,list] of paragraphs) { list.sort((a,b)=>a.index-b.index); data[`p:${id}`] = list; }
   sessions.sort((a,b)=>a.startTs-b.startTs || a.id.localeCompare(b.id));

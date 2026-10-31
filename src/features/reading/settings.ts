@@ -68,6 +68,33 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   focusBarEnabled: true,
 };
 
+/** Android keeps these reading rules automatic; stored extension preferences remain untouched. */
+const APP_READING_DEFAULTS = {
+  finishRatio: 0.9,
+  restorePositionEnabled: DEFAULT_READING_SETTINGS.restorePositionEnabled,
+  articleReviewEnabled: DEFAULT_READING_SETTINGS.articleReviewEnabled,
+  idleTimeoutMs: DEFAULT_READING_SETTINGS.idleTimeoutMs,
+  stallTimeoutMs: DEFAULT_READING_SETTINGS.stallTimeoutMs,
+  maxQuietMs: DEFAULT_READING_SETTINGS.maxQuietMs,
+  minSessionMs: DEFAULT_READING_SETTINGS.minSessionMs,
+  paragraphDwellMs: DEFAULT_READING_SETTINGS.paragraphDwellMs,
+  readFraction: DEFAULT_READING_SETTINGS.readFraction,
+};
+let appReadingDefaults = false;
+export function useAppReadingDefaults(): void { appReadingDefaults = true; }
+
+export function resolveReadingSettings(stored: Partial<ReadingSettings>): ReadingSettings {
+  return { ...DEFAULT_READING_SETTINGS, ...stored, ...(appReadingDefaults ? APP_READING_DEFAULTS : {}) };
+}
+
+/** Hidden Android rules must not overwrite another device's explicit preferences when saving. */
+export function editableReadingPatch<T extends Partial<ReadingSettings>>(patch: T): T {
+  if (!appReadingDefaults) return patch;
+  const editable = { ...patch };
+  for (const key of Object.keys(APP_READING_DEFAULTS) as (keyof typeof APP_READING_DEFAULTS)[]) delete editable[key];
+  return editable;
+}
+
 /** 这个功能的网址名单，交给名单对话（core/background/ruleChat.ts）。meaning 是写给模型看的。 */
 export const READING_URL_LISTS: readonly UrlRuleList[] = [{
   key: "articleExcludedUrls" satisfies keyof ReadingSettings,

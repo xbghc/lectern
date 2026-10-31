@@ -43,7 +43,7 @@ savedSummary.textContent = "Saved";
 const savedList = document.createElement("div");
 savedList.className = "list";
 savedSection.append(savedSummary, savedList);
-document.getElementById("continue-reading")?.after(savedSection);
+document.getElementById("articles")?.after(savedSection);
 let archiveRender = 0;
 async function renderSavedArticles(): Promise<void> {
   const turn = ++archiveRender;
@@ -165,7 +165,6 @@ async function renderBooks(): Promise<void> {
   const records = new Map((res.articles ?? []).map(a => [a.id, a]));
 
   const fragment = document.createDocumentFragment();
-  const homeFragment = document.createDocumentFragment();
   for (const book of books) {
     const done = new Set(book.chapters.filter(c => finished.has(chapterId(book.id, c.index))).map(c => c.index));
     const card = document.createElement("div");
@@ -186,24 +185,18 @@ async function renderBooks(): Promise<void> {
     const coverLink = document.createElement("a"); coverLink.className = "shelf-cover-link";
     coverLink.href = readerUrl(target) + "&from=books"; coverLink.setAttribute("aria-label", `Read “${book.title}”`);
     coverLink.append(coverNode()); row.append(coverLink);
-    if (homeFragment.childElementCount < 2) {
-      const preview = document.createElement("a"); preview.className = "phone-shelf-preview";
-      preview.href = readerUrl(target) + "&from=articles";
-      preview.setAttribute("aria-label", `Read “${book.title}” · ${progress}%`);
-      const info = document.createElement("div"); const name = document.createElement("h3"); name.textContent = book.title;
-      const detail = document.createElement("p"); detail.textContent = `${progress}%`;
-      info.append(name, detail); preview.append(coverNode(), info); homeFragment.append(preview);
-    }
     const title = document.createElement("div");
     title.className = "title";
     const open = document.createElement("a");
     open.href = readerUrl(target) + "&from=books";
     open.textContent = book.title;
     title.append(open);
-    row.append(title);
+    const info = document.createElement("div"); info.className = "book-info";
+    info.append(title);
+    row.append(info);
     if (book.author) {
       const author = document.createElement("p"); author.className = "book-author"; author.textContent = book.author;
-      row.append(author);
+      info.append(author);
     }
     const progressRow = document.createElement("div"); progressRow.className = "book-reading-progress";
     const bar = document.createElement("div"); bar.className = "progress";
@@ -212,6 +205,7 @@ async function renderBooks(): Promise<void> {
     const fillProgress = document.createElement("i"); fillProgress.style.width = `${progress}%`; bar.append(fillProgress);
     const progressText = document.createElement("span"); progressText.textContent = `${progress}%`; progressText.setAttribute("aria-hidden", "true");
     progressRow.append(bar, progressText);
+    info.append(progressRow);
 
     const sub = document.createElement("div");
     sub.className = "sub";
@@ -264,16 +258,11 @@ async function renderBooks(): Promise<void> {
 
     const actions = document.createElement("div"); actions.className = "book-actions";
     actions.append(toc, remove);
-    card.append(row, progressRow, actions, problem);
+    card.append(row, actions, problem);
     fragment.append(card);
   }
   if (turn !== bookRender) { for (const url of urls) URL.revokeObjectURL(url); return; }
   bookList.replaceChildren(fragment);
-  $("home-books").replaceChildren(homeFragment);
-  $("home-books-count").textContent = String(books.length);
-  $("home-books-count").setAttribute("aria-label", quantity(books.length, "book"));
-  $("home-shelf").hidden = false;
-  if (!books.length) $("home-books").textContent = "No books yet";
   for (const url of coverUrls) URL.revokeObjectURL(url);
   coverUrls = urls;
   bookSection.hidden = books.length === 0;
@@ -289,6 +278,10 @@ async function renderBooks(): Promise<void> {
 async function importBook(uri?: string): Promise<void> {
   if (importing) return;
   $("show-books").click();
+  if (!canOpenBooks()) {
+    say(native() ? "Update the app to import books." : "Import EPUB is available in the Android app.");
+    return;
+  }
   importing = true;
   $<HTMLButtonElement>("import-book").disabled = true;
   $<HTMLButtonElement>("import-book-empty").disabled = true;
@@ -328,12 +321,11 @@ async function importBook(uri?: string): Promise<void> {
   }
 }
 
+$("import-book").hidden = document.body.dataset.pane !== "books";
+$("import-book").addEventListener("click", () => void importBook());
 if (canOpenBooks()) {
-  $("import-book").dataset.available = "true";
-  $("import-book").hidden = document.body.dataset.pane !== "books";
   $("import-book-empty").hidden = false;
   $("book-open-hint").hidden = true;
-  $("import-book").addEventListener("click", () => void importBook());
   $("import-book-empty").addEventListener("click", () => void importBook());
 }
 void renderBooks();

@@ -12,6 +12,18 @@ export function renderPage(args: PageArgs): HTMLElement {
   frame.title = `Lectern · ${args.page} · ${args.state}`;
   frame.setAttribute('sandbox', `allow-scripts allow-same-origin allow-modals${args.page === 'chat' ? ' allow-forms' : ''}`);
   frame.style.cssText = `box-sizing:border-box;display:block;width:min(calc(100% - 32px),${args.width}px);height:${args.height}px;border:1px solid #d8d5ce;margin:16px auto;background:white;border-radius:8px;`;
+  if (args.page === 'popup') {
+    let observer: ResizeObserver | undefined;
+    frame.addEventListener('load', () => {
+      observer?.disconnect();
+      const body = frame.contentDocument?.body;
+      if (!body) return;
+      const resize = () => { frame.style.height = `${Math.ceil(body.getBoundingClientRect().height) + 2}px`; };
+      observer = new ResizeObserver(resize);
+      observer.observe(body);
+      resize();
+    });
+  }
   const config = JSON.stringify({ state: args.state, tab: args.tab, page: args.page }).replaceAll('<', '\\u003c');
   frame.srcdoc = pages[args.page].replace('<!--PREVIEW_CONFIG-->', `<script>window.__PREVIEW__=${config};</script>`);
   return frame;

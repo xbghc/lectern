@@ -10,6 +10,9 @@ import { setOcrBackend } from "../features/translation/ocr.ts";
 import { cleanOcrLines } from "../lib/ocrText.ts";
 import { indexedDriver, installStorage } from "../sync/storage.ts";
 import { bootSync, setHostVisible } from "../sync/engine.ts";
+import { useAppReadingDefaults } from "../features/reading/settings.ts";
+
+useAppReadingDefaults();
 
 /**
  * App 每个页面的第一件事：把 chrome.* 垫片和宿主桥装好。

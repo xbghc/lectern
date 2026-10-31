@@ -24,6 +24,7 @@ export function fontSize(value: unknown): number {
 export async function setupReaderControls(options: {
   articleId: string; body: HTMLElement; book: Book | null; chapter: number | null;
   openChapter: (url: string) => void;
+  closeTools?: (settings: { restoreScroll: boolean }) => void;
 }): Promise<void> {
   const { body, articleId, book, chapter } = options;
   const doc = body.ownerDocument;
@@ -47,8 +48,14 @@ export async function setupReaderControls(options: {
   let saveRevision = 0;
   const tracker = createUiTracker(events => void chrome.runtime.sendMessage({ type: 'ui:track', events }).catch(() => undefined));
   const status = doc.getElementById('reader-feedback')!;
+  const toolStatus = doc.getElementById('reader-tools-status')!;
   let feedbackTimer: ReturnType<typeof setTimeout> | undefined;
-  const say = (text: string): void => { clearTimeout(feedbackTimer); status.textContent = text; feedbackTimer = setTimeout(() => { status.textContent = ""; }, 3000); };
+  const say = (text: string): void => {
+    clearTimeout(feedbackTimer);
+    status.textContent = tools.open ? '' : text;
+    toolStatus.textContent = tools.open ? text : '';
+    feedbackTimer = setTimeout(() => { status.textContent = ''; toolStatus.textContent = ''; }, 3000);
+  };
   host.addEventListener('pagehide', () => { clearTimeout(feedbackTimer); tracker.flush(); }, { once: true });
   const steps = FONT_SIZES.map(value => {
     const button = doc.createElement('button');
@@ -87,7 +94,12 @@ export async function setupReaderControls(options: {
     markButton.classList.toggle('bookmarked', !!mark);
     doc.getElementById('reader-bookmark-label')!.textContent = mark ? 'Remove bookmark' : 'Add bookmark here';
     jump.hidden = !mark;
-    if (mark) jump.textContent = `Go to bookmark · ${Math.round(mark.ratio * 100)}%`;
+    if (mark) {
+      const position = `${book ? `Chapter ${(chapter ?? 0) + 1} · ` : ''}${Math.round(mark.ratio * 100)}%`;
+      doc.getElementById('bookmark-position')!.textContent = position;
+      jump.setAttribute('aria-label', `Go to bookmark, ${position}`);
+      jump.title = `Go to bookmark · ${position}`;
+    }
   };
   // Optional preferences must not prevent the article and its tracker from opening.
   const saved = await chrome.storage.local.get([FONT_KEY, THEME_KEY, LEGACY_FONT_KEY, ENGLISH_FONT_KEY, CHINESE_FONT_KEY, key]).catch(() => {
@@ -154,7 +166,8 @@ export async function setupReaderControls(options: {
   });
   jump.addEventListener('click', () => {
     if (!mark) return;
-    tools.close();
+    if (options.closeTools) options.closeTools({ restoreScroll: false });
+    else tools.close();
     const paragraph = mark.paragraph === undefined ? null : body.querySelectorAll<HTMLElement>('p,h2,h3,li')[mark.paragraph];
     if (paragraph && mark.offset !== undefined) window.scrollBy({ top: paragraph.getBoundingClientRect().top - mark.offset, behavior: 'instant' });
     else window.scrollTo({ top: mark.ratio * Math.max(0, doc.documentElement.scrollHeight - window.innerHeight), behavior: 'instant' });

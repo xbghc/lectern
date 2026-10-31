@@ -29,6 +29,7 @@ const dev = watch || process.argv.includes("--dev");
 const app = process.argv.includes("--app");
 const OUT = app ? "android/app/src/main/assets/www" : "dist";
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+const versionName = process.env.LECTERN_VERSION_NAME || pkg.version;
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
@@ -55,6 +56,7 @@ function copyStaticExtension() {
   mkdirSync(OUT, { recursive: true });
   const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
   manifest.version = pkg.version;
+  if (versionName !== pkg.version) manifest.version_name = versionName;
   writeFileSync(join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
   copyFonts();
   copyTesseract();
@@ -127,7 +129,7 @@ const options = app
       logLevel: "info",
       // 产物里保留中文，出问题时在 assets 里能直接搜到
       charset: "utf8",
-      define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+      define: { __APP_VERSION__: JSON.stringify(versionName) },
     }
   : {
       entryPoints: {
@@ -169,3 +171,4 @@ if (watch) {
   await build(options);
   console.log(`[lectern] built ${OUT}/ (${app ? "app, " : ""}${dev ? "dev" : "production"})`);
 }
+

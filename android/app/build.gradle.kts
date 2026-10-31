@@ -11,15 +11,17 @@ plugins {
 val repoRoot: File = rootProject.projectDir.parentFile
 
 /*
- * 版本号跟着 package.json 走：扩展、App、Release 标签三处只维护一个数
- * （`npm version patch` 改数字并打标签，Release 工作流核对两者一致）。
- * versionCode 由它换算：0.3.0 → 300，每次发版号变了它就单调递增。
+ * 本地版本跟着 package.json 走。Release 工作流为 preview 注入显示版本，
+ * 两个发布渠道共用递增的 versionCode，正式签名的包可以相互覆盖升级。
  */
-val webVersion: String = Regex("\"version\"\\s*:\\s*\"([^\"]+)\"")
+val packageVersion: String = Regex("\"version\"\\s*:\\s*\"([^\"]+)\"")
     .find(repoRoot.resolve("package.json").readText())?.groupValues?.get(1) ?: "0.0.0"
-val webVersionCode: Int = webVersion.split(".").map { it.toIntOrNull() ?: 0 }
+val webVersion: String = System.getenv("LECTERN_VERSION_NAME") ?: packageVersion
+val localVersionCode: Int = packageVersion.split(".").map { it.toIntOrNull() ?: 0 }
     .let { p -> p.getOrElse(0) { 0 } * 10000 + p.getOrElse(1) { 0 } * 100 + p.getOrElse(2) { 0 } }
     .coerceAtLeast(1)
+val webVersionCode: Int = System.getenv("LECTERN_VERSION_CODE")?.toInt() ?: localVersionCode
+require(webVersionCode in 1..2_100_000_000) { "LECTERN_VERSION_CODE is outside Android's supported range" }
 
 /*
  * 正式签名只在 CI 的 Release 工作流里配（密钥从 Secrets 解出来、路径走环境变量）。
@@ -86,6 +88,7 @@ val buildWeb = tasks.register<Exec>("buildWeb") {
     commandLine(npm, "run", "build:app")
     inputs.dir(repoRoot.resolve("src"))
     inputs.files(repoRoot.resolve("build.mjs"), repoRoot.resolve("package.json"))
+    inputs.property("releaseVersionName", webVersion)
     outputs.dir(project.file("src/main/assets/www"))
 }
 tasks.named("preBuild") { dependsOn(buildWeb) }
@@ -100,3 +103,4 @@ dependencies {
     // FileProvider：分享导出文件
     implementation("androidx.core:core:1.16.0")
 }
+

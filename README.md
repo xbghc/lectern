@@ -138,7 +138,7 @@ The Android shell handles back navigation, foreground/background transitions, sa
 
 ### App updates
 
-The app checks the public GitHub latest-release endpoint at most once a day unless disabled in Settings, including when an older update has already been downloaded. It remembers the latest offer between checks. This anonymous request does not include API keys, reading data or the current version; comparison happens locally. Manual checks remain available.
+The app checks public GitHub releases at most once a day unless disabled in Settings, including when an older update has already been downloaded. Stable installations check the latest stable release; installing a `vX.Y.Z-preview.N` APK opts into subsequent preview updates instead. Both use the existing release signing certificate, so newer packages can update an existing installation without removing its data. To change channels, install a newer APK from the other channel. The app remembers the latest offer between checks. This anonymous request does not include API keys, reading data or the current version; comparison happens locally. Manual checks remain available.
 
 Automatic downloading, when enabled, uses an unmetered network and HTTPS GitHub APK URLs, then attempts installation after you leave the app. Android may require permission or confirmation. Disable this option to use the update banner manually. The extension instead receives updates through the Chrome Web Store. A submitted extension update still requires store review.
 
@@ -228,7 +228,9 @@ Keep feature boundaries, storage keys, protocol IDs and account binding intact. 
 
 Main and pull-request workflows check client/server code, run PostgreSQL integration tests, build the extension, Android app and Storybook, and validate server images as configured in `.github/workflows/`. Main publishes the preview and static site to GitHub Pages.
 
-A `v*` tag triggers release ZIP/APK artifacts and server images. Root and server package versions and lockfiles must match the tag. Keep the Android release certificate stable so existing installations can update. Required signing secrets are documented in the release workflow; never substitute a different key for an existing release app.
+Every push to `main` runs the Release workflow and publishes a GitHub prerelease containing an extension ZIP and Android APK after checks pass. Preview versions use the next patch and the Release workflow run number, for example `v0.3.30-preview.30`; the source package version stays unchanged. Preview builds do not submit to the Chrome Web Store. Download the newest preview from [Releases](https://github.com/xbghc/lectern/releases), then use the app's normal update checks for subsequent previews. Running the Release workflow manually on `main` also creates a preview.
+
+A stable `vX.Y.Z` tag continues to trigger release ZIP/APK artifacts, server images and Chrome Web Store submission. Root and server package versions and lockfiles must match the tag. Published Android packages use `1,000,000 + Release workflow run number` as their versionCode across both channels; keep this workflow's sequence when changing the release setup. Local builds retain their package-derived versionCode. Keep the Android release certificate stable so existing installations can update. Required signing secrets are documented in the release workflow; never substitute a different key for an existing release app.
 
 Chrome Web Store automation uploads the same extension ZIP and submits it for review when configured. Upload success does not mean public availability. Store descriptions, screenshots and privacy declarations are maintained separately; see the [store guide](docs/chrome-web-store.md).
 
@@ -239,3 +241,4 @@ The project was renamed from Focus Session to Lectern. The extension migrates le
 The old Android package `com.focussession.app` cannot update in place to `io.github.xbghc.lectern`; install Lectern separately and transfer records through sync or export/import. Preserve local book files yourself.
 
 Model compatibility, site extraction, OCR accuracy and system speech voices vary. Focus/progress metrics estimate activity rather than understanding. Storybook verifies web interfaces with simulated services; native installation, real credentials and production sync require separate environment checks. Lectern does not currently add OAuth sign-in, cloud-hosted model keys, or synchronization of local EPUB content.
+

@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {
   compareVersions,
   isNewer,
+  isPreviewVersion,
   parseVersion,
   pickReleaseApk,
   planAutoUpdate,
   readUpdate,
+  readLatestUpdate,
   type AutoInput,
   type ReleaseAsset,
   type Update,
@@ -43,6 +45,38 @@ test("compareVersions 位数不同时短的补 0", () => {
   assert.equal(compareVersions("0.4", "0.4.0"), 0);
   assert.equal(compareVersions("v0.4", "0.4.1"), -1);
   assert.equal(compareVersions("0.4.1", "0.4"), 1);
+});
+
+test("preview versions compare their patch and run number, below the matching stable version", () => {
+  assert.equal(isPreviewVersion("v0.3.30-preview.30"), true);
+  assert.equal(isPreviewVersion("0.3.30"), false);
+  assert.equal(isPreviewVersion("0.3.30-preview.bad"), false);
+  assert.deepEqual(parseVersion("v0.3.30-preview.30"), [0, 3, 30]);
+  assert.equal(compareVersions("0.3.30-preview.30", "0.3.29"), 1);
+  assert.equal(compareVersions("0.3.30-preview.10", "0.3.30-preview.9"), 1);
+  assert.equal(compareVersions("0.3.31-preview.11", "0.3.30-preview.99"), 1);
+  assert.equal(compareVersions("0.3.30-preview.30", "0.3.30-preview.30"), 0);
+  assert.equal(compareVersions("0.3.30-preview.30", "0.3.30"), -1);
+  assert.equal(compareVersions("0.3.30", "0.3.30-preview.30"), 1);
+});
+
+test("preview updates stay on their channel and select the newest installable release", () => {
+  const release = (version: string, extra: Record<string, unknown> = {}) => ({
+    tag_name: `v${version}`, assets: [asset(`lectern-v${version}.apk`)], ...extra,
+  });
+  const current = "0.3.30-preview.9";
+  const next = release("0.3.30-preview.10", { prerelease: true });
+  assert.equal(readUpdate(next, current)?.version, "0.3.30-preview.10");
+  assert.equal(readUpdate(next, "0.3.29"), null, "stable installations do not opt into previews");
+  assert.equal(readUpdate(release("0.3.30"), current), null, "preview installations keep receiving previews");
+  assert.equal(readUpdate(release("0.3.31", { prerelease: true }), "0.3.29"), null);
+  assert.equal(readLatestUpdate([
+    release("0.3.30-preview.100", { draft: true }),
+    release("0.3.30-preview.99", { assets: [asset("lectern-v0.3.30-preview.99-debug.apk")] }),
+    release("0.3.31"), next, release("0.3.30-preview.8"),
+  ], current)?.version, "0.3.30-preview.10");
+  assert.equal(readLatestUpdate([next], "0.3.30-preview.10"), null);
+  assert.equal(readLatestUpdate(null, current), null);
 });
 
 test("isNewer 只在严格更新时为真", () => {
@@ -180,3 +214,4 @@ test("躺着的包已经不是最新的：去下新的那个，不装旧的", ()
   // 问到的反而更旧（发布被撤回之类）：躺着的照装
   assert.equal(planAutoUpdate(auto({ ready: "0.4.1", found: found("0.4.0") })).do, "ready");
 });
+

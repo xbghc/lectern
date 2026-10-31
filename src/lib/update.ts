@@ -15,6 +15,8 @@ export interface ReleaseAsset {
 
 export interface Release {
   tag_name: string;
+  draft?: boolean;
+  prerelease?: boolean;
   body?: string | null;
   assets?: ReleaseAsset[] | null;
 }
@@ -33,19 +35,24 @@ export interface Update {
 /**
  * `v0.3.10` → `[0, 3, 10]`。
  *
- * 认不出的段按 0 算，和 build.gradle.kts 里算 versionCode 的 `toIntOrNull() ?: 0`
- * 保持一致：那边把 `0.3.5` 换算成 305，两处对版本号的读法必须是同一种，
- * 否则会出现「更新提示说有新版、装上去 versionCode 反而没涨」这种事。
+ * Preview 的核心版本单独比较；发布工作流另外保证 Android versionCode 递增。
+ * 其他认不出的段仍按 0 算，保留旧版本的容错行为。
  */
 export function parseVersion(v: string): number[] {
   return v
     .trim()
     .replace(/^v/i, "")
+    .replace(/-preview\.\d+$/i, "")
     .split(".")
     .map((p) => {
       const n = Number.parseInt(p, 10);
       return Number.isFinite(n) && n >= 0 ? n : 0;
     });
+}
+
+/** 安装 preview 包即选择 preview 更新渠道；正式安装保持正式渠道。 */
+export function isPreviewVersion(version: string): boolean {
+  return /^v?\d+\.\d+\.\d+-preview\.\d+$/i.test(version.trim());
 }
 
 /** 负 / 零 / 正，同 Array.prototype.sort 的约定。位数不同时短的那个补 0：`0.4` == `0.4.0`。 */
@@ -55,6 +62,13 @@ export function compareVersions(a: string, b: string): number {
   for (let i = 0; i < Math.max(x.length, y.length); i++) {
     const d = (x[i] ?? 0) - (y[i] ?? 0);
     if (d !== 0) return d < 0 ? -1 : 1;
+  }
+  const previewA = isPreviewVersion(a), previewB = isPreviewVersion(b);
+  if (previewA !== previewB) return previewA ? -1 : 1;
+  if (previewA && previewB) {
+    const runA = Number(a.trim().split(".").at(-1));
+    const runB = Number(b.trim().split(".").at(-1));
+    return runA === runB ? 0 : runA < runB ? -1 : 1;
   }
   return 0;
 }
@@ -76,7 +90,7 @@ export function isNewer(remote: string, local: string): boolean {
  * 那个包是 runner 每次现生成的 debug 密钥签的，装不上任何已有的安装——
  * 拿它当升级包只会让用户在系统安装器那里撞一句没头没尾的「应用未安装」。
  */
-const RELEASE_APK = /^lectern-v\d+(?:\.\d+)*\.apk$/;
+const RELEASE_APK = /^lectern-v\d+(?:\.\d+)*(?:-preview\.\d+)?\.apk$/;
 
 export function pickReleaseApk(assets: readonly ReleaseAsset[] | null | undefined, tag?: string): ReleaseAsset | null {
   // 响应来自网络：assets 是不是个数组都得先问一句
@@ -98,12 +112,25 @@ export function readUpdate(release: unknown, current: string): Update | null {
   if (typeof release !== "object" || release === null) return null;
   const r = release as Partial<Release>;
   const tag = typeof r.tag_name === "string" ? r.tag_name.trim() : "";
-  if (!tag) return null;
+  if (!tag || r.draft === true) return null;
+  if (isPreviewVersion(tag) !== isPreviewVersion(current)) return null;
+  if (r.prerelease === true && !isPreviewVersion(tag)) return null;
   const version = tag.replace(/^v/i, "");
   if (!isNewer(version, current)) return null;
   const apk = pickReleaseApk(r.assets, tag);
   if (!apk) return null;
   return { tag, version, notes: typeof r.body === "string" ? r.body : "", apk };
+}
+
+/** Releases 列表的顺序不作为版本依据；跳过草稿、其他渠道和没有可安装 APK 的发布。 */
+export function readLatestUpdate(releases: unknown, current: string): Update | null {
+  if (!Array.isArray(releases)) return null;
+  let latest: Update | null = null;
+  for (const release of releases) {
+    const update = readUpdate(release, current);
+    if (update && (!latest || isNewer(update.version, latest.version))) latest = update;
+  }
+  return latest;
 }
 
 /* ==================== 自动下载并安装 ==================== */
@@ -151,3 +178,4 @@ export function planAutoUpdate(input: AutoInput): AutoStep {
   const quietly = input.autoInstall && input.canPrefetch && !input.metered && input.failedVersion !== found.version;
   return quietly ? { do: "download", update: found } : { do: "offer", update: found };
 }
+

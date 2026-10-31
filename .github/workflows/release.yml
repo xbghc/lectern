@@ -1,7 +1,7 @@
 name: Release
 
-# 打一个 v* 标签就发版：核对版本号、跑完整检查、把扩展打成 zip、打 APK，
-# 一起挂到 GitHub Release 上；然后把 zip 传到 Chrome 应用商店提交审核（配了凭据的话）。
+# main 每次更新都发布可安装的 preview；v* 标签继续发布正式版并提交商店审核。
+# 两个渠道使用同一份 Android 签名，并按此工作流的运行序号递增 versionCode。
 #
 # APK 默认是 debug 签名的——runner 每次生成的 debug 密钥都不一样，手机上装第二个版本
 # 得先卸载第一个。仓库里配了四个 Secret（见 README「持续集成与发布」）时改出正式签名的包。
@@ -9,10 +9,15 @@ name: Release
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ["v*"]
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -20,26 +25,45 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    outputs:
+      preview: ${{ steps.version.outputs.preview }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
-
-      - name: Verify tag matches package.json version
-        run: |
-          WANT="v$(node -p "require('./package.json').version")"
-          if [ "$GITHUB_REF_NAME" != "$WANT" ]; then
-            echo "标签是 $GITHUB_REF_NAME，package.json 里是 $WANT；用 npm version 打标签就不会错" >&2
-            exit 1
-          fi
 
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
+
+      - name: Select release version
+        id: version
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const base = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          if (!/^\d+\.\d+\.\d+$/.test(base)) throw new Error('package.json must use a stable three-part version');
+          const run = Number(process.env.GITHUB_RUN_NUMBER);
+          if (!Number.isSafeInteger(run) || run < 1 || run > 2_099_000_000) throw new Error('Invalid release run number');
+          const preview = process.env.GITHUB_REF === 'refs/heads/main';
+          if (!preview && process.env.GITHUB_REF !== `refs/tags/v${base}`) {
+            throw new Error('Run on main for a preview, or on the v* tag matching package.json for a stable release');
+          }
+          const [major, minor, patch] = base.split('.').map(Number);
+          const version = preview ? `${major}.${minor}.${patch + 1}-preview.${run}` : base;
+          const tag = `v${version}`;
+          appendFileSync(process.env.GITHUB_OUTPUT, `preview=${preview}\ntag=${tag}\n`);
+          appendFileSync(process.env.GITHUB_ENV, [
+            `IS_PREVIEW=${preview}`, `RELEASE_TAG=${tag}`,
+            `LECTERN_VERSION_NAME=${version}`, `LECTERN_VERSION_CODE=${1_000_000 + run}`, '',
+          ].join('\n'));
+          NODE
+
       - run: npm ci
       - run: npm run check
 
       - name: Package extension
-        run: (cd dist && zip -qr "../lectern-extension-${GITHUB_REF_NAME}.zip" .)
+        run: (cd dist && zip -qr "../lectern-extension-${RELEASE_TAG}.zip" .)
 
       - uses: actions/setup-java@v6
         with:
@@ -64,24 +88,30 @@ jobs:
         run: |
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$FS_KEYSTORE_FILE"
           ./gradlew assembleRelease --console=plain
-          cp app/build/outputs/apk/release/app-release.apk "../lectern-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "../lectern-${RELEASE_TAG}.apk"
 
       - name: Debug-signed APK
         if: env.HAS_KEYSTORE != 'true'
         working-directory: android
         run: |
           ./gradlew assembleDebug --console=plain
-          cp app/build/outputs/apk/debug/app-debug.apk "../lectern-${GITHUB_REF_NAME}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "../lectern-${RELEASE_TAG}-debug.apk"
 
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" lectern-*.zip lectern-*.apk
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" lectern-*.zip lectern-*.apk
           else
-            gh release create "$GITHUB_REF_NAME" lectern-*.zip lectern-*.apk \
-              --title "$GITHUB_REF_NAME" --generate-notes
+            args=()
+            if [ "$IS_PREVIEW" = "true" ]; then
+              args+=(--prerelease --latest=false)
+              printf 'Preview from main, commit %s.\n\nInstall the APK to try the latest changes. Preview installations check for subsequent preview updates.\n' "$GITHUB_SHA" > "$RUNNER_TEMP/preview-notes.md"
+              args+=(--notes-file "$RUNNER_TEMP/preview-notes.md")
+            fi
+            gh release create "$RELEASE_TAG" lectern-*.zip lectern-*.apk \
+              --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes "${args[@]}"
           fi
 
   # GitHub Release 发完之后，把同一个 zip 传到 Chrome 应用商店并提交审核。没配凭据时那边自己跳过。
@@ -90,9 +120,11 @@ jobs:
   store:
     name: Chrome Web Store
     needs: release
+    if: needs.release.outputs.preview == 'false'
     permissions:
       contents: read
     uses: ./.github/workflows/store.yml
     with:
-      tag: ${{ github.ref_name }}
+      tag: ${{ needs.release.outputs.tag }}
     secrets: inherit
+

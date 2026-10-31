@@ -1,5 +1,5 @@
 import { native, downloadUpdate } from "./native.ts";
-import { planAutoUpdate, readUpdate, type AutoStep, type Update } from "../lib/update.ts";
+import { isPreviewVersion, planAutoUpdate, readLatestUpdate, readUpdate, type AutoStep, type Update } from "../lib/update.ts";
 
 /**
  * 「有没有新版本」这件事的 App 侧。纯逻辑（版本比较、挑附件）在 lib/update.ts，
@@ -14,8 +14,9 @@ import { planAutoUpdate, readUpdate, type AutoStep, type Update } from "../lib/u
 
 const REPO = "xbghc/lectern";
 const LATEST_API = `https://api.github.com/repos/${REPO}/releases/latest`;
+const PREVIEW_API = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
 /** 自动更新走不通时（debug 包、宿主太老）让用户自己去下的地方。 */
-export const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;
+export const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -79,7 +80,9 @@ export function skipVersion(version: string): void {
  * 自动检查那条路径（autoCheck）自己把异常咽掉。
  */
 export async function checkForUpdate(): Promise<Update | null> {
-  const res = await fetch(LATEST_API, {
+  const current = currentVersion();
+  const preview = isPreviewVersion(current);
+  const res = await fetch(preview ? PREVIEW_API : LATEST_API, {
     // 不带 token 的匿名请求，GitHub 按 IP 限流 60 次/小时
     headers: { Accept: "application/vnd.github+json" },
   });
@@ -89,7 +92,7 @@ export async function checkForUpdate(): Promise<Update | null> {
   if (res.status === 404) throw new Error("This repository has no releases yet");
   if (!res.ok) throw new Error(`GitHub returned ${res.status}`);
   const json: unknown = await res.json();
-  return readUpdate(json, currentVersion());
+  return preview ? readLatestUpdate(json, current) : readUpdate(json, current);
 }
 
 /**
@@ -217,3 +220,4 @@ export async function downloadAndInstall(
   }
   native()?.updateInstall?.();
 }
+

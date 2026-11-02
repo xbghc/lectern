@@ -684,7 +684,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand > [data-icon] { color: var(--primary); }
 .brand .ui-icon { width: 29px; height: 29px; }
 .brand-name { font: 30px var(--sans); letter-spacing: -1px; }
-body.extension-popup { width: 368px; max-width: 100%; font-family: var(--sans); }
+/* Chrome measures popup content to choose its viewport. Do not constrain this width
+ * to the initial viewport, which can still be smaller than the content. */
+body.extension-popup { width: 368px; min-width: 368px; font-family: var(--sans); }
 .extension-popup .popup-tabs .tab { border: 0; font-family: var(--sans); }
 .extension-popup .popup-body { max-height: 470px; padding: 0 20px; }
 .extension-popup .popup-brand { padding: 12px 18px; }
@@ -723,6 +725,7 @@ body.extension-popup { width: 368px; max-width: 100%; font-family: var(--sans); 
 .error { color: var(--danger); }
 @media (hover: hover) { .icon-btn:hover, .secondary:hover { background: var(--line-soft); } .text-btn:hover { text-decoration: underline; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+/* A viewport-relative height (such as 100dvh) traps the popup at its initial height. */
 body.extension-popup { display:flex; flex-direction:column; height:auto; max-height:600px; overflow:hidden; }
 .extension-popup .popup-body { flex:0 1 auto; min-height:0; max-height:none; }
 .extension-popup .popup-brand, .extension-popup .popup-tabs, .extension-popup .popup-footer { flex-shrink:0; }

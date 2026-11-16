@@ -1,8 +1,9 @@
 import { localStorage } from "../../sync/storage.ts";
-import type { LlmConfig, LlmUsage } from "../../types.ts";
+import type { LlmConfig, LlmProviderConfig, LlmProviderStats, LlmUsage, PublicLlmProviderConfig } from "../../types.ts";
 import { DEFAULT_LLM, EMPTY_USAGE, LEGACY_MINIMAX } from "../../types.ts";
 import { serialize, updateLocalOnly } from "../../background/store.ts";
 import { normalizeLlmBaseUrl, sameLlmOrigin } from "../../lib/llmUrl.ts";
+import { findProvider } from "../../lib/providers.ts";
 
 /**
  * 模型连接的配置与用量。文章判别、文章回顾、划词翻译共用一份，不属于任何一个功能。
@@ -39,7 +40,70 @@ export async function getLlmConfig(): Promise<LlmConfig> {
 type StoredLlm = Partial<LlmConfig> & {
   /** 一次性标记：输出上限与超时的默认值那次抬升已经跑过。 */
   budgetRaised?: boolean;
+  /** 按 provider id 记住各家存过的连接配置，来回切换时不必重新填写。 */
+  providers?: Record<string, LlmProviderConfig>;
 };
+
+export type PublicLlmConfig = Omit<LlmConfig, "apiKey"> & {
+  apiKey: "";
+  apiKeySet: boolean;
+  providers: Record<string, PublicLlmProviderConfig>;
+};
+
+/** 整理已存的各家配置，并把当前正在用的这一家（若地址合法）一并算进去，兼容尚未落过 providers 表的旧配置。 */
+function storedProvidersOf(current: StoredLlm & LlmConfig): Record<string, LlmProviderConfig> {
+  const map: Record<string, LlmProviderConfig> = {};
+  for (const [id, entry] of Object.entries(current.providers ?? {})) {
+    if (!id || !entry || typeof entry !== "object") continue;
+    try {
+      const baseUrl = normalizeLlmBaseUrl(entry.baseUrl);
+      map[id] = {
+        protocol: entry.protocol === "anthropic" ? "anthropic" : "openai",
+        baseUrl,
+        model: typeof entry.model === "string" ? entry.model : "",
+        apiKey: typeof entry.apiKey === "string" ? entry.apiKey : "",
+      };
+    } catch {
+      /* 忽略历史无效地址 */
+    }
+  }
+  if (current.provider && current.baseUrl) {
+    try {
+      const baseUrl = normalizeLlmBaseUrl(current.baseUrl);
+      map[current.provider] = {
+        protocol: current.protocol,
+        baseUrl,
+        model: current.model,
+        apiKey: current.apiKey,
+      };
+    } catch {
+      /* 当前地址无效时不收入可用配置表 */
+    }
+  }
+  return map;
+}
+
+/** 传给设置页/弹窗的配置：不回显任何一家服务的明文密钥，只告知是否已配置。 */
+export function redactLlmConfig(cfg: LlmConfig): PublicLlmConfig {
+  const stored = storedProvidersOf(cfg as StoredLlm & LlmConfig);
+  const providers = Object.fromEntries(
+    Object.entries(stored).map(([id, p]) => [
+      id,
+      {
+        protocol: p.protocol,
+        baseUrl: p.baseUrl,
+        model: p.model,
+        apiKeySet: p.apiKey.length > 0,
+      },
+    ]),
+  );
+  return {
+    ...cfg,
+    apiKey: "",
+    apiKeySet: cfg.apiKey.length > 0,
+    providers,
+  };
+}
 
 /** 抬升前的两个默认值。 */
 const OLD_MAX_TOKENS = 1024;
@@ -68,16 +132,73 @@ function raiseBudget(stored: StoredLlm): StoredLlm {
 
 export async function setLlmConfig(patch: Partial<LlmConfig>): Promise<LlmConfig> {
   return serialize(async () => {
-    const current = await getLlmConfig();
-    const merged = { ...current, ...patch };
+    const current = (await getLlmConfig()) as StoredLlm & LlmConfig;
     // 独立撤回同意不能被旧的坏地址锁住；夹带其它改动、重新同意仍须完整校验。
     const revokeOnly = patch.consentAt === null && Object.keys(patch).length === 1;
+    if (revokeOnly) {
+      const revoked = { ...current, consentAt: null };
+      await local().set({ [KEY_LLM]: revoked });
+      return revoked;
+    }
+
+    const providers = storedProvidersOf(current);
+    const targetProvider = patch.provider ?? current.provider;
+    const switchingProvider = patch.provider !== undefined && patch.provider !== current.provider;
+    const remembered = switchingProvider && targetProvider ? providers[targetProvider] : undefined;
+    const preset = switchingProvider && !remembered && targetProvider ? findProvider(targetProvider) : undefined;
+
+    const base = switchingProvider
+      ? (remembered ?? {
+          protocol: preset?.protocol ?? current.protocol,
+          baseUrl: preset?.baseUrl ?? "",
+          model: "",
+          apiKey: "",
+        })
+      : {
+          protocol: current.protocol,
+          baseUrl: current.baseUrl,
+          model: current.model,
+          apiKey: current.apiKey,
+        };
+
+    const protocol = patch.protocol ?? base.protocol;
+    const model = patch.model ?? base.model;
+    let baseUrl = patch.baseUrl ?? base.baseUrl;
     // 空串表示尚未配置；其它地址保存前先校验，失败绝不落盘。
-    if (!revokeOnly && merged.baseUrl !== "") merged.baseUrl = normalizeLlmBaseUrl(merged.baseUrl);
-    if (patch.apiKey !== undefined) merged.apiKey = patch.apiKey.trim();
-    // 回填或再次提交原 Key 不算新 Key。后台兜底，不能依赖某个 UI 是否记得清空输入框。
-    if (patch.baseUrl !== undefined && !sameLlmOrigin(current.baseUrl, merged.baseUrl)
-      && (patch.apiKey === undefined || merged.apiKey === current.apiKey.trim())) merged.apiKey = "";
+    if (baseUrl !== "") baseUrl = normalizeLlmBaseUrl(baseUrl);
+
+    let apiKey: string;
+    if (patch.apiKey !== undefined) {
+      const trimmed = patch.apiKey.trim();
+      // 回填或再次提交原 Key 不算新 Key。后台兜底，不能依赖某个 UI 是否记得清空输入框。
+      const replayedCurrent = !sameLlmOrigin(current.baseUrl, baseUrl) && trimmed === current.apiKey.trim();
+      const replayedBase = base.apiKey !== "" && !sameLlmOrigin(base.baseUrl, baseUrl) && trimmed === base.apiKey.trim();
+      const validRememberedSameKey = Boolean(remembered && sameLlmOrigin(remembered.baseUrl, baseUrl) && trimmed === remembered.apiKey.trim());
+      apiKey = (replayedCurrent || replayedBase) && !validRememberedSameKey ? "" : trimmed;
+    } else if (switchingProvider) {
+      if (remembered) {
+        apiKey = sameLlmOrigin(remembered.baseUrl, baseUrl) ? remembered.apiKey : "";
+      } else {
+        apiKey = sameLlmOrigin(current.baseUrl, baseUrl) ? current.apiKey : "";
+      }
+    } else {
+      apiKey = patch.baseUrl !== undefined && !sameLlmOrigin(current.baseUrl, baseUrl) ? "" : current.apiKey;
+    }
+
+    if (targetProvider && baseUrl !== "") {
+      providers[targetProvider] = { protocol, baseUrl, model, apiKey };
+    }
+
+    const merged: StoredLlm & LlmConfig = {
+      ...current,
+      ...patch,
+      provider: targetProvider,
+      protocol,
+      baseUrl,
+      model,
+      apiKey,
+      ...(Object.keys(providers).length > 0 ? { providers } : {}),
+    };
     await local().set({ [KEY_LLM]: merged });
     return merged;
   });
@@ -88,18 +209,48 @@ export async function getUsage(): Promise<LlmUsage> {
   return { ...EMPTY_USAGE, ...((got[KEY_USAGE] as Partial<LlmUsage>) ?? {}) };
 }
 
+export interface UsageCallMeta {
+  provider?: string;
+  model?: string;
+  totalMs?: number;
+}
+
 /** 在一份用量上记一次调用。单拎出来是给 llmLog.ts 的 recordCall 用：用量和耗时一笔写完。 */
-export function bumpUsage(stored: unknown, input: number, output: number, failed: boolean): LlmUsage {
+export function bumpUsage(stored: unknown, input: number, output: number, failed: boolean, meta?: UsageCallMeta): LlmUsage {
+  const now = Date.now();
   const u: LlmUsage = { ...EMPTY_USAGE, ...((stored as Partial<LlmUsage> | undefined) ?? {}) };
+  const provider = (meta?.provider ?? "").trim();
+  const model = (meta?.model ?? "").trim();
+  let providers: Record<string, LlmProviderStats> | undefined = u.providers ? { ...u.providers } : undefined;
+  if (provider || model) {
+    providers ??= {};
+    const key = `${provider || "unknown"}::${model || "unknown"}`;
+    const prev = providers[key];
+    const totalMs = typeof meta?.totalMs === "number" && Number.isFinite(meta.totalMs) && meta.totalMs > 0 ? meta.totalMs : 0;
+    const timed = output > 0 && totalMs > 0;
+    providers[key] = {
+      provider,
+      model,
+      requests: (prev?.requests ?? 0) + 1,
+      errors: (prev?.errors ?? 0) + (failed ? 1 : 0),
+      inputTokens: (prev?.inputTokens ?? 0) + input,
+      outputTokens: (prev?.outputTokens ?? 0) + output,
+      timedCalls: (prev?.timedCalls ?? 0) + (timed ? 1 : 0),
+      timedOutputTokens: (prev?.timedOutputTokens ?? 0) + (timed ? output : 0),
+      outputMs: (prev?.outputMs ?? 0) + (timed ? totalMs : 0),
+      lastTs: now,
+    };
+  }
   return {
     requests: u.requests + 1,
     inputTokens: u.inputTokens + input,
     outputTokens: u.outputTokens + output,
     errors: u.errors + (failed ? 1 : 0),
-    lastTs: Date.now(),
+    lastTs: now,
+    ...(providers ? { providers } : {}),
   };
 }
 
-export async function addUsage(input: number, output: number, failed = false): Promise<void> {
-  await updateLocalOnly([KEY_USAGE], (v) => ({ [KEY_USAGE]: bumpUsage(v[KEY_USAGE], input, output, failed) }));
+export async function addUsage(input: number, output: number, failed = false, meta?: UsageCallMeta): Promise<void> {
+  await updateLocalOnly([KEY_USAGE], (v) => ({ [KEY_USAGE]: bumpUsage(v[KEY_USAGE], input, output, failed, meta) }));
 }

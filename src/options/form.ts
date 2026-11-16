@@ -1,9 +1,9 @@
 import "./sync.ts";
 import { resolveReadingSettings } from "../features/reading/settings.ts";
-import type { ExportBundle, ImportOutcome, LlmConfig, LlmLogBundle, LlmUsage, Settings } from "../types.ts";
+import type { ExportBundle, ImportOutcome, LlmConfig, LlmLogBundle, LlmUsage, PublicLlmProviderConfig, Settings } from "../types.ts";
 import { DEFAULT_LLM, DEFAULT_SETTINGS, MAX_AUTO_WORDS } from "../types.ts";
 import { saveTextFile } from "../lib/download.ts";
-import { SOURCE_LABEL, appLogLine, timingLine } from "../lib/llmStats.ts";
+import { SOURCE_LABEL, appLogLine, formatTokPerSec, providerSpeedLine, summarizeProviderSpeed, timingLine } from "../lib/llmStats.ts";
 import { summarizeUiUsage } from "../lib/uiUsage.ts";
 import { followStoredList } from "../lib/ruleChat.ts";
 import { ruleChatBox } from "../popup/ruleChat.ts";
@@ -121,7 +121,7 @@ const saveBar = $("savebar");
 const revertBtn = $<HTMLButtonElement>("revert");
 let baseline: Settings | null = null;
 let llmBaseline: Record<string, string> | null = null;
-let savedLlm: (LlmConfig & { apiKeySet?: boolean }) | null = null;
+let savedLlm: (LlmConfig & { apiKeySet?: boolean; providers?: Record<string, PublicLlmProviderConfig> }) | null = null;
 let saving = false;
 let testing = false;
 let flashing: { msg: string; error: boolean } | null = null;
@@ -370,18 +370,29 @@ const picker = setupProviderPicker({
   model: llmFields.model,
   models: $<HTMLDataListElement>("model-list"),
   doc: $<HTMLAnchorElement>("provider-doc"),
+  apiKey: llmFields.apiKey,
 });
 /** 保存时的地址与密钥状态；协议、主机或有效端口变化都不能沿用原 Key。 */
 let saved = { baseUrl: "", apiKeySet: false };
+let savedProviders: Record<string, PublicLlmProviderConfig> = {};
 
 const llmStatus = $("llm-status");
+function syncApiKeyPlaceholder(): void {
+  const providerSaved = savedProviders[picker.provider()];
+  const keepKey = Boolean(providerSaved?.apiKeySet && sameLlmOrigin(llmFields.baseUrl.value, providerSaved.baseUrl));
+  llmFields.apiKey.placeholder = keepKey ? "Configured; leave blank to keep it" : "Not configured";
+}
 // 上一次保存留下的提示（「先选一家」之类）在人动手改了之后就过时了
 $("provider").addEventListener("change", () => {
   $<HTMLDetailsElement>("model-advanced").open = picker.provider() === "custom";
+  syncApiKeyPlaceholder();
   llmStatus.textContent = ""; renderStatus();
 });
 for (const input of Object.values(llmFields)) {
-  for (const event of ["input", "change"]) input.addEventListener(event, () => { llmStatus.textContent = ""; renderStatus(); });
+  for (const event of ["input", "change"]) input.addEventListener(event, () => {
+    if (input === llmFields.baseUrl) syncApiKeyPlaceholder();
+    llmStatus.textContent = ""; renderStatus();
+  });
 }
 
 /*
@@ -420,18 +431,36 @@ $("consent-agree").addEventListener("click", async () => {
 });
 $("consent-revoke").addEventListener("click", () => void setConsent(null));
 
-function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean }): void {
+function fillLlm(cfg: LlmConfig & { apiKeySet?: boolean; providers?: Record<string, PublicLlmProviderConfig> }): void {
   fillConsent(cfg.consentAt ?? null);
+  savedProviders = {};
+  for (const [id, p] of Object.entries(cfg.providers ?? {})) {
+    if (!id || !p || typeof p !== "object") continue;
+    savedProviders[id] = {
+      protocol: p.protocol === "anthropic" ? "anthropic" : "openai",
+      baseUrl: p.baseUrl,
+      model: p.model,
+      apiKeySet: Boolean((p as { apiKeySet?: boolean; apiKey?: string }).apiKeySet ?? (p as { apiKey?: string }).apiKey),
+    };
+  }
+  if (cfg.provider && cfg.baseUrl) {
+    savedProviders[cfg.provider] = {
+      protocol: cfg.protocol,
+      baseUrl: cfg.baseUrl,
+      model: cfg.model,
+      apiKeySet: Boolean(cfg.apiKeySet ?? cfg.apiKey),
+    };
+  }
   // 密钥不回显：后台只回传"设没设过"。留空提交表示保持不变。
   llmFields.apiKey.value = "";
   llmFields.apiKey.placeholder = cfg.apiKeySet ? "Configured; leave blank to keep it" : "Not configured";
-  picker.show(cfg);
+  picker.show({ ...cfg, providers: savedProviders });
   $<HTMLDetailsElement>("model-advanced").open = cfg.provider === "custom";
   saved = { baseUrl: cfg.baseUrl, apiKeySet: !!cfg.apiKeySet };
   llmFields.maxTokens.value = String(cfg.maxTokens);
   llmFields.timeout.value = String(Math.round(cfg.timeoutMs / 1000));
   advancedEditor?.setModel(cfg);
-  savedLlm = cfg;
+  savedLlm = { ...cfg, providers: savedProviders };
   llmBaseline = llmDraft();
   renderStatus();
 }
@@ -461,8 +490,10 @@ function collectLlm(): Partial<LlmConfig> {
     throw new Error(err instanceof Error ? err.message : "Enter a valid base URL.");
   }
   if (!model) throw new Error("Choose a model or enter its name from your provider's documentation.");
+  const providerSaved = savedProviders[picker.provider()];
+  const canKeepSavedKey = Boolean(providerSaved?.apiKeySet && sameLlmOrigin(baseUrl, providerSaved.baseUrl));
   // 后台也会清掉旧密钥（见 setLlmConfig），这里先拦下说明白，免得人以为是保存坏了
-  if (saved.apiKeySet && !key && !sameLlmOrigin(baseUrl, saved.baseUrl)) {
+  if (!key && !canKeepSavedKey && (providerSaved?.apiKeySet || saved.apiKeySet)) {
     throw new Error("The endpoint changed. Enter an API key for this provider; the previous key will not be sent to the new endpoint.");
   }
   const patch: Partial<LlmConfig> = {
@@ -547,7 +578,31 @@ async function loadLog(): Promise<void> {
     : "No failures recorded.";
   logTiming.textContent = timingLine(bundle.timings);
   logApp.textContent = appLogLine(bundle.fetches, bundle.errors);
+  renderProviderSpeed(bundle);
   renderUsage(bundle);
+}
+
+/**
+ * 各提供商/模型的累计 token 速度。切换提供商或清空诊断日志后仍保留历史对比。
+ */
+function renderProviderSpeed(bundle: LlmLogBundle): void {
+  const summaryEl = document.getElementById("speed-summary");
+  const body = document.getElementById("speed-rows");
+  if (!summaryEl || !body) return;
+  const speed = summarizeProviderSpeed(bundle.llmUsage, bundle.timings);
+  summaryEl.textContent = providerSpeedLine(speed);
+  body.textContent = "";
+  for (const row of speed.rows) {
+    const tr = document.createElement("tr");
+    if (row.tokensPerSecond === null) tr.className = "never";
+    const reqText = row.errors > 0 ? `${row.requests} (${row.errors} failed)` : String(row.requests);
+    for (const text of [row.label, formatTokPerSec(row.tokensPerSecond), row.outputTokens, reqText]) {
+      const td = document.createElement("td");
+      td.textContent = String(text);
+      tr.append(td);
+    }
+    body.append(tr);
+  }
 }
 
 /**

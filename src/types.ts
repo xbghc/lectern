@@ -605,6 +605,19 @@ export interface ReviewCardView {
  */
 export type LlmProtocol = "anthropic" | "openai";
 
+/** 单家模型服务的连接配置，按 provider id 记住，来回切换服务商时不必重新填写。 */
+export interface LlmProviderConfig {
+  protocol: LlmProtocol;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+}
+
+/** 传给设置页的单家配置摘要：密钥只回传「设没设过」，不回显明文。 */
+export type PublicLlmProviderConfig = Omit<LlmProviderConfig, "apiKey"> & {
+  apiKeySet: boolean;
+};
+
 export interface LlmConfig {
   apiKey: string;
   /**
@@ -660,6 +673,23 @@ export const LEGACY_MINIMAX: Pick<LlmConfig, "provider" | "protocol" | "baseUrl"
   model: "MiniMax-M3-highspeed",
 };
 
+/** 按提供商与模型分组的累计用量与端到端输出速度统计。 */
+export interface LlmProviderStats {
+  provider: string;
+  model: string;
+  requests: number;
+  errors: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** 产出过 outputTokens 且带有效耗时的调用次数。 */
+  timedCalls: number;
+  /** 计入速度统计的输出 token 数（与 outputMs 同口径累加，排除无耗时旧记录或未报用量的调用）。 */
+  timedOutputTokens: number;
+  /** 计入速度统计的端到端总耗时（毫秒）。timedOutputTokens ÷ (outputMs / 1000) 即平均 token/s。 */
+  outputMs: number;
+  lastTs: number | null;
+}
+
 /** 累计用量，给用户一个"烧了多少"的直观数字。 */
 export interface LlmUsage {
   requests: number;
@@ -667,6 +697,8 @@ export interface LlmUsage {
   outputTokens: number;
   errors: number;
   lastTs: number | null;
+  /** 按提供商与模型分组的累计统计，切换提供商后仍保留历史对比；旧记录可能没有此字段。 */
+  providers?: Record<string, LlmProviderStats>;
 }
 
 export const EMPTY_USAGE: LlmUsage = {
@@ -739,6 +771,8 @@ export interface LlmTiming {
   attempts: number;
   inputTokens: number;
   outputTokens: number;
+  /** 调用时的服务商 id；旧日志可能没有此字段。 */
+  provider?: string;
   model: string;
 }
 
@@ -816,6 +850,8 @@ export interface LlmLogBundle {
   errors: AppError[];
   /** 首页各按钮按天的点击次数，只有次数。见 lib/uiUsage.ts */
   usage: import("./lib/uiUsage.ts").UiUsageLog;
+  /** 模型累计用量与按提供商/模型分组的速度统计。 */
+  llmUsage?: LlmUsage;
 }
 
 /* ==================== 流式翻译 ==================== */

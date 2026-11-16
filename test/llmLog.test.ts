@@ -13,6 +13,7 @@ import {
   getLlmLog,
   getLlmTimings,
   llmLogBundle,
+  recordCall,
   recordFailure,
   recordLlmFailure,
   recordTiming,
@@ -265,4 +266,26 @@ test("流式原始分块随失败持久化并进入诊断导出", async () => {
   const bundle = await llmLogBundle("test");
   assert.deepEqual(bundle.failures[0]?.stream, err.stream);
   assert.equal(bundle.failures[0]?.raw, "半截文本");
+});
+
+test("recordCall 与 recordFailure 按提供商和模型累计速度统计，切换提供商及清空诊断日志后仍保留对比", async () => {
+  const openaiCfg = { ...CFG, provider: "openai", model: "gpt-5.6-luna" };
+  const deepseekCfg = { ...CFG, provider: "deepseek", model: "deepseek-v4-flash" };
+  await recordCall("translate", openaiCfg, { ...TIMING, totalMs: 2_000 }, { inputTokens: 100, outputTokens: 80 });
+  await recordCall("ask", deepseekCfg, { ...TIMING, totalMs: 1_000 }, { inputTokens: 50, outputTokens: 90 });
+  const timeout = new LlmError("timeout", "timeout");
+  timeout.timing = { totalMs: 60_000, firstTextMs: null, firstFieldMs: null, attempts: 1 };
+  await recordFailure(timeout, openaiCfg, { source: "translate", request: {}, countUsage: true });
+
+  await clearLlmLog();
+  const bundle = await llmLogBundle("0.3.30");
+  assert.deepEqual(bundle.timings, []);
+  const providers = bundle.llmUsage?.providers ?? {};
+  assert.equal(providers["openai::gpt-5.6-luna"]?.requests, 2);
+  assert.equal(providers["openai::gpt-5.6-luna"]?.errors, 1);
+  assert.equal(providers["openai::gpt-5.6-luna"]?.timedCalls, 1);
+  assert.equal(providers["openai::gpt-5.6-luna"]?.timedOutputTokens, 80);
+  assert.equal(providers["openai::gpt-5.6-luna"]?.outputMs, 2_000);
+  assert.equal(providers["deepseek::deepseek-v4-flash"]?.timedOutputTokens, 90);
+  assert.equal(providers["deepseek::deepseek-v4-flash"]?.outputMs, 1_000);
 });

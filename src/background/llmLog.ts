@@ -2,7 +2,7 @@ import { localStorage } from "../sync/storage.ts";
 import type { LlmConfig, LlmFailure, LlmLogBundle, LlmTiming } from "../types.ts";
 import { type CallTiming, LlmError, type RawUsage } from "../lib/llm.ts";
 import { KEY_APP_ERROR, KEY_READER_FETCH, getAppErrors, getFetchLog } from "./appLog.ts";
-import { KEY_USAGE, bumpUsage, getLlmConfig } from "../core/background/llm.ts";
+import { KEY_USAGE, bumpUsage, getLlmConfig, getUsage } from "../core/background/llm.ts";
 import { serialize, updateLocalOnly } from "./store.ts";
 import { getTranslationTraces, KEY_TRANSLATION_TRACE } from "../features/translation/translationLog.ts";
 import { getUiUsage } from "./uiUsage.ts";
@@ -103,6 +103,7 @@ const timingEntry = (source: LlmFailure["source"], config: LlmConfig, timing: Ca
   attempts: timing.attempts,
   inputTokens: usage.inputTokens,
   outputTokens: usage.outputTokens,
+  ...(config.provider ? { provider: config.provider } : {}),
   model: config.model,
 });
 
@@ -131,7 +132,11 @@ export async function recordTiming(
 export async function recordCall(source: LlmFailure["source"], config: LlmConfig, timing: CallTiming, usage: RawUsage, expectedIdentity?: string): Promise<void> {
   try {
     await updateLocalOnly([KEY_USAGE, KEY_LLM_TIMING], (v) => ({
-      [KEY_USAGE]: bumpUsage(v[KEY_USAGE], usage.inputTokens, usage.outputTokens, false),
+      [KEY_USAGE]: bumpUsage(v[KEY_USAGE], usage.inputTokens, usage.outputTokens, false, {
+        provider: config.provider,
+        model: config.model,
+        totalMs: timing.totalMs,
+      }),
       [KEY_LLM_TIMING]: pushTiming(v[KEY_LLM_TIMING], timingEntry(source, config, timing, usage, null)),
     }), expectedIdentity);
   } catch {
@@ -197,7 +202,11 @@ export async function recordFailure(err: unknown, config: LlmConfig, ctx: Failur
     await updateLocalOnly(keys, (v) => ({
       [KEY_LLM_LOG]: pushFailure(v[KEY_LLM_LOG], entry),
       ...(timing ? { [KEY_LLM_TIMING]: pushTiming(v[KEY_LLM_TIMING], timing) } : {}),
-      ...(ctx.countUsage ? { [KEY_USAGE]: bumpUsage(v[KEY_USAGE], spent.inputTokens, spent.outputTokens, true) } : {}),
+      ...(ctx.countUsage ? { [KEY_USAGE]: bumpUsage(v[KEY_USAGE], spent.inputTokens, spent.outputTokens, true, {
+        provider: config.provider,
+        model: config.model,
+        totalMs: e?.timing?.totalMs ?? 0,
+      }) } : {}),
     }), ctx.dataIdentity);
   } catch {
     /* 日志是附属品，不能反过来把给调用方的回复搞丢 */
@@ -226,5 +235,6 @@ export async function llmLogBundle(version: string): Promise<LlmLogBundle> {
     fetches: await getFetchLog(),
     errors: await getAppErrors(),
     usage: await getUiUsage(),
+    llmUsage: await getUsage(),
   };
 }

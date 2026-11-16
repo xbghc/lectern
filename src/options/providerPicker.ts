@@ -1,4 +1,4 @@
-import type { LlmConfig, LlmProtocol } from "../types.ts";
+import type { LlmConfig, LlmProtocol, PublicLlmProviderConfig } from "../types.ts";
 import { CUSTOM_PROVIDER, findProvider, searchProviders } from "../lib/providers.ts";
 import type { ProviderPreset } from "../lib/providers.ts";
 import { PROVIDERS } from "../lib/providers.generated.ts";
@@ -17,11 +17,15 @@ export interface PickerElements {
   model: HTMLInputElement;
   models: HTMLDataListElement;
   doc: HTMLAnchorElement;
+  apiKey?: HTMLInputElement;
 }
 
 export interface ProviderPicker {
   /** 把存着的配置摆上去。地址和模型以存着的为准，不拿清单里的覆盖。 */
-  show(cfg: Pick<LlmConfig, "provider" | "protocol" | "baseUrl" | "model">): void;
+  show(cfg: Pick<LlmConfig, "provider" | "protocol" | "baseUrl" | "model"> & {
+    apiKeySet?: boolean;
+    providers?: Record<string, PublicLlmProviderConfig>;
+  }): void;
   /** 现在选的是哪家：清单里的 id、`custom`，或者空串（还没选）。 */
   provider(): string;
 }
@@ -42,6 +46,8 @@ function group(label: string, presets: readonly ProviderPreset[]): HTMLOptGroupE
 
 export function setupProviderPicker(els: PickerElements): ProviderPicker {
   let current = "";
+  let saved: Record<string, PublicLlmProviderConfig> = {};
+  const drafts = new Map<string, { protocol: LlmProtocol; baseUrl: string; model: string; apiKey: string }>();
   els.search.placeholder = `Search ${PROVIDERS.length} providers, such as OpenAI or DeepSeek`;
 
   /** 按搜索框里的字重画列表。当前选中的那家要是被筛掉了，列表里就没有高亮——选择本身不变。 */
@@ -58,7 +64,12 @@ export function setupProviderPicker(els: PickerElements): ProviderPicker {
       const hits = [...pinned, ...others];
       if (hits.length) els.list.append(group(`Matches: ${hits.length} providers`, hits));
     } else {
-      els.list.append(group("Popular", pinned), group("All providers (by name)", others));
+      const configured = [...pinned, ...others].filter(p => saved[p.id]?.apiKeySet || saved[p.id]?.model);
+      const configuredIds = new Set(configured.map(p => p.id));
+      if (configured.length > 0) els.list.append(group("Configured", configured));
+      const restPinned = pinned.filter(p => !configuredIds.has(p.id));
+      if (restPinned.length > 0) els.list.append(group("Popular", restPinned));
+      els.list.append(group("All providers (by name)", others.filter(p => !configuredIds.has(p.id))));
     }
     // 搜不到的时候正是要用它的时候，所以不管筛成什么样它都在
     els.list.append(option(CUSTOM_PROVIDER, "Custom endpoint…"));
@@ -80,25 +91,70 @@ export function setupProviderPicker(els: PickerElements): ProviderPicker {
   els.search.addEventListener("input", render);
   els.list.addEventListener("change", () => {
     if (!els.list.value || els.list.value === current) return;
+    const prev = current;
+    if (prev) {
+      drafts.set(prev, {
+        protocol: els.protocol.value === "anthropic" ? "anthropic" : "openai",
+        baseUrl: els.baseUrl.value,
+        model: els.model.value,
+        apiKey: els.apiKey?.value ?? "",
+      });
+    }
     current = els.list.value;
     const preset = describe(current);
-    if (!preset) return; // 自定义：地址、协议、模型都留给人填，已经填着的不动
-    els.protocol.value = preset.protocol;
-    els.baseUrl.value = preset.baseUrl;
-    // 上一家的模型名在这一家多半不存在；清掉，免得保存时带过去
-    if (!preset.models.includes(els.model.value.trim())) els.model.value = "";
+    const draft = drafts.get(current);
+    const remembered = saved[current];
+    if (draft) {
+      els.protocol.value = draft.protocol;
+      els.baseUrl.value = draft.baseUrl;
+      els.model.value = draft.model;
+      if (els.apiKey) els.apiKey.value = draft.apiKey;
+    } else if (remembered) {
+      els.protocol.value = remembered.protocol;
+      els.baseUrl.value = remembered.baseUrl;
+      els.model.value = remembered.model;
+      if (els.apiKey) els.apiKey.value = "";
+    } else if (preset) {
+      els.protocol.value = preset.protocol;
+      els.baseUrl.value = preset.baseUrl;
+      // 上一家的模型名在这一家多半不存在；清掉，免得保存时带过去
+      if (prev !== "" || !preset.models.includes(els.model.value.trim())) els.model.value = "";
+      if (prev !== "" && els.apiKey) els.apiKey.value = "";
+    } else {
+      // 自定义：地址、协议、模型都留给人填，从另一家切过来时不带走刚填的密钥
+      if (prev !== "" && els.apiKey) els.apiKey.value = "";
+    }
+    if (els.apiKey) {
+      els.apiKey.placeholder = remembered?.apiKeySet ? "Configured; leave blank to keep it" : "Not configured";
+    }
     els.baseUrl.dispatchEvent(new Event("input", { bubbles: true }));
   });
 
   return {
     show(cfg) {
       current = cfg.provider;
+      saved = { ...(cfg.providers ?? {}) };
+      if (cfg.provider && cfg.baseUrl) {
+        saved[cfg.provider] = {
+          protocol: cfg.protocol,
+          baseUrl: cfg.baseUrl,
+          model: cfg.model,
+          apiKeySet: Boolean(cfg.apiKeySet ?? saved[cfg.provider]?.apiKeySet),
+        };
+      }
+      drafts.clear();
       els.search.value = "";
       render();
       describe(current);
       els.protocol.value = cfg.protocol satisfies LlmProtocol;
       els.baseUrl.value = cfg.baseUrl;
       els.model.value = cfg.model;
+      if (els.apiKey) {
+        els.apiKey.value = "";
+        els.apiKey.placeholder = (saved[current]?.apiKeySet ?? Boolean(cfg.apiKeySet))
+          ? "Configured; leave blank to keep it"
+          : "Not configured";
+      }
     },
     provider: () => current,
   };

@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { DEFAULT_LLM, DEFAULT_SETTINGS, type LlmConfig } from "../src/types.ts";
 import { freshState, installStorage, memoryDriver } from "../src/sync/storage.ts";
-import { getLlmConfig, setLlmConfig } from "../src/core/background/llm.ts";
+import { getLlmConfig, redactLlmConfig, setLlmConfig } from "../src/core/background/llm.ts";
 
-test("设置页与后台共同保护原 Key 和同意状态：保存失败不测试，旧无效地址仍可撤回同意", async () => {
+test("设置页与后台共同保护原 Key 和同意状态：保存失败不测试，旧无效地址仍可撤回同意，多家提供商来回切换无需重配", async () => {
   const dom = new JSDOM(readFileSync(new URL("../src/options/options.html", import.meta.url), "utf8"), { url: "https://extension.example/options.html" });
   const doc = dom.window.document;
   // 与模型无关的同步表单不启动轮询。
@@ -24,7 +24,7 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
       case "settings:get": return DEFAULT_SETTINGS;
       case "llm:get": {
         const cfg = await getLlmConfig();
-        return { ...cfg, apiKey: "", apiKeySet: !!cfg.apiKey };
+        return redactLlmConfig(cfg);
       }
       case "llm:set":
         saves++;
@@ -140,6 +140,60 @@ test("设置页与后台共同保护原 Key 和同意状态：保存失败不测
       assertConsent(true);
     }
     assert.equal(tests, 0, "同意/撤回本身不发送模型请求");
+
+    // 多提供商切换：先配置 DeepSeek，再切换到 OpenAI 使用，之后切回 DeepSeek 可直接保存使用，无需重新填 Key 和模型
+    const selectProvider = (id: string) => {
+      const sel = doc.getElementById("provider") as HTMLSelectElement;
+      sel.value = id;
+      sel.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    };
+    selectProvider("deepseek");
+    assert.equal((doc.getElementById("apiKey") as HTMLInputElement).placeholder, "Not configured");
+    input("model", "deepseek-chat");
+    input("apiKey", "sk-deepseek-key");
+    await save();
+    assert.equal((await getLlmConfig()).provider, "deepseek");
+    assert.equal((await getLlmConfig()).model, "deepseek-chat");
+    assert.equal((await getLlmConfig()).apiKey, "sk-deepseek-key");
+
+    // 切换到还没配过的 OpenAI：必须填 OpenAI 的 Key，不能把 DeepSeek 的 Key 带过去
+    selectProvider("openai");
+    assert.equal((doc.getElementById("model") as HTMLInputElement).value, "");
+    assert.equal((doc.getElementById("apiKey") as HTMLInputElement).placeholder, "Not configured");
+    input("model", "gpt-4.1-mini");
+    const savesBeforeMissingKey = saves;
+    await save();
+    assert.equal(saves, savesBeforeMissingKey, "切到未配置的新提供商时不填 Key 不能直接沿用上一家的 Key");
+    assert.match(doc.getElementById("llm-status")!.textContent!, /The endpoint changed/);
+    input("apiKey", "sk-openai-key");
+    await save();
+    assert.equal((await getLlmConfig()).provider, "openai");
+    assert.equal((await getLlmConfig()).model, "gpt-4.1-mini");
+    assert.equal((await getLlmConfig()).apiKey, "sk-openai-key");
+
+    // 使用一段时间后再切回 DeepSeek：模型、地址自动带出，Key 显示已配置，直接点保存即可恢复使用
+    selectProvider("deepseek");
+    assert.equal((doc.getElementById("model") as HTMLInputElement).value, "deepseek-chat");
+    assert.equal((doc.getElementById("baseUrl") as HTMLInputElement).value, "https://api.deepseek.com");
+    assert.equal((doc.getElementById("apiKey") as HTMLInputElement).value, "");
+    assert.equal((doc.getElementById("apiKey") as HTMLInputElement).placeholder, "Configured; leave blank to keep it");
+    await save();
+    const backToDeepseek = await getLlmConfig();
+    assert.equal(backToDeepseek.provider, "deepseek");
+    assert.equal(backToDeepseek.baseUrl, "https://api.deepseek.com");
+    assert.equal(backToDeepseek.model, "deepseek-chat");
+    assert.equal(backToDeepseek.apiKey, "sk-deepseek-key");
+
+    // 再切回 OpenAI 同样无需重新配置
+    selectProvider("openai");
+    assert.equal((doc.getElementById("model") as HTMLInputElement).value, "gpt-4.1-mini");
+    assert.equal((doc.getElementById("baseUrl") as HTMLInputElement).value, "https://api.openai.com/v1");
+    assert.equal((doc.getElementById("apiKey") as HTMLInputElement).placeholder, "Configured; leave blank to keep it");
+    await save();
+    const backToOpenai = await getLlmConfig();
+    assert.equal(backToOpenai.provider, "openai");
+    assert.equal(backToOpenai.model, "gpt-4.1-mini");
+    assert.equal(backToOpenai.apiKey, "sk-openai-key");
   } finally {
     dom.window.close();
     for (const [key, value] of Object.entries(previous)) {

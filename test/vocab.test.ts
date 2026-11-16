@@ -211,15 +211,26 @@ test("多提供商之前存下的配置：照当时的默认补成 MiniMax，接
   assert.deepEqual([custom.provider, custom.protocol, custom.baseUrl, custom.model], ["custom", "anthropic", "https://other.example/anthropic", "m"]);
 });
 
-test("换了服务地址而没给新密钥：旧密钥清掉，不会被发到新的那一家去", async () => {
+test("换了服务地址而没给新密钥：旧密钥清掉，不会被发到新的那一家去；切回已配置过的服务商可直接沿用", async () => {
   await llm.setLlmConfig({ provider: "a", baseUrl: "https://a.example/v1", model: "m", apiKey: "key-of-a" });
   // 同一家改个路径、改模型：密钥留着
   await llm.setLlmConfig({ baseUrl: "https://a.example/v2", model: "m2" });
   assert.equal((await llm.getLlmConfig()).apiKey, "key-of-a");
-  // 换了主机：清掉
+  // 换到还没配过的服务商：旧密钥不会跟过去
   await llm.setLlmConfig({ provider: "b", baseUrl: "https://b.example/v1" });
   assert.equal((await llm.getLlmConfig()).apiKey, "");
-  // 换主机的同时给了新密钥：用新的
+  // 给第二家配上自己的密钥与模型
+  await llm.setLlmConfig({ provider: "b", baseUrl: "https://b.example/v1", model: "mb", apiKey: "key-of-b" });
+  assert.equal((await llm.getLlmConfig()).apiKey, "key-of-b");
+  // 切回第一家而不重填密钥和模型：直接恢复第一家存过的连接
+  await llm.setLlmConfig({ provider: "a" });
+  const restoredA = await llm.getLlmConfig();
+  assert.deepEqual([restoredA.provider, restoredA.baseUrl, restoredA.model, restoredA.apiKey], ["a", "https://a.example/v2", "m2", "key-of-a"]);
+  // 再切回第二家也一样直接可用
+  await llm.setLlmConfig({ provider: "b" });
+  const restoredB = await llm.getLlmConfig();
+  assert.deepEqual([restoredB.provider, restoredB.baseUrl, restoredB.model, restoredB.apiKey], ["b", "https://b.example/v1", "mb", "key-of-b"]);
+  // 切回第一家的同时给了新密钥：用新的
   await llm.setLlmConfig({ provider: "a", baseUrl: "https://a.example/v1", apiKey: "new-key" });
   assert.equal((await llm.getLlmConfig()).apiKey, "new-key");
 });

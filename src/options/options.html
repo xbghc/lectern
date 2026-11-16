@@ -567,6 +567,13 @@
       <p id="log-summary" class="muted small"></p>
       <p id="log-timing" class="muted small"></p>
       <p id="log-app" class="muted small"></p>
+      <details id="speed-panel" class="status-panel">
+        <summary><span id="speed-summary">Provider token speed</span></summary>
+        <table class="usage-table">
+          <thead><tr><th scope="col">Provider / Model</th><th scope="col">Speed</th><th scope="col">Output tokens</th><th scope="col">Requests</th></tr></thead>
+          <tbody id="speed-rows"></tbody>
+        </table>
+      </details>
       <details id="usage-panel" class="status-panel">
         <summary><span id="usage-summary">Workspace button usage</span></summary>
         <table class="usage-table">
